@@ -1,0 +1,15 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Archives
+*.zip
+*.tar
+*.gz
+
+# Notes exports
+class1-notes.json
+class1-notes.html
