@@ -13,3 +13,15 @@ Thumbs.db
 # Notes exports
 class1-notes.json
 class1-notes.html
+
+# Node modules
+node_modules/
+
+# Media files (large downloads)
+assets/video/
+assets/audio/
+assets/documents/*.pdf
+
+# Electron build artifacts
+desktop/dist/
+desktop/build/
