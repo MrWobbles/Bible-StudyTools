@@ -6,6 +6,16 @@
   --muted: #9fb3cc;
   --shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
 }
+.question-notes {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
 
 * {
   box-sizing: border-box;

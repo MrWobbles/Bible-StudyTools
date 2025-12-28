@@ -323,6 +323,10 @@ function selectClass(index) {
   currentClass = index;
   const cls = allClasses[index];
 
+  // Ensure outline/media arrays exist to avoid runtime errors when editing
+  if (!Array.isArray(cls.media)) cls.media = [];
+  if (!Array.isArray(cls.outline)) cls.outline = [];
+
   // Update UI
   document.getElementById('editor').style.display = 'block';
   document.getElementById('no-selection').style.display = 'none';
@@ -381,15 +385,22 @@ function renderOutlineList(cls) {
   const outlineList = document.getElementById('outline-list');
   outlineList.innerHTML = '';
 
-  cls.outline.forEach((section, index) => {
+   // Guard against missing outline array
+  const outline = Array.isArray(cls.outline) ? cls.outline : [];
+  outline.forEach((section, index) => {
+    const safeSection = section || {};
+    const questions = Array.isArray(safeSection.questions) ? safeSection.questions : [];
+    const summary = safeSection.summary || '(No summary)';
+    const id = safeSection.id || '';
+
     const item = document.createElement('div');
     item.className = 'section-item';
     item.innerHTML = `
       <div class="section-item-info">
-        <div class="section-item-title">${section.summary}</div>
-        <div class="section-item-id">${section.id}</div>
+        <div class="section-item-title">${summary}</div>
+        <div class="section-item-id">${id}</div>
         <div class="section-item-type" style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-          ${section.questions.length} questions
+          ${questions.length} questions
         </div>
       </div>
       <div class="item-actions">
@@ -753,16 +764,20 @@ function deleteMedia(index) {
 // Edit section
 function editSection(index) {
   currentSectionIndex = index;
-  const section = allClasses[currentClass].outline[index];
+  const section = allClasses[currentClass].outline[index] || {};
+
+  // Normalize arrays to avoid runtime errors when fields are missing
+  const points = Array.isArray(section.points) ? section.points : [];
+  const questions = Array.isArray(section.questions) ? section.questions : [];
 
   document.getElementById('section-modal-title').textContent = 'Edit Section';
-  document.getElementById('section-id').value = section.id;
-  document.getElementById('section-summary').value = section.summary;
-  document.getElementById('section-defaultOpen').checked = section.defaultOpen;
-  document.getElementById('section-points').value = section.points.join('\n');
+  document.getElementById('section-id').value = section.id || '';
+  document.getElementById('section-summary').value = section.summary || '';
+  document.getElementById('section-defaultOpen').checked = !!section.defaultOpen;
+  document.getElementById('section-points').value = points.join('\n');
 
   // Populate questions
-  renderSectionQuestions(section.questions);
+  renderSectionQuestions(questions);
 
   document.getElementById('section-modal').style.display = 'flex';
 }
@@ -792,26 +807,39 @@ function renderSectionQuestions(questions) {
   container.appendChild(questionsDiv);
 
   questions.forEach((q, index) => {
-    addQuestionField(q.key, q.prompt, index);
+    addQuestionField(q.key, q.prompt, q.answer, index);
   });
 }
 
 // Add/edit question field
-function addQuestionField(key = '', prompt = '', index = -1) {
+function addQuestionField(key = '', prompt = '', answer = '', index = -1) {
   const questionsList = document.getElementById('questions-list');
 
   const field = document.createElement('div');
   field.className = 'question-field';
   field.innerHTML = `
     <div class="question-field-group">
-      <input type="text" placeholder="Question key" value="${key}" class="question-key" />
-      <input type="text" placeholder="Question prompt" value="${prompt}" class="question-prompt" style="flex: 2;" />
+      <input type="text" placeholder="Question key" class="question-key" />
+      <input type="text" placeholder="Question prompt" class="question-prompt" style="flex: 2;" />
       <button class="btn-icon" onclick="this.parentElement.parentElement.remove()">Remove</button>
+    </div>
+    <div class="question-answer">
+      <label style="display:block; font-size:12px; color: var(--muted); margin-bottom:4px;">Notes / Answer (optional)</label>
+      <textarea class="question-answer-input" rows="3" placeholder="Your notes or suggested answer"></textarea>
     </div>
   `;
 
+  field.querySelector('.question-key').value = key || '';
+  field.querySelector('.question-prompt').value = prompt || '';
+  field.querySelector('.question-answer-input').value = answer || '';
+
   if (index >= 0) {
-    document.querySelectorAll('.question-field')[index].replaceWith(field);
+    const existing = document.querySelectorAll('.question-field')[index];
+    if (existing) {
+      existing.replaceWith(field);
+    } else {
+      questionsList.appendChild(field);
+    }
   } else {
     questionsList.appendChild(field);
   }
@@ -839,8 +867,9 @@ function saveSection() {
   document.querySelectorAll('.question-field').forEach((field) => {
     const key = field.querySelector('.question-key').value;
     const prompt = field.querySelector('.question-prompt').value;
+    const answer = field.querySelector('.question-answer-input')?.value || '';
     if (key && prompt) {
-      questions.push({ key, prompt });
+      questions.push({ key, prompt, answer });
     }
   });
 
@@ -942,19 +971,7 @@ function setupEventListeners() {
   document.getElementById('add-section-btn').addEventListener('click', addSection);
   document.getElementById('save-class-btn').addEventListener('click', saveClass);
 
-  // Close modals on background click
-  document.getElementById('media-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'media-modal') closeModal('media-modal');
-  });
-  document.getElementById('section-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'section-modal') closeModal('section-modal');
-  });
-  document.getElementById('lessonplan-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'lessonplan-modal') closeModal('lessonplan-modal');
-  });
-  document.getElementById('class-add-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'class-add-modal') closeModal('class-add-modal');
-  });
+  // Keep modals open while selecting/copying; require explicit close buttons to prevent accidental closes
 }
 
 // Toggle between link and upload modes for media inputs

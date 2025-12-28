@@ -41,7 +41,8 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "*.node"
+      "*.node",
+      "bin/**"
     ],
     "compression": "maximum",
     "dmg": {

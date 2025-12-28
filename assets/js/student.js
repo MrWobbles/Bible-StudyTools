@@ -201,9 +201,33 @@ function skipToNextPause() {
 }
 
 function goFullscreen() {
-  // Toggle fullscreen mode by adding/removing class on body
-  document.body.classList.toggle('fullscreen-mode');
-  console.log('[Fullscreen] Toggled fullscreen-mode class');
+  const container = document.querySelector('.player-shell') || document.documentElement;
+  const shouldEnter = !document.fullscreenElement;
+
+  if (shouldEnter) {
+    // Try real fullscreen first
+    const req = container.requestFullscreen?.bind(container)
+      || container.webkitRequestFullscreen?.bind(container)
+      || container.msRequestFullscreen?.bind(container);
+
+    if (req) {
+      req().catch(() => {
+        // Fall back to CSS-based fullscreen mode
+        document.body.classList.toggle('fullscreen-mode');
+      });
+    } else {
+      document.body.classList.toggle('fullscreen-mode');
+    }
+  } else {
+    // Exit fullscreen if active; always toggle CSS class for consistency
+    const exit = document.exitFullscreen?.bind(document)
+      || document.webkitExitFullscreen?.bind(document)
+      || document.msExitFullscreen?.bind(document);
+    if (exit) exit().catch(() => {});
+    document.body.classList.toggle('fullscreen-mode');
+  }
+
+  console.log('[Fullscreen] Toggled fullscreen-mode class / request');
 }
 
 function bindControls() {

@@ -241,9 +241,12 @@ ipcMain.handle('download-media', async (event, mediaType, url) => {
 
           // Check if yt-dlp is installed and get the correct command
           let ytDlpCommand = 'yt-dlp';
-          
-          // First try bundled yt-dlp.exe (for Windows builds)
-          const bundledYtDlp = path.join(__dirname, 'bin', 'yt-dlp.exe');
+
+          // First try bundled yt-dlp.exe (prefer unpacked path when packaged)
+          const devYtDlp = path.join(__dirname, 'bin', 'yt-dlp.exe');
+          const prodYtDlp = path.join(process.resourcesPath, 'app.asar.unpacked', 'bin', 'yt-dlp.exe');
+          const bundledYtDlp = app.isPackaged ? prodYtDlp : devYtDlp;
+
           if (require('fs').existsSync(bundledYtDlp)) {
             ytDlpCommand = `"${bundledYtDlp}"`;
           } else {

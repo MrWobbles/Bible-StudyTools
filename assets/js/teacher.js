@@ -139,7 +139,7 @@ function renderOutlineWithQuestions() {
       detailsEl.appendChild(ul);
     }
 
-    // Questions with answer fields
+    // Questions with answer fields + notes
     if (section.questions && section.questions.length > 0) {
       section.questions.forEach(q => {
         const questionDiv = document.createElement('div');
@@ -148,6 +148,14 @@ function renderOutlineWithQuestions() {
         const promptP = document.createElement('p');
         promptP.textContent = q.prompt;
         questionDiv.appendChild(promptP);
+
+        // Teacher notes / suggested answer
+        if (q.answer) {
+          const answerP = document.createElement('div');
+          answerP.className = 'question-notes';
+          answerP.textContent = q.answer;
+          questionDiv.appendChild(answerP);
+        }
 
         const textarea = document.createElement('textarea');
         textarea.setAttribute('data-question-key', q.key);

@@ -536,6 +536,23 @@ header .subtitle {
   flex-shrink: 0;
 }
 
+.question-answer {
+  margin-top: 8px;
+}
+
+.question-answer textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .layout-admin {
