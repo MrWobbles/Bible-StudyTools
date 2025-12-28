@@ -15,15 +15,16 @@
     "serve-static": "^1.15.0"
   },
   "devDependencies": {
-    "electron": "^30.0.0",
-    "electron-builder": "^24.6.0"
+    "electron": "^39.2.7",
+    "electron-builder": "^23.6.0"
   },
   "build": {
     "appId": "com.biblestudy.tools",
     "productName": "Bible Study Tools",
     "files": [
       "main.js",
-      "preload.js"
+      "preload.js",
+      "bin/**"
     ],
     "extraResources": [
       {
@@ -75,7 +76,7 @@
     },
     "win": {
       "target": [
-        "nsis"
+        "portable"
       ],
       "icon": "build/icon.ico"
     },
@@ -84,7 +85,8 @@
       "perMachine": false,
       "allowElevation": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Bible Study Tools"
+      "shortcutName": "Bible Study Tools",
+      "differentialPackage": false
     }
   }
 }

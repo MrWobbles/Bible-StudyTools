@@ -239,16 +239,46 @@ ipcMain.handle('download-media', async (event, mediaType, url) => {
           const filename = `youtube_${videoId}.mp4`;
           const filePath = path.join(mediaDir, filename);
 
-          // Check if yt-dlp is installed
-          try {
-            await execAsync('yt-dlp --version');
-          } catch (err) {
-            reject(new Error('yt-dlp is not installed. Please install it with: brew install yt-dlp'));
-            return;
+          // Check if yt-dlp is installed and get the correct command
+          let ytDlpCommand = 'yt-dlp';
+          
+          // First try bundled yt-dlp.exe (for Windows builds)
+          const bundledYtDlp = path.join(__dirname, 'bin', 'yt-dlp.exe');
+          if (require('fs').existsSync(bundledYtDlp)) {
+            ytDlpCommand = `"${bundledYtDlp}"`;
+          } else {
+            // Try system-installed yt-dlp
+            try {
+              await execAsync('yt-dlp --version');
+            } catch (err) {
+              // Try python -m yt_dlp for pip installations
+              try {
+                await execAsync('python -m yt_dlp --version');
+                ytDlpCommand = 'python -m yt_dlp';
+              } catch (err2) {
+                // Try py -m yt_dlp for Windows Python Launcher
+                try {
+                  await execAsync('py -m yt_dlp --version');
+                  ytDlpCommand = 'py -m yt_dlp';
+                } catch (err3) {
+                  // Platform-specific installation instructions
+                  let installMsg;
+                  if (process.platform === 'win32') {
+                    installMsg = 'yt-dlp is not installed.\n\nInstall options:\n1. pip install yt-dlp\n2. Download from: https://github.com/yt-dlp/yt-dlp/releases';
+                  } else if (process.platform === 'darwin') {
+                    installMsg = 'yt-dlp is not installed.\n\nInstall with: brew install yt-dlp\nOr: pip install yt-dlp';
+                  } else {
+                    installMsg = 'yt-dlp is not installed.\n\nInstall with: pip install yt-dlp';
+                  }
+                  reject(new Error(installMsg));
+                  return;
+                }
+              }
+            }
           }
 
           // Download video using yt-dlp
-          const command = `yt-dlp -f "best[ext=mp4]" -o "${filePath}" "${url}"`;
+          const command = `${ytDlpCommand} -f "best[ext=mp4]" -o "${filePath}" "${url}"`;
 
           await execAsync(command, { maxBuffer: 1024 * 1024 * 100 }); // 100MB buffer
           resolve(`assets/video/${filename}`);
