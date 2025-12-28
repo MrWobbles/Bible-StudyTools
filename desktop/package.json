@@ -1,0 +1,90 @@
+{
+  "name": "bible-study-tools-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop wrapper for Bible Study Tools (HTML/JS/CSS) using Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "serve-static": "^1.15.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.6.0"
+  },
+  "build": {
+    "appId": "com.biblestudy.tools",
+    "productName": "Bible Study Tools",
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../",
+        "to": "site",
+        "filter": [
+          "admin.html",
+          "student.html",
+          "teacher.html",
+          "index.html",
+          "assets/**"
+        ]
+      }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "*.node"
+    ],
+    "compression": "maximum",
+    "dmg": {
+      "title": "${productName}",
+      "icon": "build/icon.icns",
+      "background": "../assets/images/app-bg-image.png",
+      "iconSize": 128,
+      "window": {
+        "width": 768,
+        "height": 512
+      },
+      "contents": [
+        {
+          "x": 220,
+          "y": 380,
+          "type": "file"
+        },
+        {
+          "x": 548,
+          "y": 380,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.education",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Bible Study Tools"
+    }
+  }
+}

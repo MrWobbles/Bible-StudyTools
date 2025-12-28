@@ -1,0 +1,290 @@
+{
+  "classes": [
+    {
+      "classNumber": 1,
+      "title": "Can I Trust the Bible?",
+      "subtitle": "Origins and Reliability",
+      "instructor": "Wes Huffman",
+      "channelName": "class1-control",
+      "media": [
+        {
+          "id": "primary-video",
+          "type": "video",
+          "title": "Main presentation",
+          "primary": true,
+          "sources": [
+            {
+              "format": "youtube",
+              "videoId": "QhVPBNBAGY0",
+              "url": "https://youtu.be/QhVPBNBAGY0"
+            }
+          ],
+          "pausePoints": [
+            {
+              "label": "Recognizing Scripture",
+              "time": 362
+            },
+            {
+              "label": "Other gospels (Thomas)",
+              "time": 825
+            },
+            {
+              "label": "Historical anchoring (names)",
+              "time": 1000
+            },
+            {
+              "label": "Egypt & preservation",
+              "time": 1090
+            },
+            {
+              "label": "Do we have the right words?",
+              "time": 1190
+            }
+          ]
+        }
+      ],
+      "outline": [
+        {
+          "id": "prayer-discernment",
+          "summary": "Prayer for discernment (James 1:5-8)",
+          "defaultOpen": true,
+          "points": [
+            "Ask for wisdom, faith without doubting, and stability.",
+            "Set the tone before the video begins."
+          ],
+          "questions": [
+            {
+              "key": "prayer",
+              "prompt": "Ask for wisdom, faith without doubting, and stability. Set the tone before the video begins."
+            }
+          ]
+        },
+        {
+          "id": "foundations",
+          "summary": "Foundations and assumptions",
+          "defaultOpen": false,
+          "points": [
+            "Why do you personally trust or not trust the Bible? What shaped that view?",
+            "Responding to \"You only believe because you grew up with it.\"",
+            "If the Bible were unreliable, what happens to your faith in Jesus?",
+            "Objections you have heard: errors, changed over time, wrong books."
+          ],
+          "questions": [
+            {
+              "key": "foundations-trust",
+              "prompt": "Why do you personally trust or not trust the Bible? What shaped that view?"
+            },
+            {
+              "key": "foundations-upbringing",
+              "prompt": "Respond to \"You only believe because you grew up with it.\""
+            },
+            {
+              "key": "foundations-unreliable",
+              "prompt": "If the Bible were unreliable, what happens to faith in Jesus?"
+            },
+            {
+              "key": "foundations-objections",
+              "prompt": "Objections you have heard: errors, changed over time, wrong books."
+            }
+          ]
+        },
+        {
+          "id": "canon",
+          "summary": "Canon and \"right books\"",
+          "defaultOpen": false,
+          "points": [
+            "What does \"canon\" mean? How were books chosen?",
+            "Initial thoughts on \"lost gospels\" (Thomas, Judas).",
+            "Read 2 Tim 3:16; 2 Pet 1:20-21 — expectations for Scripture."
+          ],
+          "questions": [
+            {
+              "key": "canon-meaning",
+              "prompt": "What does \"canon\" mean? How were books chosen?"
+            },
+            {
+              "key": "canon-lost-gospels",
+              "prompt": "Initial thoughts on \"lost gospels\" (Thomas, Judas)."
+            },
+            {
+              "key": "canon-2tim-2pet",
+              "prompt": "Read 2 Tim 3:16; 2 Pet 1:20-21 — expectations for Scripture."
+            }
+          ]
+        },
+        {
+          "id": "recognizing-scripture",
+          "summary": "00:07:05 · Recognizing Scripture",
+          "defaultOpen": false,
+          "mediaLink": "primary-video",
+          "points": [
+            "Video link: https://youtu.be/QhVPBNBAGY0",
+            "Recognized, not \"voted in.\" Why does recognition matter?",
+            "Criteria hints (Luke 1:1-4; 1 John 1:1-3).",
+            "OT–NT relationship and confidence in having the right books."
+          ],
+          "questions": [
+            {
+              "key": "recognition-why",
+              "prompt": "Recognized, not \"voted in\" — why does recognition matter?"
+            },
+            {
+              "key": "recognition-criteria",
+              "prompt": "Criteria hints (Luke 1:1-4; 1 John 1:1-3)."
+            },
+            {
+              "key": "recognition-ot-nt",
+              "prompt": "OT–NT relationship and confidence in the right books."
+            }
+          ]
+        },
+        {
+          "id": "other-gospels",
+          "summary": "00:13:45 · Other gospels (Gospel of Thomas)",
+          "defaultOpen": false,
+          "mediaLink": "primary-video",
+          "points": [
+            "Pseudonymous names to borrow authority — how does that shape trust?",
+            "Thomas = 114 sayings with secret knowledge; contrast with four Gospels.",
+            "What feels out of step with Jesus of the canonical Gospels?",
+            "Responding to \"Church suppressed alternate Christianities.\""
+          ],
+          "questions": [
+            {
+              "key": "thomas-pseudonym",
+              "prompt": "Pseudonymous names to borrow authority — trust implications."
+            },
+            {
+              "key": "thomas-contrast",
+              "prompt": "Thomas = 114 sayings with secret knowledge; contrast the four Gospels."
+            },
+            {
+              "key": "thomas-out-of-step",
+              "prompt": "What feels out of step with Jesus in Matthew–John?"
+            },
+            {
+              "key": "thomas-response",
+              "prompt": "Respond to \"Church suppressed alternate Christianities.\""
+            }
+          ]
+        },
+        {
+          "id": "historical-anchoring",
+          "summary": "00:16:40 · Historical anchoring (names)",
+          "defaultOpen": false,
+          "mediaLink": "primary-video",
+          "points": [
+            "Name accuracy by time/place as evidence for reliability.",
+            "Forgery analogy (17th c. Paris) — why details matter.",
+            "What does name/location evidence suggest about when/where written?"
+          ],
+          "questions": [
+            {
+              "key": "names-evidence",
+              "prompt": "Name accuracy by time/place as reliability evidence."
+            },
+            {
+              "key": "names-analogy",
+              "prompt": "Forgery analogy (17th c. Paris) — why details matter."
+            },
+            {
+              "key": "names-implications",
+              "prompt": "Implications for when/where the biblical Gospels were written."
+            }
+          ]
+        },
+        {
+          "id": "egypt-preservation",
+          "summary": "00:18:10 · Egypt & preservation",
+          "defaultOpen": false,
+          "mediaLink": "primary-video",
+          "points": [
+            "Egypt's role in early manuscripts; near-loss stories.",
+            "How does survival interact with Isaiah 40:8?",
+            "Providence: more confident, less confident, or curious?"
+          ],
+          "questions": [
+            {
+              "key": "egypt-role",
+              "prompt": "Egypt's role in early manuscripts; near-loss stories."
+            },
+            {
+              "key": "egypt-isaiah",
+              "prompt": "How survival connects to Isaiah 40:8."
+            },
+            {
+              "key": "egypt-providence",
+              "prompt": "Providence: more confident, less confident, or curious?"
+            }
+          ]
+        },
+        {
+          "id": "right-words",
+          "summary": "00:19:50 · \"Do we have the right words?\"",
+          "defaultOpen": false,
+          "mediaLink": "primary-video",
+          "points": [
+            "Preliminary answer to \"It was changed so many times.\"",
+            "Why thousands of handwritten copies instead of one vault copy?",
+            "Role of textual criticism in serving the church."
+          ],
+          "questions": [
+            {
+              "key": "words-response",
+              "prompt": "First response to \"changed too many times.\""
+            },
+            {
+              "key": "words-many-copies",
+              "prompt": "Why many handwritten copies instead of one vault copy?"
+            },
+            {
+              "key": "words-textual-criticism",
+              "prompt": "Role of textual criticism for the church."
+            }
+          ]
+        },
+        {
+          "id": "reflection",
+          "summary": "Personal reflection & application",
+          "defaultOpen": false,
+          "points": [
+            "Did confidence increase, decrease, or sharpen?",
+            "Impact on prayer, Bible reading, trust in Jesus.",
+            "One concrete step this month (book, rest of series, study Luke 1 or 1 Cor 15)."
+          ],
+          "questions": [
+            {
+              "key": "reflection-confidence",
+              "prompt": "Confidence: up, down, sharpened?"
+            },
+            {
+              "key": "reflection-devotional",
+              "prompt": "Impact on prayer, Bible reading, trust in Jesus."
+            },
+            {
+              "key": "reflection-next-step",
+              "prompt": "One concrete step this month (book, rest of series, study Luke 1 or 1 Cor 15)."
+            }
+          ]
+        }
+      ],
+      "navigation": [
+        {
+          "number": 1,
+          "title": "Class 1",
+          "href": "student.html?class=1"
+        },
+        {
+          "number": 2,
+          "title": "Class 2 (placeholder)",
+          "href": "#"
+        },
+        {
+          "number": 3,
+          "title": "Class 3 (placeholder)",
+          "href": "#"
+        }
+      ]
+    }
+  ]
+}

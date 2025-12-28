@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Can I Trust the Bible? — Class 1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/student.css" />
+  <link rel="icon" href="assets/images/icon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/images/icon.png" />
+</head>
+
+<body>
+  <div class="page">
+    <header>
+      <div class="title-group">
+        <h1>Can I Trust the Bible?</h1>
+        <p class="subtitle">Class 1 · Origins and Reliability · Wes Huffman</p>
+      </div>
+      <nav>
+        <a class="pill active" href="#">Class 1</a>
+        <a class="pill" href="#">Class 2 (placeholder)</a>
+        <a class="pill" href="#">Class 3 (placeholder)</a>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <section class="card video-card" id="video-card">
+        <div class="player-shell">
+          <div id="player"></div>
+        </div>
+
+        <div class="controls">
+          <button class="primary" id="toggle-play">Play / Pause</button>
+          <button id="restart">Restart from 0:00</button>
+          <button id="next-pause">Skip to next pause</button>
+          <button id="fullscreen">Go fullscreen</button>
+        </div>
+
+        <div class="next-stop" id="next-stop">
+          <span>Next planned pause:</span>
+          <strong>loading…</strong>
+        </div>
+
+        <div class="list" id="pause-list"></div>
+      </section>
+
+      <section class="card note-card">
+        <h3>Session flow</h3>
+        <p>Quick prompts to keep you on track while the video plays.</p>
+        <div class="list" id="session-outline"></div>
+      </section>
+    </div>
+  </div>
+
+  <script src="assets/js/loader.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/student.js"></script>
+</body>
+
+</html>

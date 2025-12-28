@@ -1,23 +1,307 @@
-const config = window.BIBLE_STUDY_CONFIG || {};
-const VIDEO_ID = config.videoId || '';
-const pausePoints = Array.isArray(config.pausePoints) ? config.pausePoints : [];
-const CHANNEL_KEY = config.channelName || 'class1-control';
-const STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
-const NOTES_KEY = 'class1-teacher-notes';
-const QUESTION_PREFIX = 'class1-question-';
+// Teacher view script - classConfig and classId are declared in loader.js
+// Initialize teacher-specific variables
+let VIDEO_ID = '';
+let pausePoints = [];
+let CHANNEL_KEY = 'class-control';
+let STORAGE_FALLBACK_KEY = 'class-control-storage';
+let NOTES_KEY = 'class-teacher-notes';
+let QUESTION_PREFIX = 'class-question-';
 
-const channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_KEY) : null;
-const statusEl = document.getElementById('status');
-const pauseListEl = document.getElementById('pause-list');
-const notesEl = document.getElementById('notes');
-const downloadBtn = document.getElementById('download-notes');
-const uploadBtn = document.getElementById('upload-notes');
-const fileInput = document.getElementById('notes-file');
-const questionFields = Array.from(document.querySelectorAll('textarea[data-question-key]'));
+let channel = null;
+let statusEl = null;
+let pauseListEl = null;
+let notesEl = null;
+let downloadBtn = null;
+let uploadBtn = null;
+let fileInput = null;
+let questionFields = [];
+
+async function loadClassConfig() {
+  try {
+    const response = await fetch('assets/data/classes.json');
+    const raw = await response.json();
+
+    // Normalize to array: supports {classes:[...]}, [ ... ], or single object
+    const classesArr = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.classes)
+        ? raw.classes
+        : [raw];
+
+    classConfig = classesArr.find(c => c.classNumber?.toString() === classId) || classesArr[0] || {};
+
+    if (!classConfig || !classConfig.classNumber) {
+      console.error(`Class ${classId} not found in configuration`);
+    }
+
+    const primaryMedia = classConfig.media?.find(m => m.primary && m.type === 'video');
+    VIDEO_ID = primaryMedia?.sources?.[0]?.videoId || '';
+    pausePoints = primaryMedia?.pausePoints || [];
+
+    CHANNEL_KEY = classConfig.channelName || `class${classId}-control`;
+    STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
+    NOTES_KEY = `class${classId}-teacher-notes`;
+    QUESTION_PREFIX = `class${classId}-question-`;
+
+    window.BIBLE_STUDY_CONFIG = {
+      videoId: VIDEO_ID,
+      channelName: CHANNEL_KEY,
+      pausePoints: pausePoints
+    };
+
+    initializePage();
+  } catch (err) {
+    console.error('Failed to load class configuration:', err);
+  }
+}
+
+function initializePage() {
+  document.title = `Presenter View — ${classConfig.title} · Class ${classConfig.classNumber}`;
+
+  statusEl = document.getElementById('status');
+  pauseListEl = document.getElementById('pause-list');
+  notesEl = document.getElementById('notes');
+  downloadBtn = document.getElementById('download-notes');
+  uploadBtn = document.getElementById('upload-notes');
+  fileInput = document.getElementById('notes-file');
+
+  const h1 = document.querySelector('h1');
+  if (h1) h1.textContent = `Presenter View · ${classConfig.title}`;
+
+  const subtitle = document.querySelector('.subtitle');
+  if (subtitle) subtitle.textContent = `Class ${classConfig.classNumber} · Keep this on your laptop while casting the main screen.`;
+
+  const guideTitle = document.querySelector('h3');
+  if (guideTitle) guideTitle.textContent = `Class ${classConfig.classNumber} guide with notes`;
+
+  renderOutlineWithQuestions();
+
+  // Render media gallery
+  renderMediaGallery();
+
+  channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_KEY) : null;
+
+  bindControls();
+  hydrateNotes();
+
+  if (statusEl) statusEl.textContent = 'Ready. Open the display page on the TV (student.html).';
+}
+
+function renderOutlineWithQuestions() {
+  if (!classConfig.outline) return;
+
+  const questionBank = document.getElementById('question-bank');
+  if (!questionBank) return;
+
+  const outlineContainer = questionBank.querySelector('div.list') || questionBank;
+
+  const existingAccordions = outlineContainer.querySelectorAll('details.accordion');
+  existingAccordions.forEach(acc => acc.remove());
+
+  const titleH3 = outlineContainer.querySelector('h3');
+  const insertPoint = titleH3 ? titleH3.nextSibling : outlineContainer.firstChild;
+
+  classConfig.outline.forEach((section) => {
+    const isOpen = section.defaultOpen ? ' open' : '';
+    const detailsEl = document.createElement('details');
+    detailsEl.className = `accordion${isOpen}`;
+
+    const summaryEl = document.createElement('summary');
+    summaryEl.textContent = section.summary;
+    detailsEl.appendChild(summaryEl);
+
+    // Actions row (e.g., Jump button)
+    const actionsRow = document.createElement('div');
+    actionsRow.style.display = 'flex';
+    actionsRow.style.gap = '10px';
+    actionsRow.style.alignItems = 'center';
+    actionsRow.style.margin = '8px 0 6px';
+
+    const pauseIdx = findPauseIndexForSection(section);
+    if (pauseIdx != null && pauseIdx >= 0) {
+      const jumpBtn = document.createElement('button');
+      jumpBtn.textContent = 'Jump here';
+      jumpBtn.onclick = () => sendCommand('jumpToPause', { index: pauseIdx });
+      actionsRow.appendChild(jumpBtn);
+    }
+    if (actionsRow.children.length > 0) {
+      detailsEl.appendChild(actionsRow);
+    }
+
+    // Points list
+    if (Array.isArray(section.points) && section.points.length > 0) {
+      const ul = document.createElement('ul');
+      section.points.forEach(pt => {
+        const li = document.createElement('li');
+        li.textContent = pt;
+        ul.appendChild(li);
+      });
+      detailsEl.appendChild(ul);
+    }
+
+    // Questions with answer fields
+    if (section.questions && section.questions.length > 0) {
+      section.questions.forEach(q => {
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question';
+
+        const promptP = document.createElement('p');
+        promptP.textContent = q.prompt;
+        questionDiv.appendChild(promptP);
+
+        const textarea = document.createElement('textarea');
+        textarea.setAttribute('data-question-key', q.key);
+        questionDiv.appendChild(textarea);
+
+        detailsEl.appendChild(questionDiv);
+      });
+    }
+
+    if (titleH3 && titleH3.parentNode === outlineContainer) {
+      titleH3.parentNode.insertBefore(detailsEl, titleH3.nextSibling);
+    } else {
+      outlineContainer.insertBefore(detailsEl, insertPoint);
+    }
+  });
+
+  questionFields = Array.from(document.querySelectorAll('textarea[data-question-key]'));
+}
+
+// Helpers to map sections to pause points
+function findPauseIndexForSection(section) {
+  try {
+    const primaryVideo = classConfig.media?.find(m => m.primary && m.type === 'video');
+    const points = primaryVideo?.pausePoints || [];
+    if (!points.length) return null;
+
+    // 1) Try by label similarity
+    const sum = normalizeString(section.summary || '');
+    let bestIdx = null;
+    let bestScore = 0;
+    points.forEach((p, idx) => {
+      const lbl = normalizeString(p.label || '');
+      if (!lbl) return;
+      // Exact or substring match gets priority
+      if (sum.includes(lbl) || lbl.includes(sum)) {
+        bestIdx = idx; bestScore = 2; return;
+      }
+      // Token overlap as fallback
+      const score = tokenOverlap(sum, lbl);
+      if (score > bestScore) { bestScore = score; bestIdx = idx; }
+    });
+    if (bestIdx != null && bestScore > 0) return bestIdx;
+
+    // 2) Try by timestamp in summary (e.g., 00:07:05 · ... or 7:05)
+    const ts = parseTimeFromSummary(section.summary || '');
+    if (ts != null) {
+      let nearest = 0;
+      let delta = Infinity;
+      points.forEach((p, idx) => {
+        const d = Math.abs((p.time || 0) - ts);
+        if (d < delta) { delta = d; nearest = idx; }
+      });
+      // Require reasonable proximity (e.g., within 45s) to avoid bad jumps
+      if (delta <= 45) return nearest;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+function normalizeString(s) {
+  return String(s)
+    .toLowerCase()
+    .replace(/\u00b7/g, ' ')
+    .replace(/"|\(|\)|\[|\]|\{|\}|:|,|\.|&/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenOverlap(a, b) {
+  if (!a || !b) return 0;
+  const ta = new Set(a.split(' '));
+  const tb = new Set(b.split(' '));
+  let count = 0;
+  ta.forEach(t => { if (tb.has(t)) count += 1; });
+  return count;
+}
+
+function parseTimeFromSummary(summary) {
+  // Supports HH:MM:SS ·, HH:MM ·, or M:SS at start
+  const m = String(summary).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const h = m[3] ? parseInt(m[1], 10) : 0;
+  const mm = m[3] ? parseInt(m[2], 10) : parseInt(m[1], 10);
+  const ss = m[3] ? parseInt(m[3], 10) : parseInt(m[2], 10);
+  return h * 3600 + mm * 60 + ss;
+}
+
+function renderMediaGallery() {
+  if (!classConfig.media || classConfig.media.length === 0) return;
+
+  // Find the control panel container
+  const controlPanel = document.querySelector('section.card.sticky');
+  if (!controlPanel) return;
+
+  let mediaPanel = document.getElementById('media-panel');
+  if (!mediaPanel) {
+    mediaPanel = document.createElement('section');
+    mediaPanel.className = 'card';
+    mediaPanel.id = 'media-panel';
+    mediaPanel.style.marginTop = '14px';
+    controlPanel.parentNode.insertBefore(mediaPanel, controlPanel);
+  }
+
+  const mediaHTML = `
+    <div class="tag">Media resources</div>
+    <h3 style="margin: 10px 0 12px;">Class materials</h3>
+    <div style="display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));">
+      ${classConfig.media.map(media => `
+        <div class="media-thumbnail" style="
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 10px;
+          padding: 12px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        " title="${media.title || media.type}">
+          <div style="font-size: 32px; margin-bottom: 8px;">${getMediaIcon(media.type)}</div>
+          <small style="color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3;">
+            ${media.title || media.type}
+          </small>
+          ${media.type === 'video' && media.pausePoints ? `<small style="color: var(--accent); display: block; margin-top: 4px; font-size: 11px;">${media.pausePoints.length} pauses</small>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  mediaPanel.innerHTML = mediaHTML;
+}
+
+function getMediaIcon(type) {
+  const icons = {
+    video: '▶️',
+    pdf: '📄',
+    images: '🖼️',
+    audio: '🔊',
+    document: '📋',
+    link: '🔗',
+    presentation: '📊'
+  };
+  return icons[type] || '📁';
+}
 
 function sendCommand(type, payload = {}) {
   const message = { type, ...payload, sentAt: Date.now() };
-  if (channel) channel.postMessage(message);
+  console.log('[Teacher] Sending command:', type, message);
+  if (channel) {
+    channel.postMessage(message);
+    console.log('[Teacher] Posted to BroadcastChannel');
+  } else {
+    console.warn('[Teacher] No BroadcastChannel available');
+  }
   try { localStorage.setItem(STORAGE_FALLBACK_KEY, JSON.stringify(message)); } catch (err) { }
   flashStatus(`Sent: ${labelFor(type, payload)}`);
 }
@@ -35,10 +319,12 @@ function labelFor(type, payload) {
 }
 
 function flashStatus(text) {
-  statusEl.textContent = text;
+  if (statusEl) statusEl.textContent = text;
 }
 
 function renderPauseList() {
+  if (!pauseListEl) return;
+
   pauseListEl.innerHTML = '';
   pausePoints.forEach((point, idx) => {
     const item = document.createElement('div');
@@ -55,27 +341,36 @@ function renderPauseList() {
   if (pausePoints.length === 0) {
     const item = document.createElement('div');
     item.className = 'list-item';
-    item.innerHTML = '<small>No planned pauses yet. Add them in config.js.</small>';
+    item.innerHTML = '<small>No planned pauses yet. Add them in classes.json.</small>';
     pauseListEl.appendChild(item);
   }
 }
 
 function bindControls() {
-  document.getElementById('toggle').onclick = () => sendCommand('toggle');
-  document.getElementById('play').onclick = () => sendCommand('play');
-  document.getElementById('pause').onclick = () => sendCommand('pause');
-  document.getElementById('restart').onclick = () => sendCommand('restart');
-  document.getElementById('next').onclick = () => sendCommand('nextPause');
-  document.getElementById('fullscreen').onclick = () => sendCommand('fullscreen');
-  downloadBtn.onclick = downloadNotes;
-  uploadBtn.onclick = () => fileInput.click();
-  fileInput.onchange = importNotes;
+  const toggleBtn = document.getElementById('toggle');
+  const playBtn = document.getElementById('play');
+  const pauseBtn = document.getElementById('pause');
+  const restartBtn = document.getElementById('restart');
+  const nextBtn = document.getElementById('next');
+  const fullscreenBtn = document.getElementById('fullscreen');
+
+  if (toggleBtn) toggleBtn.onclick = () => sendCommand('toggle');
+  if (playBtn) playBtn.onclick = () => sendCommand('play');
+  if (pauseBtn) pauseBtn.onclick = () => sendCommand('pause');
+  if (restartBtn) restartBtn.onclick = () => sendCommand('restart');
+  if (nextBtn) nextBtn.onclick = () => sendCommand('nextPause');
+  if (fullscreenBtn) fullscreenBtn.onclick = () => sendCommand('fullscreen');
+
+  if (downloadBtn) downloadBtn.onclick = downloadNotes;
+  if (uploadBtn) uploadBtn.onclick = () => fileInput?.click();
+  if (fileInput) fileInput.onchange = importNotes;
+
   document.querySelectorAll('.rte-toolbar button').forEach(btn => {
     btn.onclick = () => {
       const cmd = btn.dataset.cmd;
       const val = btn.dataset.value || null;
       document.execCommand(cmd, false, val);
-      notesEl.focus();
+      if (notesEl) notesEl.focus();
       persistNotes();
     };
   });
@@ -88,14 +383,18 @@ function bindControls() {
       try { localStorage.setItem(QUESTION_PREFIX + key, field.value); } catch (err) { }
     });
   });
+
+  renderPauseList();
 }
 
 function hydrateNotes() {
+  if (!notesEl) return;
   notesEl.innerHTML = localStorage.getItem(NOTES_KEY) || '';
   notesEl.addEventListener('input', persistNotes);
 }
 
 function persistNotes() {
+  if (!notesEl) return;
   try { localStorage.setItem(NOTES_KEY, notesEl.innerHTML); } catch (err) { }
 }
 
@@ -106,21 +405,22 @@ function downloadNotes() {
   });
   const payload = {
     version: 1,
-    notesHtml: notesEl.innerHTML || '',
+    classNumber: classConfig.classNumber,
+    notesHtml: notesEl?.innerHTML || '',
     questions
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'class1-notes.json';
+  a.download = `class${classId}-notes.json`;
   a.click();
   URL.revokeObjectURL(url);
-  flashStatus('Downloaded notes file (class1-notes.json).');
+  flashStatus(`Downloaded notes file (class${classId}-notes.json).`);
 }
 
 function importNotes(event) {
-  const file = event.target.files && event.target.files[0];
+  const file = event.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
@@ -128,7 +428,7 @@ function importNotes(event) {
     try {
       const parsed = JSON.parse(text);
       if (parsed && typeof parsed === 'object') {
-        if (parsed.notesHtml) notesEl.innerHTML = parsed.notesHtml;
+        if (parsed.notesHtml && notesEl) notesEl.innerHTML = parsed.notesHtml;
         if (parsed.questions && typeof parsed.questions === 'object') {
           questionFields.forEach(field => {
             const val = parsed.questions[field.dataset.questionKey];
@@ -147,7 +447,7 @@ function importNotes(event) {
       // fall through to treat as raw HTML
     }
 
-    notesEl.innerHTML = text;
+    if (notesEl) notesEl.innerHTML = text;
     persistNotes();
     flashStatus('Imported notes (rich text).');
     event.target.value = '';
@@ -161,7 +461,8 @@ function formatTime(totalSeconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-renderPauseList();
-bindControls();
-hydrateNotes();
-flashStatus('Ready. Open the display page on the TV (index.html).');
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadClassConfig);
+} else {
+  loadClassConfig();
+}

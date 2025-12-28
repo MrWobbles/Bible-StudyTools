@@ -4,10 +4,12 @@
 import http.server
 import socketserver
 import os
+import webbrowser
 from pathlib import Path
 
 PORT = 8000
-DIRECTORY = str(Path(__file__).parent)
+# Serve from project root (parent of the docs folder)
+DIRECTORY = str(Path(__file__).resolve().parent.parent)
 
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -22,13 +24,44 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     os.chdir(DIRECTORY)
     handler = MyHTTPRequestHandler
+    root = Path(DIRECTORY)
+
     with socketserver.TCPServer(("", PORT), handler) as httpd:
         print(f"Server running at http://localhost:{PORT}")
         print(f"Serving from: {DIRECTORY}")
-        print(f"\nOpen in browser:")
-        print(f"  Display:  http://localhost:{PORT}/Class%201/index.html")
-        print(f"  Teacher:  http://localhost:{PORT}/Class%201/teacher.html")
-        print(f"\nPress Ctrl+C to stop")
+
+        print("\nOpen in browser:")
+        # Admin/Start pages
+        if (root / 'admin.html').exists():
+            print(f"  Admin:    http://localhost:{PORT}/admin.html")
+        if (root / 'start.html').exists():
+            print(f"  Start:    http://localhost:{PORT}/start.html")
+
+        # Student/Teacher views
+        if (root / 'student.html').exists():
+            print(f"  Student:  http://localhost:{PORT}/student.html")
+        if (root / 'teacher.html').exists():
+            print(f"  Teacher:  http://localhost:{PORT}/teacher.html")
+
+        # Config JSON
+        data_dir = root / 'assets' / 'data'
+        if data_dir.exists():
+            classes_json = data_dir / 'classes.json'
+            lessonplans_json = data_dir / 'lessonPlans.json'
+            if classes_json.exists():
+                print(f"  Data:     http://localhost:{PORT}/assets/data/classes.json")
+            if lessonplans_json.exists():
+                print(f"            http://localhost:{PORT}/assets/data/lessonPlans.json")
+
+        # Auto-open Admin in browser if present
+        admin_path = root / 'admin.html'
+        if admin_path.exists():
+            try:
+                webbrowser.open(f"http://localhost:{PORT}/admin.html")
+            except Exception:
+                pass
+
+        print("\nPress Ctrl+C to stop")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

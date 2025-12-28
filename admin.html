@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Class Manager — Bible Study Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/admin.css" />
+  <link rel="icon" href="assets/images/icon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/images/icon.png" />
+</head>
+
+<body>
+  <div class="page">
+    <header>
+      <div class="title-group">
+        <h1 id="header-title">Lesson Plans</h1>
+        <p class="subtitle" id="header-subtitle">Create and manage Bible study lesson plans</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button id="back-btn" class="pill-link"
+          style="display: none; background: var(--accent); border: none; cursor: pointer;">← Back</button>
+        <a id="view-student-link" href="student.html" class="pill-link" target="_blank" rel="noopener"
+          style="display: none;">View Student</a>
+        <a id="view-teacher-link" href="teacher.html" class="pill-link" target="_blank" rel="noopener"
+          style="display: none;">View Teacher</a>
+      </div>
+    </header>
+
+    <!-- Lesson Plan List View -->
+    <div id="lessonplan-view" class="layout-admin">
+      <section class="panel" id="lessonplan-list-panel" style="grid-column: 1 / -1;">
+        <div class="panel-header">
+          <h2>Lesson Plans</h2>
+          <button id="new-lessonplan-btn" class="btn-primary">+ New Lesson Plan</button>
+        </div>
+        <div id="lessonplans-list" class="lessonplans-list"></div>
+      </section>
+    </div>
+
+    <!-- Class Editor View (hidden until lesson plan selected) -->
+    <div id="class-editor-view" class="layout-admin" style="display: none;">
+      <!-- Class List Panel -->
+      <section class="panel" id="class-list-panel">
+        <div class="panel-header">
+          <h2 id="class-list-title">Classes</h2>
+          <button id="new-class-btn" class="btn-primary">+ New Class</button>
+        </div>
+        <div id="classes-list" class="classes-list"></div>
+      </section>
+
+      <!-- Edit Panel -->
+      <section class="panel" id="edit-panel">
+        <div class="panel-header">
+          <h2 id="edit-title">Select a class to edit</h2>
+          <button id="save-class-btn" class="btn-primary" style="display: none;">Save Changes</button>
+        </div>
+
+        <div id="editor" style="display: none;">
+          <!-- Class Basics -->
+          <div class="form-section">
+            <h3>Class Details</h3>
+            <div class="form-group">
+              <label for="classNumber">Class Number</label>
+              <input type="number" id="classNumber" min="1" />
+            </div>
+            <div class="form-group">
+              <label for="classTitle">Title</label>
+              <input type="text" id="classTitle" placeholder="e.g., Can I Trust the Bible?" />
+            </div>
+            <div class="form-group">
+              <label for="classSubtitle">Subtitle/Topic</label>
+              <input type="text" id="classSubtitle" placeholder="e.g., Origins and Reliability" />
+            </div>
+            <div class="form-group">
+              <label for="classInstructor">Instructor</label>
+              <input type="text" id="classInstructor" placeholder="e.g., Wes Huffman" />
+            </div>
+            <div class="form-group">
+              <label for="classChannel">Channel Name</label>
+              <input type="text" id="classChannel" placeholder="e.g., class1-control" />
+            </div>
+          </div>
+
+          <!-- Media Management -->
+          <div class="form-section">
+            <h3>Media</h3>
+            <div id="media-list"></div>
+            <button id="add-media-btn" class="btn-secondary">+ Add Media</button>
+          </div>
+
+          <!-- Outline Management -->
+          <div class="form-section">
+            <h3>Outline Sections</h3>
+            <div id="outline-list"></div>
+            <button id="add-section-btn" class="btn-secondary">+ Add Section</button>
+          </div>
+
+          <!-- Actions -->
+          <div class="form-section">
+            <div style="display: flex; gap: 10px;">
+              <button id="save-class-btn-bottom" class="btn-primary">Save Class</button>
+              <button id="delete-class-btn" class="btn-danger">Delete Class</button>
+              <button id="export-class-btn" class="btn-secondary">Export JSON</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="no-selection" style="text-align: center; padding: 40px 20px; color: var(--muted);">
+          <p>Select a class from the list to edit, or create a new one.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Modal Templates -->
+  <div id="media-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="media-modal-title">Add Media</h3>
+        <button class="modal-close" onclick="closeModal('media-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="media-id">ID</label>
+          <input type="text" id="media-id" placeholder="e.g., primary-video" />
+        </div>
+        <div class="form-group">
+          <label for="media-type">Type</label>
+          <select id="media-type" onchange="updateMediaForm()">
+            <option value="video">Video</option>
+            <option value="pdf">PDF</option>
+            <option value="images">Images</option>
+            <option value="audio">Audio</option>
+            <option value="document">Document</option>
+            <option value="link">Link</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="media-title">Title</label>
+          <input type="text" id="media-title" placeholder="Display title" />
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="media-primary" />
+            Primary media
+          </label>
+        </div>
+        <div id="media-fields"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('media-modal')">Cancel</button>
+        <button class="btn-primary" onclick="saveMedia()">Save Media</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="section-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="section-modal-title">Add Section</h3>
+        <button class="modal-close" onclick="closeModal('section-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="section-id">ID</label>
+          <input type="text" id="section-id" placeholder="e.g., prayer-discernment" />
+        </div>
+        <div class="form-group">
+          <label for="section-summary">Summary/Title</label>
+          <input type="text" id="section-summary" placeholder="Section title" />
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="section-defaultOpen" />
+            Open by default
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="section-points">Discussion Points (one per line)</label>
+          <textarea id="section-points" rows="6" placeholder="Point 1&#10;Point 2&#10;Point 3"></textarea>
+        </div>
+        <div id="section-questions-container"></div>
+        <button id="add-question-btn" class="btn-secondary" onclick="addQuestionField()">+ Add Question</button>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('section-modal')">Cancel</button>
+        <button class="btn-primary" onclick="saveSection()">Save Section</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lesson Plan Modal -->
+  <div id="lessonplan-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="lessonplan-modal-title">New Lesson Plan</h3>
+        <button class="modal-close" onclick="closeModal('lessonplan-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="lessonplan-title">Title</label>
+          <input type="text" id="lessonplan-title" placeholder="e.g., Understanding Scripture" />
+        </div>
+        <div class="form-group">
+          <label for="lessonplan-description">Description</label>
+          <textarea id="lessonplan-description" rows="4" placeholder="Brief description of this lesson plan"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('lessonplan-modal')">Cancel</button>
+        <button class="btn-primary" onclick="saveLessonPlan()">Create Lesson Plan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Class to Lesson Plan Modal -->
+  <div id="class-add-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add Class to Lesson Plan</h3>
+        <button class="modal-close" onclick="closeModal('class-add-modal')">&times;</button>
+      </div>
+      <div class="modal-body" id="class-add-modal-content"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('class-add-modal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/admin.js"></script>
+</body>
+
+</html>

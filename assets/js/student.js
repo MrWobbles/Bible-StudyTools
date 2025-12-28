@@ -70,6 +70,8 @@ function handleRemoteCommand(event) {
   const data = event.data || event;
   if (!data || !data.type) return;
 
+  console.log('[Student] Received command:', data.type, data);
+
   switch (data.type) {
     case 'toggle':
       togglePlay();
@@ -93,6 +95,7 @@ function handleRemoteCommand(event) {
       }
       break;
     case 'fullscreen':
+      console.log('[Student] Executing fullscreen command');
       goFullscreen();
       break;
     default:
@@ -198,28 +201,9 @@ function skipToNextPause() {
 }
 
 function goFullscreen() {
-  // Try the YouTube iframe first (allows fullscreen even from remote commands)
-  const playerFrame = document.querySelector('#player iframe');
-  if (playerFrame) {
-    const request = playerFrame.requestFullscreen || playerFrame.webkitRequestFullscreen || playerFrame.mozRequestFullScreen || playerFrame.msRequestFullscreen;
-    if (request) {
-      console.log('Attempting fullscreen on YouTube iframe');
-      request.call(playerFrame).catch(err => console.error('Fullscreen error:', err));
-      return;
-    }
-  }
-
-  // Fallback to player-shell
-  const playerShell = document.querySelector('.player-shell');
-  if (!playerShell) {
-    console.error('Neither iframe nor player-shell found');
-    return;
-  }
-  const request = playerShell.requestFullscreen || playerShell.webkitRequestFullscreen || playerShell.mozRequestFullScreen || playerShell.msRequestFullscreen;
-  if (request) {
-    console.log('Attempting fullscreen on .player-shell');
-    request.call(playerShell).catch(err => console.error('Fullscreen error:', err));
-  }
+  // Toggle fullscreen mode by adding/removing class on body
+  document.body.classList.toggle('fullscreen-mode');
+  console.log('[Fullscreen] Toggled fullscreen-mode class');
 }
 
 function bindControls() {
