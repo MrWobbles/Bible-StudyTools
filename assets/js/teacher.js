@@ -38,6 +38,26 @@ async function loadClassConfig() {
     VIDEO_ID = primaryMedia?.sources?.[0]?.videoId || '';
     pausePoints = primaryMedia?.pausePoints || [];
 
+    // Normalize pausePoints to objects: { time: seconds, label: 'M:SS' }
+    pausePoints = (pausePoints || []).map(p => {
+      if (p == null) return null;
+      if (typeof p === 'number') return { time: p, label: formatTime(p) };
+      if (typeof p === 'string') {
+        const parts = p.split(':').map(n => Number(n));
+        let secs = 0;
+        if (parts.length === 3) secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        else if (parts.length === 2) secs = parts[0] * 60 + parts[1];
+        else secs = Number(p) || 0;
+        return { time: secs, label: formatTime(secs) };
+      }
+      if (typeof p === 'object') {
+        const t = Number(p.time);
+        const timeVal = Number.isFinite(t) ? t : (typeof p.time === 'string' ? (p.time.split(':').reduce((acc, cur) => acc * 60 + Number(cur), 0)) : 0);
+        return { time: timeVal, label: p.label || formatTime(timeVal) };
+      }
+      return null;
+    }).filter(Boolean);
+
     CHANNEL_KEY = classConfig.channelName || `class${classId}-control`;
     STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
     NOTES_KEY = `class${classId}-teacher-notes`;
@@ -119,6 +139,15 @@ function renderOutlineWithQuestions() {
 
     const pauseIdx = findPauseIndexForSection(section);
     if (pauseIdx != null && pauseIdx >= 0) {
+      const info = document.createElement('div');
+      info.style.fontSize = '13px';
+      info.style.color = 'var(--muted)';
+      info.style.marginRight = '8px';
+      const timeText = (pausePoints[pauseIdx] && typeof pausePoints[pauseIdx].time === 'number') ? formatTime(pausePoints[pauseIdx].time) : '';
+      // Show section title first, then the time
+      info.textContent = `${section.summary}${timeText ? ' · ' + timeText : ''}`;
+      actionsRow.appendChild(info);
+
       const jumpBtn = document.createElement('button');
       jumpBtn.textContent = 'Jump here';
       jumpBtn.onclick = () => sendCommand('jumpToPause', { index: pauseIdx });
@@ -252,34 +281,36 @@ function renderMediaGallery() {
   const controlPanel = document.querySelector('section.card.sticky');
   if (!controlPanel) return;
 
+  // Ensure media panel exists after the control panel (right column)
   let mediaPanel = document.getElementById('media-panel');
   if (!mediaPanel) {
     mediaPanel = document.createElement('section');
     mediaPanel.className = 'card';
     mediaPanel.id = 'media-panel';
     mediaPanel.style.marginTop = '14px';
-    controlPanel.parentNode.insertBefore(mediaPanel, controlPanel);
+    // Insert after controlPanel to keep controls on top and materials below
+    if (controlPanel.parentNode) {
+      controlPanel.parentNode.insertBefore(mediaPanel, controlPanel.nextSibling);
+    }
   }
 
+  // Render a compact vertical list of class materials
   const mediaHTML = `
     <div class="tag">Media resources</div>
     <h3 style="margin: 10px 0 12px;">Class materials</h3>
-    <div style="display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));">
+    <div class="materials-list">
       ${classConfig.media.map(media => `
-        <div class="media-thumbnail" style="
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          border-radius: 10px;
-          padding: 12px;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        " title="${media.title || media.type}">
-          <div style="font-size: 32px; margin-bottom: 8px;">${getMediaIcon(media.type)}</div>
-          <small style="color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3;">
-            ${media.title || media.type}
-          </small>
-          ${media.type === 'video' && media.pausePoints ? `<small style="color: var(--accent); display: block; margin-top: 4px; font-size: 11px;">${media.pausePoints.length} pauses</small>` : ''}
+        <div class="list-item" title="${media.title || media.type}">
+          <div style="display:flex; gap:10px; align-items:center;">
+            <div style="font-size:20px">${getMediaIcon(media.type)}</div>
+            <div style="min-width:0;">
+              <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${media.title || media.type}</div>
+              <div style="font-size:12px; color:var(--muted)">${media.type}${media.type==='video' && media.pausePoints? ` · ${media.pausePoints.length} pauses` : ''}</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            ${media.type === 'video' ? `<button onclick="sendCommand('jumpToMedia', { id: '${media.id}' })">Open</button>` : `<a href="${(media.sources && media.sources[0] && (media.sources[0].url||media.sources[0].path))|| '#'}" target="_blank" rel="noopener"><button>Open</button></a>`}
+          </div>
         </div>
       `).join('')}
     </div>
@@ -316,7 +347,20 @@ function sendCommand(type, payload = {}) {
 
 function labelFor(type, payload) {
   if (type === 'jumpToPause' && Number.isInteger(payload.index)) {
-    const point = pausePoints[payload.index];
+    const idx = payload.index;
+    const point = pausePoints[idx];
+    // Prefer section title if we can map the pause index back to an outline section
+    if (classConfig?.outline) {
+      for (const sec of classConfig.outline) {
+        try {
+          const found = findPauseIndexForSection(sec);
+          if (found === idx) {
+            const time = point && typeof point.time === 'number' ? ` · ${formatTime(point.time)}` : '';
+            return `Jump to ${sec.summary}${time}`;
+          }
+        } catch (e) { /* ignore */ }
+      }
+    }
     return point ? `Jump to ${point.label}` : 'Jump to pause';
   }
   if (type === 'nextPause') return 'Skip to next pause';
@@ -329,6 +373,8 @@ function labelFor(type, payload) {
 function flashStatus(text) {
   if (statusEl) statusEl.textContent = text;
 }
+
+// Removed local fullscreen toggle; teacher should request student to fullscreen the video.
 
 function renderPauseList() {
   if (!pauseListEl) return;

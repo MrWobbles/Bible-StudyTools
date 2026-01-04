@@ -10,7 +10,13 @@ let STORAGE_FALLBACK_KEY = 'class1-control-storage';
 function initConfig() {
   const config = window.BIBLE_STUDY_CONFIG || {};
   VIDEO_ID = config.videoId || '';
-  pausePoints = Array.isArray(config.pausePoints) ? config.pausePoints : [];
+  // Normalize pausePoints: allow seconds (number) or "MM:SS" strings
+  pausePoints = Array.isArray(config.pausePoints)
+    ? config.pausePoints.map((p) => ({
+        ...p,
+        time: parseTimeValue(p.time),
+      })).filter((p) => Number.isFinite(p.time))
+    : [];
   CHANNEL_KEY = config.channelName || 'class1-control';
   STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
 }
@@ -141,6 +147,26 @@ function resetNextPause() {
   updateNextPauseText();
 }
 
+// Accepts number (seconds) or "MM:SS" string; returns seconds as number
+function parseTimeValue(val) {
+  if (typeof val === 'number' && Number.isFinite(val)) return val;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    // MM:SS
+    const mmss = /^([0-9]{1,2}):([0-5][0-9])$/;
+    const match = trimmed.match(mmss);
+    if (match) {
+      const minutes = parseInt(match[1], 10);
+      const seconds = parseInt(match[2], 10);
+      return minutes * 60 + seconds;
+    }
+    // plain number string
+    const num = Number(trimmed);
+    if (Number.isFinite(num)) return num;
+  }
+  return NaN;
+}
+
 function renderPauseList() {
   const list = document.getElementById('pause-list');
   list.innerHTML = '';
@@ -202,32 +228,43 @@ function skipToNextPause() {
 
 function goFullscreen() {
   const container = document.querySelector('.player-shell') || document.documentElement;
-  const shouldEnter = !document.fullscreenElement;
+
+  function isFullscreenActive() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+  }
+
+  const shouldEnter = !isFullscreenActive();
 
   if (shouldEnter) {
-    // Try real fullscreen first
     const req = container.requestFullscreen?.bind(container)
       || container.webkitRequestFullscreen?.bind(container)
+      || container.mozRequestFullScreen?.bind(container)
       || container.msRequestFullscreen?.bind(container);
 
     if (req) {
       req().catch(() => {
         // Fall back to CSS-based fullscreen mode
-        document.body.classList.toggle('fullscreen-mode');
+        document.body.classList.add('fullscreen-mode');
       });
     } else {
-      document.body.classList.toggle('fullscreen-mode');
+      document.body.classList.add('fullscreen-mode');
     }
   } else {
-    // Exit fullscreen if active; always toggle CSS class for consistency
     const exit = document.exitFullscreen?.bind(document)
       || document.webkitExitFullscreen?.bind(document)
+      || document.mozCancelFullScreen?.bind(document)
       || document.msExitFullscreen?.bind(document);
-    if (exit) exit().catch(() => {});
-    document.body.classList.toggle('fullscreen-mode');
+    if (exit) {
+      exit().catch(() => {
+        // ensure CSS class removed even if exit rejects
+        document.body.classList.remove('fullscreen-mode');
+      });
+    }
+    // Always remove CSS fullscreen class when exiting
+    document.body.classList.remove('fullscreen-mode');
   }
 
-  console.log('[Fullscreen] Toggled fullscreen-mode class / request');
+  console.log('[Fullscreen] Toggled fullscreen-mode / request');
 }
 
 function bindControls() {

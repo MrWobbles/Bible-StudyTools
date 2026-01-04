@@ -14,32 +14,13 @@
           "primary": true,
           "sources": [
             {
-              "format": "youtube",
-              "videoId": "QhVPBNBAGY0",
+              "type": "youtube",
               "url": "https://youtu.be/QhVPBNBAGY0"
             }
           ],
           "pausePoints": [
-            {
-              "label": "Recognizing Scripture",
-              "time": 362
-            },
-            {
-              "label": "Other gospels (Thomas)",
-              "time": 825
-            },
-            {
-              "label": "Historical anchoring (names)",
-              "time": 1000
-            },
-            {
-              "label": "Egypt & preservation",
-              "time": 1090
-            },
-            {
-              "label": "Do we have the right words?",
-              "time": 1190
-            }
+            144,
+            1061
           ]
         }
       ],
@@ -64,7 +45,7 @@
           "summary": "Foundations and assumptions",
           "defaultOpen": false,
           "points": [
-            "Why do you personally trust or not trust the Bible? What shaped that view?",
+            "Why do you personally trust the Bible? What shaped that view?",
             "Responding to \"You only believe because you grew up with it.\"",
             "If the Bible were unreliable, what happens to your faith in Jesus?",
             "Objections you have heard: errors, changed over time, wrong books."
@@ -72,77 +53,20 @@
           "questions": [
             {
               "key": "foundations-trust",
-              "prompt": "Why do you personally trust or not trust the Bible? What shaped that view?"
+              "prompt": "Why do you personally trust the Bible? What shaped that view?",
+              "answer": "I didn't start out trusting the Bible, it didn't seem realistic to me and I had heard a lot of false information on it throughout my life leading me to believe that it wasn't historical, it wasn't reliable, etc.. as I've studied more, learned more and adjusted my perspective - I came to see that truth in it.  I've heard more about it's historical reliability and I've experienced the power that it has to change not just my life - but my families lives.I didn't start out trusting the Bible, it didn't seem realistic to me and I had heard a lot of false information on it throughout my life leading me to believe that it wasn't historical, it wasn't reliable, etc.. as I've studied more, learned more and adjusted my perspective - I came to see that truth in it.  I've heard more about it's historical reliability and I've experienced the power that it has to change not just my life - but my families lives."
             },
             {
-              "key": "foundations-upbringing",
-              "prompt": "Respond to \"You only believe because you grew up with it.\""
-            },
-            {
-              "key": "foundations-unreliable",
-              "prompt": "If the Bible were unreliable, what happens to faith in Jesus?"
-            },
-            {
-              "key": "foundations-objections",
-              "prompt": "Objections you have heard: errors, changed over time, wrong books."
-            }
-          ]
-        },
-        {
-          "id": "canon",
-          "summary": "Canon and \"right books\"",
-          "defaultOpen": false,
-          "points": [
-            "What does \"canon\" mean? How were books chosen?",
-            "Initial thoughts on \"lost gospels\" (Thomas, Judas).",
-            "Read 2 Tim 3:16; 2 Pet 1:20-21 — expectations for Scripture."
-          ],
-          "questions": [
-            {
-              "key": "canon-meaning",
-              "prompt": "What does \"canon\" mean? How were books chosen?"
-            },
-            {
-              "key": "canon-lost-gospels",
-              "prompt": "Initial thoughts on \"lost gospels\" (Thomas, Judas)."
-            },
-            {
-              "key": "canon-2tim-2pet",
-              "prompt": "Read 2 Tim 3:16; 2 Pet 1:20-21 — expectations for Scripture."
+              "key": "foundations-terminology",
+              "prompt": "Canon, Apocryphal, Gnosticism",
+              "answer": "Canon - these are the books of the Bible that were considered to be truth.\n\nApocryphal - meaning strange, hidden, secret, used in relation to books that were non-canonical, specifically books that were considered to be scripture but did not have the same authenticity as books that were canon\n\nGnosticism - this is a modern term, related to the group of mystic religious philosophies popular in the second and third centuries AD.  \n\nEssential to Gnosticism is the idea that the physical world is evil and the spiritual world is pure. Gnostics believed that this world was created by an evil god (known as the Demi-Urge) who trapped spiritual beings within evil physical realities. To escape from this physical world one must realize, through secret knowledge (γνῶσις - gnosis in Greek, of where we get the group’s namesake) that they too are divine, and by this realization (knowledge revealed to humanity by Aeons) people can break free and release their divine spirit. Gnostic belief often appropriated already existing religious figures into the pantheon of the Aeons. Within “Christian Gnosticism” Jesus is portrayed as an Aeon who communicates this secret knowledge to his followers. Gnostic literature, such as the Gospel of Thomas, commandeered the names of key biblical characters in an attempt to popularize and legitimize these ideas. \n\nOther Gnostic Gospels\nThe Gospel of Judas\nThe Gospel of Mary\nThe Gospel of Thomas\nThe Gospel of Philip\nThe Gospel of Peter"
             }
           ]
         },
         {
           "id": "recognizing-scripture",
-          "summary": "00:07:05 · Recognizing Scripture",
+          "summary": "Recognizing Scripture",
           "defaultOpen": false,
-          "mediaLink": "primary-video",
-          "points": [
-            "Video link: https://youtu.be/QhVPBNBAGY0",
-            "Recognized, not \"voted in.\" Why does recognition matter?",
-            "Criteria hints (Luke 1:1-4; 1 John 1:1-3).",
-            "OT–NT relationship and confidence in having the right books."
-          ],
-          "questions": [
-            {
-              "key": "recognition-why",
-              "prompt": "Recognized, not \"voted in\" — why does recognition matter?"
-            },
-            {
-              "key": "recognition-criteria",
-              "prompt": "Criteria hints (Luke 1:1-4; 1 John 1:1-3)."
-            },
-            {
-              "key": "recognition-ot-nt",
-              "prompt": "OT–NT relationship and confidence in the right books."
-            }
-          ]
-        },
-        {
-          "id": "other-gospels",
-          "summary": "00:13:45 · Other gospels (Gospel of Thomas)",
-          "defaultOpen": false,
-          "mediaLink": "primary-video",
           "points": [
             "Pseudonymous names to borrow authority — how does that shape trust?",
             "Thomas = 114 sayings with secret knowledge; contrast with four Gospels.",
@@ -151,95 +75,67 @@
           ],
           "questions": [
             {
-              "key": "thomas-pseudonym",
-              "prompt": "Pseudonymous names to borrow authority — trust implications."
+              "key": "recognition-why",
+              "prompt": "Recognized, not \"voted in\" - why does recognition matter?",
+              "answer": "Criteria hints\n------\nLuke 1:1-4\n1 Inasmuch as many have taken in hand to set in order a narrative of those things which have been fulfilled among us, 2 just as those who from the beginning were eyewitnesses and ministers of the word delivered them to us, 3 it seemed good to me also, having had perfect understanding of all things from the very first, to write to you an orderly account, most excellent Theophilus, 4 that you may know the certainty of those things in which you were instructed.\n\n1 John 1:1-3\n1 That which was from the beginning, which we have heard, which we have seen with our eyes, which we have looked upon, and our hands have handled, concerning the Word of life— 2 the life was manifested, and we have seen, and bear witness, and declare to you that eternal life which was with the Father and was manifested to us— 3 that which we have seen and heard we declare to you, that you also may have fellowship with us; and truly our fellowship is with the Father and with His Son Jesus Christ."
             },
             {
-              "key": "thomas-contrast",
-              "prompt": "Thomas = 114 sayings with secret knowledge; contrast the four Gospels."
+              "key": "recognition-luke",
+              "prompt": " Given this standard, what would be the books that had obvious connections to Jesus that were included within our Bible? What canonical books might have had an indirect association. For example, Luke was not an apostle, why would his Gospel have been considered scripture?",
+              "answer": "Given this standard, what would be the books that had obvious connections to Jesus that were included within our Bible?\nAll four Gospels were accepted because they claim eyewitness or apostolic origins and their content is mutually consistent. Luke, though not one of the Twelve, collected eyewitness reports and was connected to Paul; John was an eyewitness apostle. Acts (same author as Luke) continues the apostolic narrative. Mark and Matthew have apostolic ties (Mark via Peter; Matthew traditionally an apostle). Early canon recognition used multiple tests — apostolic origin or close association, conformity to the rule of faith, widespread usage, and perceived spiritual authority — not a single proof."
             },
             {
-              "key": "thomas-out-of-step",
-              "prompt": "What feels out of step with Jesus in Matthew–John?"
-            },
-            {
-              "key": "thomas-response",
-              "prompt": "Respond to \"Church suppressed alternate Christianities.\""
+              "key": "recognition-indirect",
+              "prompt": "What canonical books might have had an indirect association. For example, Luke was not an apostle, why would his Gospel have been considered scripture?",
+              "answer": "Luke’s Gospel was trusted because he explicitly gathered eyewitness reports, was linked to Paul (an apostle), his work fit established teaching about Jesus, and it was widely used and affirmed by early church leaders — meeting the practical tests the church applied for canonicity.\n\nMark — indirect: traditionally Peter’s interpreter/assistant; accepted because it preserved Peter’s eyewitness testimony and matched the rule of faith.\nLuke & Acts — indirect: Luke wasn’t an apostle but was Paul’s companion, explicitly used eyewitness sources (Luke 1:1–4), shows careful historical method, and circulated widely with apostolic endorsement.\nHebrews — indirect/uncertain authorship; accepted because it reflected Pauline theology, circulated with Paul’s letters, and proved useful and orthodox in worship.\nPastoral epistles (1–2 Timothy, Titus) — debated authorship but accepted due to Pauline attribution, ecclesial usefulness, and doctrinal fit.\nJames, Jude — authorship tied to Jesus’ family/early leaders (not apostles in the Twelve sense for James the brother); accepted because of early use, orthodox teaching, and apostolic-era provenance.\n2 Peter, Revelation — had longer debates but were accepted on grounds of apostolic connection, theological consonance, and widespread church usage.\nWhy indirect works were accepted:\n\nApostolic connection (authorship, close associate, or direct testimony used).\nConformity to the church’s “rule of faith” (orthodox teaching about Christ).\nWidespread liturgical and catechetical use across churches (catholicity).\nEndorsement by respected church leaders (patristic attestation) and perceived spiritual/inspirational authority.\n"
             }
           ]
         },
         {
           "id": "historical-anchoring",
-          "summary": "00:16:40 · Historical anchoring (names)",
+          "summary": "Historical anchoring (names)",
           "defaultOpen": false,
-          "mediaLink": "primary-video",
           "points": [
             "Name accuracy by time/place as evidence for reliability.",
-            "Forgery analogy (17th c. Paris) — why details matter.",
-            "What does name/location evidence suggest about when/where written?"
+            "Forgery analogy (17th c. Paris) — why details matter."
           ],
           "questions": [
             {
-              "key": "names-evidence",
-              "prompt": "Name accuracy by time/place as reliability evidence."
-            },
-            {
-              "key": "names-analogy",
-              "prompt": "Forgery analogy (17th c. Paris) — why details matter."
-            },
-            {
               "key": "names-implications",
-              "prompt": "Implications for when/where the biblical Gospels were written."
+              "prompt": "Implications for when/where the biblical Gospels were written.",
+              "answer": ""
             }
           ]
         },
         {
           "id": "egypt-preservation",
-          "summary": "00:18:10 · Egypt & preservation",
+          "summary": "Egypt & preservation",
           "defaultOpen": false,
-          "mediaLink": "primary-video",
           "points": [
             "Egypt's role in early manuscripts; near-loss stories.",
-            "How does survival interact with Isaiah 40:8?",
-            "Providence: more confident, less confident, or curious?"
+            "How does survival interact with Isaiah 40:8?"
           ],
           "questions": [
             {
-              "key": "egypt-role",
-              "prompt": "Egypt's role in early manuscripts; near-loss stories."
-            },
-            {
               "key": "egypt-isaiah",
-              "prompt": "How survival connects to Isaiah 40:8."
-            },
-            {
-              "key": "egypt-providence",
-              "prompt": "Providence: more confident, less confident, or curious?"
+              "prompt": "How survival connects to Isaiah 40:8.",
+              "answer": "The grass withers, the flower fades,\nBut the word of our God stands forever."
             }
           ]
         },
         {
           "id": "right-words",
-          "summary": "00:19:50 · \"Do we have the right words?\"",
+          "summary": "Trusting Scripture",
           "defaultOpen": false,
-          "mediaLink": "primary-video",
           "points": [
             "Preliminary answer to \"It was changed so many times.\"",
-            "Why thousands of handwritten copies instead of one vault copy?",
-            "Role of textual criticism in serving the church."
+            "Why thousands of handwritten copies instead of one vault copy?"
           ],
           "questions": [
             {
-              "key": "words-response",
-              "prompt": "First response to \"changed too many times.\""
-            },
-            {
               "key": "words-many-copies",
-              "prompt": "Why many handwritten copies instead of one vault copy?"
-            },
-            {
-              "key": "words-textual-criticism",
-              "prompt": "Role of textual criticism for the church."
+              "prompt": "Why many handwritten copies instead of one vault copy?",
+              "answer": ""
             }
           ]
         },
@@ -248,22 +144,13 @@
           "summary": "Personal reflection & application",
           "defaultOpen": false,
           "points": [
-            "Did confidence increase, decrease, or sharpen?",
-            "Impact on prayer, Bible reading, trust in Jesus.",
             "One concrete step this month (book, rest of series, study Luke 1 or 1 Cor 15)."
           ],
           "questions": [
             {
-              "key": "reflection-confidence",
-              "prompt": "Confidence: up, down, sharpened?"
-            },
-            {
-              "key": "reflection-devotional",
-              "prompt": "Impact on prayer, Bible reading, trust in Jesus."
-            },
-            {
               "key": "reflection-next-step",
-              "prompt": "One concrete step this month (book, rest of series, study Luke 1 or 1 Cor 15)."
+              "prompt": "One concrete step this month (book, rest of series, study Luke 1 or 1 Cor 15).",
+              "answer": ""
             }
           ]
         }

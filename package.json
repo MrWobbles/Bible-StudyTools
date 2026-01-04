@@ -1,0 +1,21 @@
+{
+  "name": "bible-study-tools",
+  "version": "1.0.0",
+  "description": "Interactive Bible study presentation system with synchronized video playback and teacher controls",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "bible-study",
+    "interactive",
+    "presentation"
+  ],
+  "author": "Wes Huffman",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ytdl-core": "^4.11.5"
+  }
+}

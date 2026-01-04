@@ -8,10 +8,15 @@ let currentSectionIndex = null;
 
 // Load data on page load
 window.addEventListener('DOMContentLoaded', async () => {
+  console.log('Page loading...');
   await loadLessonPlans();
+  console.log('Lesson plans loaded:', allLessonPlans);
   await loadClasses();
+  console.log('Classes loaded:', allClasses);
   setupEventListeners();
+  console.log('Event listeners set up');
   renderLessonPlansList();
+  console.log('Rendered lesson plans list');
 });
 
 // ===== LESSON PLAN MANAGEMENT =====
@@ -19,10 +24,18 @@ window.addEventListener('DOMContentLoaded', async () => {
 // Load lesson plans from JSON
 async function loadLessonPlans() {
   try {
+    console.log('Fetching lessonPlans.json from: assets/data/lessonPlans.json');
     const response = await fetch('assets/data/lessonPlans.json');
+    console.log('Response status:', response.status, response.statusText);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
     const data = await response.json();
+    console.log('Parsed JSON data:', data);
     allLessonPlans = data.lessonPlans || [];
-    console.log('Loaded lesson plans:', allLessonPlans);
+    console.log('Set allLessonPlans to:', allLessonPlans);
   } catch (error) {
     console.error('Failed to load lesson plans:', error);
     allLessonPlans = [];
@@ -196,12 +209,12 @@ function goBackToLessonPlans() {
 
 // Save lesson plans to file
 async function saveLessonPlansToFile() {
-  const jsonData = JSON.stringify({ lessonPlans: allLessonPlans }, null, 2);
+  const jsonData = { lessonPlans: allLessonPlans };
 
   // If running in Electron, save directly to file system
   if (window.bst && window.bst.saveFile) {
     try {
-      await window.bst.saveFile('lessonPlans.json', jsonData);
+      await window.bst.saveFile('lessonPlans.json', JSON.stringify(jsonData, null, 2));
       console.log('Lesson plans saved successfully');
       return;
     } catch (err) {
@@ -211,14 +224,32 @@ async function saveLessonPlansToFile() {
     }
   }
 
-  // Fallback: download file (for browser mode)
-  const blob = new Blob([jsonData], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'lessonPlans.json';
-  link.click();
-  URL.revokeObjectURL(url);
+  // Try API endpoint (web server mode)
+  try {
+    const response = await fetch('/api/save/lessonplans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(jsonData),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✓ ' + result.message);
+      return;
+    } else {
+      throw new Error(`API error: ${response.status}`);
+    }
+  } catch (err) {
+    console.warn('API save failed, falling back to download:', err);
+    // Fallback: download file
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'lessonPlans.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 }
 
 // ===== CLASS MANAGEMENT (within a lesson plan) =====
@@ -751,6 +782,9 @@ function saveMedia() {
 
   renderMediaList(allClasses[currentClass]);
   closeModal('media-modal');
+  
+  // Auto-save after media changes
+  saveClassToFile();
 }
 
 // Delete media item
@@ -758,6 +792,9 @@ function deleteMedia(index) {
   if (confirm('Delete this media item?')) {
     allClasses[currentClass].media.splice(index, 1);
     renderMediaList(allClasses[currentClass]);
+    
+    // Auto-save after deletion
+    saveClassToFile();
   }
 }
 
@@ -891,6 +928,9 @@ function saveSection() {
 
   renderOutlineList(allClasses[currentClass]);
   closeModal('section-modal');
+  
+  // Auto-save after section changes
+  saveClassToFile();
 }
 
 // Delete section
@@ -898,6 +938,9 @@ function deleteSection(index) {
   if (confirm('Delete this section?')) {
     allClasses[currentClass].outline.splice(index, 1);
     renderOutlineList(allClasses[currentClass]);
+    
+    // Auto-save after deletion
+    saveClassToFile();
   }
 }
 
@@ -911,18 +954,21 @@ function saveClass() {
   cls.instructor = document.getElementById('classInstructor').value;
   cls.channelName = document.getElementById('classChannel').value;
 
+  // Ensure all unsaved changes in sections are included
+  // (saveSection updates allClasses in memory, so this final save captures all changes)
+  
   // Save classes automatically
   saveClassToFile();
 }
 
 // Save classes to file
 async function saveClassToFile() {
-  const jsonData = JSON.stringify({ classes: allClasses }, null, 2);
+  const jsonData = { classes: allClasses };
 
   // If running in Electron, save directly to file system
   if (window.bst && window.bst.saveFile) {
     try {
-      await window.bst.saveFile('classes.json', jsonData);
+      await window.bst.saveFile('classes.json', JSON.stringify(jsonData, null, 2));
       alert('Class saved successfully!');
       return;
     } catch (err) {
@@ -932,15 +978,33 @@ async function saveClassToFile() {
     }
   }
 
-  // Fallback: download file (for browser mode)
-  const blob = new Blob([jsonData], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'classes.json';
-  link.click();
-  URL.revokeObjectURL(url);
-  alert('Class saved! Please replace assets/data/classes.json with the downloaded file.');
+  // Try API endpoint (web server mode)
+  try {
+    const response = await fetch('/api/save/classes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(jsonData),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      alert('✓ ' + result.message);
+      return;
+    } else {
+      throw new Error(`API error: ${response.status}`);
+    }
+  } catch (err) {
+    console.warn('API save failed, falling back to download:', err);
+    // Fallback: download file
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'classes.json';
+    link.click();
+    URL.revokeObjectURL(url);
+    alert('Class saved! Please replace assets/data/classes.json with the downloaded file.');
+  }
 }
 
 // ===== UTILITY FUNCTIONS =====
@@ -1156,40 +1220,69 @@ async function downloadYouTubeVideo() {
     return;
   }
 
-  if (!window.bst || !window.bst.downloadMedia) {
-    alert('Download feature is only available in the desktop app.');
-    return;
-  }
-
   const button = event.target;
   const originalText = button.textContent;
 
   try {
-    // Show progress
     button.disabled = true;
-    button.textContent = 'Downloading YouTube video...';
+    button.textContent = 'Attempting download...';
     button.style.opacity = '0.7';
 
-    // Construct YouTube URL
     const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
 
-    // Download the video
-    const localPath = await window.bst.downloadMedia('video', youtubeUrl);
+    // Try API download (may fail due to YouTube protection)
+    try {
+      const response = await fetch('/api/download/youtube', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: youtubeUrl }),
+      });
 
-    // Update the local video field
-    document.getElementById('media-local-video').value = localPath;
+      if (response.ok) {
+        const result = await response.json();
+        document.getElementById('media-local-video').value = result.localPath;
+        button.textContent = 'Download Complete!';
+        button.style.opacity = '1';
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.disabled = false;
+        }, 2000);
+        return;
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Download failed');
+      }
+    } catch (apiErr) {
+      // API download failed - provide manual download instructions
+      console.warn('API download failed:', apiErr.message);
+      
+      const manualDownloadUrl = youtubeUrl;
+      const instructions = `
+YouTube is blocking automated downloads.
 
-    button.textContent = 'Download Complete!';
-    button.style.opacity = '1';
-    setTimeout(() => {
+You can download the video manually using:
+1. Download from YouTube directly using a download service
+2. Use a tool like yt-dlp or ffmpeg
+
+Video URL: ${manualDownloadUrl}
+
+For now, you can:
+- Keep the YouTube link as the source
+- Or manually download and place in: assets/video/${youtubeId}.mp4
+
+Copy the URL and use an external downloader.
+      `;
+      
+      alert(instructions);
       button.textContent = originalText;
       button.disabled = false;
-    }, 2000);
+      button.style.opacity = '1';
+    }
   } catch (err) {
-    console.error('YouTube download failed:', err);
+    console.error('Download error:', err);
     button.textContent = originalText;
     button.disabled = false;
     button.style.opacity = '1';
-    alert('YouTube download failed: ' + err.message);
+    alert('Download error: ' + err.message);
   }
 }

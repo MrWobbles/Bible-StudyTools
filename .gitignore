@@ -10,17 +10,25 @@ Thumbs.db
 *.tar
 *.gz
 
-# Notes exports
+# User-generated exports (keep local only)
+exports/
 class1-notes.json
 class1-notes.html
+*-notes-*.json
+*-notes-*.html
 
 # Node modules
 node_modules/
 
-# Media files (large downloads)
-assets/video/
-assets/audio/
-assets/documents/*.pdf
+# Large media files (download manually, not tracked)
+assets/video/*
+!assets/video/README.md
+assets/audio/*
+!assets/audio/README.md
+
+# Track documents and images (they're not too large)
+# assets/documents/ - TRACKED
+# assets/images/ - TRACKED
 
 # Electron build artifacts
 desktop/dist/
