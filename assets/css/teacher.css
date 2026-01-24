@@ -37,6 +37,8 @@ body {
   padding: 28px 16px 40px;
   display: flex;
   justify-content: center;
+  font-size: 16px;
+  line-height: 1.7;
 }
 
 .page {
@@ -196,6 +198,153 @@ button:hover {
   outline: none;
 }
 
+/* Outline section improvements for teaching */
+details.accordion {
+  margin-bottom: 16px;
+}
+
+details.accordion summary {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 14px 16px;
+  background: rgba(240, 180, 41, 0.12);
+  border: 1px solid rgba(240, 180, 41, 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: -0.01em;
+}
+
+details.accordion summary:hover {
+  background: rgba(240, 180, 41, 0.18);
+}
+
+details.accordion[open] summary {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: rgba(240, 180, 41, 0.15);
+  margin-bottom: 0;
+}
+
+details.accordion > *:not(summary) {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(240, 180, 41, 0.15);
+  border-top: none;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+/* Point type styles */
+.points-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.point {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.point-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.point-text {
+  flex: 1;
+}
+
+.point-verse {
+  background: rgba(147, 112, 219, 0.12);
+  border-left: 3px solid rgba(147, 112, 219, 0.6);
+  font-style: italic;
+  color: #c9b3ff;
+}
+
+.point-question {
+  background: rgba(73, 161, 255, 0.12);
+  border-left: 3px solid rgba(73, 161, 255, 0.6);
+  font-weight: 600;
+  color: #7db9ff;
+}
+
+.point-example {
+  background: rgba(255, 193, 7, 0.12);
+  border-left: 3px solid rgba(255, 193, 7, 0.6);
+  color: #ffd766;
+}
+
+.point-note {
+  background: rgba(76, 175, 80, 0.12);
+  border-left: 3px solid rgba(76, 175, 80, 0.6);
+  font-size: 14px;
+  color: #a5d6a7;
+}
+
+.point-heading {
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 8px;
+}
+
+.point-point {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.point-point .point-icon {
+  display: none;
+}
+
+.question {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(73, 161, 255, 0.08);
+  border: 2px solid rgba(73, 161, 255, 0.25);
+  border-radius: 10px;
+}
+
+.question p {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.6;
+}
+
+.question textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  font-size: 15px;
+  line-height: 1.6;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.question textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.4);
+}
+
 .rte-editor h3,
 .rte-editor h4 {
   margin: 0.4em 0;
@@ -264,13 +413,6 @@ details.accordion summary {
 
 details.accordion summary::-webkit-details-marker {
   display: none;
-}
-
-details.accordion ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  color: var(--muted);
-  line-height: 1.5;
 }
 
 details.accordion a {

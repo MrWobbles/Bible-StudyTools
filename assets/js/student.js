@@ -7,6 +7,19 @@ let pausePoints = [];
 let CHANNEL_KEY = 'class1-control';
 let STORAGE_FALLBACK_KEY = 'class1-control-storage';
 
+// Function to update player reference when a new video is loaded
+window.updatePlayerReference = function(newPlayer) {
+  player = newPlayer;
+  window.player = newPlayer;
+  console.log('[Student] Player reference updated');
+};
+
+// Make player and callback functions globally accessible so loader.js can reinitialize
+window.player = player;
+window.VIDEO_ID = VIDEO_ID;
+window.onPlayerReady = onPlayerReady;
+window.onPlayerStateChange = onPlayerStateChange;
+
 function initConfig() {
   const config = window.BIBLE_STUDY_CONFIG || {};
   VIDEO_ID = config.videoId || '';
@@ -43,7 +56,11 @@ function onYouTubeIframeAPIReady() {
       playsinline: 1
     },
     events: {
-      onReady: onPlayerReady,
+      onReady: function(event) {
+        player = event.target;
+        window.player = event.target;
+        onPlayerReady(event);
+      },
       onStateChange: onPlayerStateChange
     }
   });
@@ -103,6 +120,18 @@ function handleRemoteCommand(event) {
     case 'fullscreen':
       console.log('[Student] Executing fullscreen command');
       goFullscreen();
+      break;
+    case 'displayMedia':
+      if (data.media && typeof window.openMediaInViewer === 'function') {
+        console.log('[Student] Opening media from teacher command:', data.media);
+        window.openMediaInViewer(data.media);
+      }
+      break;
+    case 'clearScreen':
+      if (typeof window.returnToDefaultView === 'function') {
+        console.log('[Student] Clearing screen and returning to default view');
+        window.returnToDefaultView();
+      }
       break;
     default:
       break;
@@ -230,10 +259,17 @@ function goFullscreen() {
   const container = document.querySelector('.player-shell') || document.documentElement;
 
   function isFullscreenActive() {
-    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    return !!(
+      document.fullscreenElement || 
+      document.webkitFullscreenElement || 
+      document.mozFullScreenElement || 
+      document.msFullscreenElement ||
+      document.body.classList.contains('fullscreen-mode')
+    );
   }
 
   const shouldEnter = !isFullscreenActive();
+  console.log('[Fullscreen] Current state:', isFullscreenActive(), '-> Should enter:', shouldEnter);
 
   if (shouldEnter) {
     const req = container.requestFullscreen?.bind(container)
@@ -242,11 +278,14 @@ function goFullscreen() {
       || container.msRequestFullscreen?.bind(container);
 
     if (req) {
-      req().catch(() => {
-        // Fall back to CSS-based fullscreen mode
+      req().then(() => {
+        console.log('[Fullscreen] Entered fullscreen via API');
+      }).catch(() => {
+        console.log('[Fullscreen] API failed, using CSS fallback');
         document.body.classList.add('fullscreen-mode');
       });
     } else {
+      console.log('[Fullscreen] No API available, using CSS fallback');
       document.body.classList.add('fullscreen-mode');
     }
   } else {
@@ -255,16 +294,33 @@ function goFullscreen() {
       || document.mozCancelFullScreen?.bind(document)
       || document.msExitFullscreen?.bind(document);
     if (exit) {
-      exit().catch(() => {
-        // ensure CSS class removed even if exit rejects
+      exit().then(() => {
+        console.log('[Fullscreen] Exited fullscreen via API');
+      }).catch(() => {
+        console.log('[Fullscreen] Exit failed, removing CSS class');
         document.body.classList.remove('fullscreen-mode');
       });
     }
     // Always remove CSS fullscreen class when exiting
     document.body.classList.remove('fullscreen-mode');
+    console.log('[Fullscreen] Exited fullscreen');
   }
+}
 
-  console.log('[Fullscreen] Toggled fullscreen-mode / request');
+// Listen for fullscreen changes to keep CSS class in sync
+document.addEventListener('fullscreenchange', syncFullscreenClass);
+document.addEventListener('webkitfullscreenchange', syncFullscreenClass);
+document.addEventListener('mozfullscreenchange', syncFullscreenClass);
+document.addEventListener('MSFullscreenChange', syncFullscreenClass);
+
+function syncFullscreenClass() {
+  const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+  if (isFullscreen) {
+    document.body.classList.add('fullscreen-mode');
+  } else {
+    document.body.classList.remove('fullscreen-mode');
+  }
+  console.log('[Fullscreen] State synced:', isFullscreen);
 }
 
 function bindControls() {

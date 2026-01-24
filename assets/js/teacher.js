@@ -157,15 +157,40 @@ function renderOutlineWithQuestions() {
       detailsEl.appendChild(actionsRow);
     }
 
-    // Points list
+    // Points list with type support
     if (Array.isArray(section.points) && section.points.length > 0) {
-      const ul = document.createElement('ul');
+      const pointsContainer = document.createElement('div');
+      pointsContainer.className = 'points-container';
+      
       section.points.forEach(pt => {
-        const li = document.createElement('li');
-        li.textContent = pt;
-        ul.appendChild(li);
+        // Support both string format (backward compatible) and object format with type
+        const pointType = typeof pt === 'object' ? (pt.type || 'point') : 'point';
+        const pointText = typeof pt === 'object' ? pt.text : pt;
+        
+        const pointDiv = document.createElement('div');
+        pointDiv.className = `point point-${pointType}`;
+        
+        // Add icons for different types
+        const icons = {
+          verse: '📖',
+          question: '❓',
+          example: '💡',
+          note: '📝',
+          heading: '',
+          point: '•'
+        };
+        
+        const icon = icons[pointType] || '•';
+        if (pointType === 'heading') {
+          pointDiv.innerHTML = `<strong>${pointText}</strong>`;
+        } else {
+          pointDiv.innerHTML = `<span class="point-icon">${icon}</span><span class="point-text">${pointText}</span>`;
+        }
+        
+        pointsContainer.appendChild(pointDiv);
       });
-      detailsEl.appendChild(ul);
+      
+      detailsEl.appendChild(pointsContainer);
     }
 
     // Questions with answer fields + notes
@@ -277,6 +302,24 @@ function parseTimeFromSummary(summary) {
 function renderMediaGallery() {
   if (!classConfig.media || classConfig.media.length === 0) return;
 
+  // Collect all section media from outline
+  let allSectionMedia = [];
+  if (classConfig.outline) {
+    classConfig.outline.forEach(section => {
+      if (section.media && section.media.length > 0) {
+        section.media.forEach(media => {
+          allSectionMedia.push({
+            ...media,
+            sectionTitle: section.summary
+          });
+        });
+      }
+    });
+  }
+
+  // Combine class-level media with section media
+  const allMedia = [...classConfig.media, ...allSectionMedia];
+
   // Find the control panel container
   const controlPanel = document.querySelector('section.card.sticky');
   if (!controlPanel) return;
@@ -299,24 +342,35 @@ function renderMediaGallery() {
     <div class="tag">Media resources</div>
     <h3 style="margin: 10px 0 12px;">Class materials</h3>
     <div class="materials-list">
-      ${classConfig.media.map(media => `
-        <div class="list-item" title="${media.title || media.type}">
-          <div style="display:flex; gap:10px; align-items:center;">
-            <div style="font-size:20px">${getMediaIcon(media.type)}</div>
-            <div style="min-width:0;">
-              <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${media.title || media.type}</div>
-              <div style="font-size:12px; color:var(--muted)">${media.type}${media.type==='video' && media.pausePoints? ` · ${media.pausePoints.length} pauses` : ''}</div>
+      ${allMedia.map((media, idx) => {
+        const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
+        const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
+        
+        return `
+          <div class="list-item" title="${media.title || media.type}">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <div style="font-size:20px">${getMediaIcon(media.type)}</div>
+              <div style="min-width:0;">
+                <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${media.title || media.type}</div>
+                <div style="font-size:12px; color:var(--muted)">${media.type}${media.primary ? ' (primary)' : ''}</div>
+                ${sectionLabel}
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              ${media.type === 'link' 
+                ? `<a href="${url}" target="_blank" rel="noopener"><button>Open</button></a>` 
+                : `<button onclick="sendMediaToStudent(${idx})">Show</button>`}
             </div>
           </div>
-          <div style="display:flex; gap:8px;">
-            ${media.type === 'video' ? `<button onclick="sendCommand('jumpToMedia', { id: '${media.id}' })">Open</button>` : `<a href="${(media.sources && media.sources[0] && (media.sources[0].url||media.sources[0].path))|| '#'}" target="_blank" rel="noopener"><button>Open</button></a>`}
-          </div>
-        </div>
-      `).join('')}
+        `;
+      }).join('')}
     </div>
   `;
 
   mediaPanel.innerHTML = mediaHTML;
+  
+  // Store media list for sendMediaToStudent function
+  window.teacherMediaList = allMedia;
 }
 
 function getMediaIcon(type) {
@@ -330,6 +384,17 @@ function getMediaIcon(type) {
     presentation: '📊'
   };
   return icons[type] || '📁';
+}
+
+function sendMediaToStudent(index) {
+  if (!window.teacherMediaList || index >= window.teacherMediaList.length) {
+    console.error('[Teacher] Invalid media index:', index);
+    return;
+  }
+  
+  const media = window.teacherMediaList[index];
+  console.log('[Teacher] Sending media to student:', media);
+  sendCommand('displayMedia', { media });
 }
 
 function sendCommand(type, payload = {}) {
@@ -407,6 +472,7 @@ function bindControls() {
   const restartBtn = document.getElementById('restart');
   const nextBtn = document.getElementById('next');
   const fullscreenBtn = document.getElementById('fullscreen');
+  const clearScreenBtn = document.getElementById('clear-screen');
 
   if (toggleBtn) toggleBtn.onclick = () => sendCommand('toggle');
   if (playBtn) playBtn.onclick = () => sendCommand('play');
@@ -414,6 +480,7 @@ function bindControls() {
   if (restartBtn) restartBtn.onclick = () => sendCommand('restart');
   if (nextBtn) nextBtn.onclick = () => sendCommand('nextPause');
   if (fullscreenBtn) fullscreenBtn.onclick = () => sendCommand('fullscreen');
+  if (clearScreenBtn) clearScreenBtn.onclick = () => sendCommand('clearScreen');
 
   if (downloadBtn) downloadBtn.onclick = downloadNotes;
   if (uploadBtn) uploadBtn.onclick = () => fileInput?.click();
