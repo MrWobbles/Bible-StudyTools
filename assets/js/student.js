@@ -7,6 +7,7 @@ let pausePoints = [];
 let CHANNEL_KEY = 'class1-control';
 let STORAGE_FALLBACK_KEY = 'class1-control-storage';
 let pendingMedia = null;
+let verseScrollContainer = null;
 
 // Function to update player reference when a new video is loaded
 window.updatePlayerReference = function (newPlayer) {
@@ -181,6 +182,12 @@ function handleRemoteCommand(event) {
         console.log('[Student] Clearing screen and returning to default view');
         window.returnToDefaultView();
       }
+      break;
+    case 'verseNext':
+      nextVersePage();
+      break;
+    case 'versePrevious':
+      previousVersePage();
       break;
     default:
       break;
@@ -465,7 +472,88 @@ function handlePendingMedia() {
       playerDiv.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:contain;" alt="${pendingMedia.title || 'Image'}">`;
       pendingMedia = null;
     }
+  } else if (pendingMedia.type === 'verse') {
+    const media = pendingMedia;
+    pendingMedia = null;
+    renderVerseMedia(media);
   }
+}
+
+async function renderVerseMedia(media) {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
+  const reference = (media.reference || media.title || '').trim();
+  if (!reference) return;
+
+  if (player) {
+    player.destroy();
+    player = null;
+  }
+
+  const translation = (media.translation || 'web').trim();
+  const endpoint = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(translation)}`;
+
+  playerDiv.innerHTML = `
+    <div style="padding:24px; display:flex; flex-direction:column; gap:12px; height:100%; overflow:auto;">
+      <div style="font-size:14px; color:var(--muted);">Loading passage…</div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(endpoint);
+    if (!res.ok) throw new Error('Failed to fetch passage');
+    const data = await res.json();
+
+    const title = data.reference || reference;
+    const text = (data.text || '').trim();
+
+    const allParagraphs = text
+      .split('\n')
+      .map(t => t.trim())
+      .filter(Boolean)
+      .map(t => `<p style="margin:0; padding:0; line-height:2.4; font-size:40px;">${escapeHtml(t)}</p>`)
+      .join('');
+
+    playerDiv.innerHTML = `
+      <div style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: rgba(0 0 0 / 75%);margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);">
+        <div style="font-size:18px; color:var(--muted); margin-bottom:20px;">World English Bible (public domain)</div>
+        <h2 style="margin:0 0 20px 0; font-size:48px;">${escapeHtml(title)}</h2>
+        <div id="verse-content" style="font-size:40px; overflow:hidden; flex:1; padding-bottom:80px;">
+          ${allParagraphs}
+        </div>
+      </div>
+    `;
+
+    verseScrollContainer = document.getElementById('verse-content');
+  } catch (err) {
+    playerDiv.innerHTML = `
+      <div style="padding:24px; color:var(--muted);">
+        Unable to load passage. Please check the reference and try again.
+      </div>
+    `;
+  }
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function nextVersePage() {
+  if (!verseScrollContainer) return;
+  const scrollHeight = verseScrollContainer.clientHeight;
+  verseScrollContainer.scrollTop += scrollHeight;
+}
+
+function previousVersePage() {
+  if (!verseScrollContainer) return;
+  const scrollHeight = verseScrollContainer.clientHeight;
+  verseScrollContainer.scrollTop = Math.max(0, verseScrollContainer.scrollTop - scrollHeight);
 }
 
 function extractVideoId(url) {

@@ -48,6 +48,9 @@ async function loadClassConfig() {
     window.BIBLE_STUDY_CONFIG_READY = true;
     window.dispatchEvent(new CustomEvent('bibleStudyConfigReady'));
 
+    window.BIBLE_STUDY_CONFIG_READY = true;
+    window.dispatchEvent(new CustomEvent('bibleStudyConfigReady'));
+
     initializePageFromConfig();
   } catch (err) {
     console.error('Failed to load class configuration:', err);
@@ -318,7 +321,8 @@ function getMediaIcon(type) {
     audio: '🔊',
     document: '📋',
     link: '🔗',
-    presentation: '📊'
+    presentation: '📊',
+    verse: '📖'
   };
   return icons[type] || '📁';
 }

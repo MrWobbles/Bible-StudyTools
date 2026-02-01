@@ -376,9 +376,34 @@ function renderMediaGallery() {
         `;
   }).join('')}
     </div>
+    <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
+      <div class="tag">Bible verse</div>
+      <h3 style="margin: 8px 0 10px;">Quick verse</h3>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="verse-ref-input" type="text" placeholder="e.g., John 3:16–18" style="flex:1; min-width:200px;" />
+        <input id="verse-translation-input" type="text" value="web" style="width:80px;" />
+        <button id="verse-send-btn">Show</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button id="verse-prev" style="flex:1;">← Previous</button>
+        <button id="verse-next" style="flex:1;">Next →</button>
+      </div>
+      <div style="font-size:12px; color:var(--muted); margin-top:6px;">
+        Uses World English Bible (public domain) via bible-api.com
+      </div>
+    </div>
   `;
 
   mediaPanel.innerHTML = mediaHTML;
+
+  const verseRefInput = document.getElementById('verse-ref-input');
+  const verseTranslationInput = document.getElementById('verse-translation-input');
+  const verseSendBtn = document.getElementById('verse-send-btn');
+
+  if (verseSendBtn && verseRefInput) {
+    verseSendBtn.onclick = () =>
+      sendVerseToStudent(verseRefInput.value, verseTranslationInput?.value || 'web');
+  }
 
   // Store media list for sendMediaToStudent function
   window.teacherMediaList = allMedia;
@@ -421,6 +446,18 @@ function sendMediaToStudent(index) {
   const media = window.teacherMediaList[index];
   console.log('[Teacher] Sending media to student:', media);
   sendCommand('displayMedia', { media });
+}
+
+function sendVerseToStudent(reference, translation = 'web') {
+  if (!reference || !reference.trim()) return;
+  sendCommand('displayMedia', {
+    media: {
+      type: 'verse',
+      reference: reference.trim(),
+      translation: (translation || 'web').trim(),
+      title: reference.trim()
+    }
+  });
 }
 
 function sendCommand(type, payload = {}) {
@@ -507,6 +544,11 @@ function bindControls() {
   if (nextBtn) nextBtn.onclick = () => sendCommand('nextPause');
   if (fullscreenBtn) fullscreenBtn.onclick = () => sendCommand('fullscreen');
   if (clearScreenBtn) clearScreenBtn.onclick = () => sendCommand('clearScreen');
+
+  const versePrevBtn = document.getElementById('verse-prev');
+  const verseNextBtn = document.getElementById('verse-next');
+  if (versePrevBtn) versePrevBtn.onclick = () => sendCommand('versePrevious');
+  if (verseNextBtn) verseNextBtn.onclick = () => sendCommand('verseNext');
 
   if (downloadBtn) downloadBtn.onclick = downloadNotes;
   if (uploadBtn) uploadBtn.onclick = () => fileInput?.click();
