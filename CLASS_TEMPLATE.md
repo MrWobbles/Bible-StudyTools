@@ -1,6 +1,6 @@
 # CLASS IMPORT TEMPLATE
-<!-- 
-This template is designed for efficient class creation. Simply paste your raw text content 
+<!--
+This template is designed for efficient class creation. Simply paste your raw text content
 into the designated sections below, then use AI to convert it into the proper JSON structure.
 
 INSTRUCTIONS:
@@ -49,7 +49,7 @@ INSTRUCTIONS:
 ---
 
 ## OUTLINE SECTIONS
-<!-- 
+<!--
 Each section represents a discussion topic or lesson segment.
 Copy this block for each new section.
 -->
@@ -257,7 +257,7 @@ Copy this block for each new section.
 ## QUICK REFERENCE: JSON STRUCTURE MAPPING
 
 ```
-METADATA → 
+METADATA →
 {
   "classNumber": number,
   "title": string,
@@ -356,19 +356,19 @@ Each of these deserves a thoughtful response based on historical and textual evi
 ## YOUR CLASS CONTENT STARTS HERE
 <!-- Replace everything below with your actual class content -->
 
-### SECTION: 
-**Section ID:** 
-**Default Open:** 
+### SECTION:
+**Section ID:**
+**Default Open:**
 
 **Main Points:**
-- 
-- 
-- 
+-
+-
+-
 
 **Discussion Questions:**
 
-#### Q: 
-**Prompt:** 
+#### Q:
+**Prompt:**
 
 **Answer:**
 

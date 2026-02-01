@@ -25,7 +25,7 @@ async function loadClassConfig() {
 
     // Set up the global config for backward compatibility
     const primaryMedia = classConfig.media?.find(m => m.primary && m.type === 'video');
-    
+
     // Extract videoId from URL or use videoId directly
     let videoId = '';
     if (primaryMedia?.sources?.[0]) {
@@ -34,16 +34,19 @@ async function loadClassConfig() {
         videoId = source.videoId;
       } else if (source.url) {
         // Extract ID from YouTube URL (supports youtu.be and youtube.com formats)
-        const match = source.url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=)([^&\?\/]+)/);
+        const match = source.url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/))([^&\?\/]+)/);
         videoId = match ? match[1] : '';
       }
     }
-    
+
     window.BIBLE_STUDY_CONFIG = {
       videoId: videoId,
       channelName: classConfig.channelName || `class${classId}-control`,
       pausePoints: primaryMedia?.pausePoints || []
     };
+
+    window.BIBLE_STUDY_CONFIG_READY = true;
+    window.dispatchEvent(new CustomEvent('bibleStudyConfigReady'));
 
     initializePageFromConfig();
   } catch (err) {
@@ -97,10 +100,10 @@ function renderMediaGallery() {
 
   // Find primary media
   const primaryMedia = classConfig.media.find(m => m.primary);
-  
+
   if (primaryMedia) {
     playerShell.innerHTML = '';
-    
+
     if (primaryMedia.type === 'video') {
       // Only render video player if there's a valid URL
       const source = primaryMedia.sources?.[0];
@@ -179,7 +182,7 @@ function renderMediaGallery() {
   // Add media gallery below pause list - includes additional class-level media and all section media
   const additionalMedia = classConfig.media.filter(m => !m.primary);
   const allGalleryMedia = [...additionalMedia, ...allSectionMedia];
-  
+
   if (allGalleryMedia.length > 0) {
     let galleryContainer = videoCard.querySelector('#media-gallery');
     if (!galleryContainer) {
@@ -195,7 +198,7 @@ function renderMediaGallery() {
         ${allGalleryMedia.map((media, idx) => renderMediaThumbnail(media, idx)).join('')}
       </div>
     `;
-    
+
     // Add click handlers for media items
     galleryContainer.querySelectorAll('.media-item').forEach(item => {
       item.addEventListener('click', () => {
@@ -234,7 +237,7 @@ function openMediaInViewer(media) {
   if (!playerShell) return;
 
   const url = media.url || media.sources?.[0]?.url || '';
-  
+
   if (media.type === 'video') {
     // Extract YouTube ID
     const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/))([^&\?\/]+)/);
@@ -242,7 +245,7 @@ function openMediaInViewer(media) {
     if (videoId) {
       // Replace the player shell with a fresh player div
       playerShell.innerHTML = '<div id="player"></div>';
-      
+
       // Reinitialize the YouTube player with the new video so controls work
       if (window.YT && window.YT.Player) {
         if (window.player) {
@@ -252,7 +255,7 @@ function openMediaInViewer(media) {
             console.warn('[Loader] Error destroying player:', e);
           }
         }
-        
+
         const newPlayer = new YT.Player('player', {
           height: '100%',
           width: '100%',
@@ -264,7 +267,7 @@ function openMediaInViewer(media) {
             playsinline: 1
           },
           events: {
-            onReady: function(event) {
+            onReady: function (event) {
               // Update all player references
               window.player = event.target;
               if (window.updatePlayerReference) {
@@ -278,7 +281,7 @@ function openMediaInViewer(media) {
             onStateChange: window.onPlayerStateChange
           }
         });
-        
+
         // Update the global VIDEO_ID so pause points work if this video has them
         window.VIDEO_ID = videoId;
         console.log('[Loader] Initialized new YouTube player with video:', videoId);

@@ -6,9 +6,10 @@ let VIDEO_ID = '';
 let pausePoints = [];
 let CHANNEL_KEY = 'class1-control';
 let STORAGE_FALLBACK_KEY = 'class1-control-storage';
+let pendingMedia = null;
 
 // Function to update player reference when a new video is loaded
-window.updatePlayerReference = function(newPlayer) {
+window.updatePlayerReference = function (newPlayer) {
   player = newPlayer;
   window.player = newPlayer;
   console.log('[Student] Player reference updated');
@@ -21,65 +22,106 @@ window.onPlayerReady = onPlayerReady;
 window.onPlayerStateChange = onPlayerStateChange;
 
 function initConfig() {
+  const classId = new URLSearchParams(window.location.search).get('class') || '1';
   const config = window.BIBLE_STUDY_CONFIG || {};
   VIDEO_ID = config.videoId || '';
   // Normalize pausePoints: allow seconds (number) or "MM:SS" strings
   pausePoints = Array.isArray(config.pausePoints)
     ? config.pausePoints.map((p) => ({
-        ...p,
-        time: parseTimeValue(p.time),
-      })).filter((p) => Number.isFinite(p.time))
+      ...p,
+      time: parseTimeValue(p.time),
+    })).filter((p) => Number.isFinite(p.time))
     : [];
-  CHANNEL_KEY = config.channelName || 'class1-control';
+  CHANNEL_KEY = config.channelName || `class${classId}-control`;
   STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
 }
 
 // Wait for config to load, then initialize YouTube API
 window.addEventListener('load', () => {
-  initConfig();
-  const tag = document.createElement('script');
-  tag.src = 'https://www.youtube.com/iframe_api';
-  document.head.appendChild(tag);
+  function initAfterConfig() {
+    initConfig();
+    setupControlChannel();
+
+    if (window.self !== window.top) {
+      const scale = 400 / 1280;
+      document.body.style.transform = `scale(${scale})`;
+      document.body.style.transformOrigin = 'top left';
+      document.body.style.width = '1280px';
+      document.body.style.height = '720px';
+      document.body.style.overflow = 'hidden';
+    }
+
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+  }
+
+  if (window.BIBLE_STUDY_CONFIG_READY) {
+    initAfterConfig();
+  } else {
+    window.addEventListener('bibleStudyConfigReady', initAfterConfig, { once: true });
+  }
 });
 
-setupControlChannel();
+// Check if we're in an iframe (preview mode)
+const isInIframe = window.self !== window.top;
 
 function onYouTubeIframeAPIReady() {
-  player = new YT.Player('player', {
-    height: '100%',
-    width: '100%',
-    videoId: VIDEO_ID,
-    playerVars: {
-      rel: 0,
-      modestbranding: 1,
-      color: 'white',
-      playsinline: 1
-    },
-    events: {
-      onReady: function(event) {
-        player = event.target;
-        window.player = event.target;
-        onPlayerReady(event);
+  try {
+    player = new YT.Player('player', {
+      height: '100%',
+      width: '100%',
+      videoId: VIDEO_ID,
+      playerVars: {
+        rel: 0,
+        modestbranding: 1,
+        color: 'white',
+        playsinline: 1,
+        mute: isInIframe ? 1 : 0
       },
-      onStateChange: onPlayerStateChange
+      events: {
+        onReady: function (event) {
+          player = event.target;
+          window.player = event.target;
+          onPlayerReady(event);
+        },
+        onStateChange: onPlayerStateChange
+      }
+    });
+  } catch (error) {
+    console.error('Error initializing YouTube player:', error);
+    // Fallback: show error message in the player div
+    const playerDiv = document.getElementById('player');
+    if (playerDiv) {
+      playerDiv.innerHTML = '<p style="color: red; text-align: center; padding: 20px;">Error loading video player. Please check your browser extensions or try refreshing the page.</p>';
     }
-  });
+  }
 }
 
 function onPlayerReady() {
   renderPauseList();
   resetNextPause();
   bindControls();
+  handlePendingMedia();
 }
 
 function setupControlChannel() {
+  console.log('[Student] Setting up control channel:', CHANNEL_KEY, 'STORAGE_FALLBACK_KEY:', STORAGE_FALLBACK_KEY);
+  console.log('[Student] Is in iframe:', window.self !== window.top);
+
   if ('BroadcastChannel' in window) {
     channel = new BroadcastChannel(CHANNEL_KEY);
-    channel.onmessage = handleRemoteCommand;
+    channel.onmessage = (event) => {
+      console.log('[Student] BroadcastChannel message received');
+      handleRemoteCommand(event);
+    };
+    console.log('[Student] BroadcastChannel set up');
   }
 
   window.addEventListener('storage', event => {
+    console.log('[Student] Storage event received, key:', event.key);
     if (event.key !== STORAGE_FALLBACK_KEY || !event.newValue) return;
+    console.log('[Student] Processing storage event');
     try {
       const data = JSON.parse(event.newValue);
       handleRemoteCommand({ data });
@@ -118,13 +160,20 @@ function handleRemoteCommand(event) {
       }
       break;
     case 'fullscreen':
-      console.log('[Student] Executing fullscreen command');
-      goFullscreen();
+      // Only execute fullscreen in the actual window, not in iframe preview
+      if (!isInIframe) {
+        console.log('[Student] Executing fullscreen command');
+        goFullscreen();
+      } else {
+        console.log('[Student] Ignoring fullscreen command in iframe');
+      }
       break;
     case 'displayMedia':
-      if (data.media && typeof window.openMediaInViewer === 'function') {
-        console.log('[Student] Opening media from teacher command:', data.media);
-        window.openMediaInViewer(data.media);
+      console.log('[Student] Received displayMedia:', data.media);
+      pendingMedia = data.media;
+      // Try to handle immediately if DOM is ready, otherwise it will be handled on player ready
+      if (document.readyState === 'complete') {
+        handlePendingMedia();
       }
       break;
     case 'clearScreen':
@@ -260,9 +309,9 @@ function goFullscreen() {
 
   function isFullscreenActive() {
     return !!(
-      document.fullscreenElement || 
-      document.webkitFullscreenElement || 
-      document.mozFullScreenElement || 
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
       document.msFullscreenElement ||
       document.body.classList.contains('fullscreen-mode')
     );
@@ -330,8 +379,97 @@ function bindControls() {
   document.getElementById('fullscreen').onclick = goFullscreen;
 }
 
-function formatTime(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = Math.floor(totalSeconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
+function handlePendingMedia() {
+  console.log('[Student] handlePendingMedia called, pendingMedia:', pendingMedia);
+  if (!pendingMedia) {
+    console.log('[Student] No pending media, returning');
+    return;
+  }
+
+  // Always use .player-shell as the container since YouTube API replaces #player with an iframe
+  const playerDiv = document.querySelector('.player-shell');
+  console.log('[Student] playerDiv:', playerDiv);
+  if (!playerDiv) {
+    console.log('[Student] No player div found, returning');
+    return;
+  }
+
+  console.log('[Student] Processing media:', pendingMedia);
+
+  if (pendingMedia.type === 'video') {
+    // Support both sources array and direct url
+    let videoUrl = '';
+    let videoId = '';
+
+    if (pendingMedia.sources && pendingMedia.sources[0]) {
+      const source = pendingMedia.sources[0];
+      videoId = source.videoId || '';
+      videoUrl = source.url || '';
+    } else if (pendingMedia.url) {
+      videoUrl = pendingMedia.url;
+    } else if (pendingMedia.videoId) {
+      videoId = pendingMedia.videoId;
+    }
+
+    const newVideoId = videoId || extractVideoId(videoUrl);
+    console.log('[Student] Extracted video ID:', newVideoId, 'from URL:', videoUrl);
+
+    if (newVideoId) {
+      VIDEO_ID = newVideoId;
+      // Destroy existing player if any
+      if (player) {
+        player.destroy();
+        player = null;
+      }
+      // Clear the container and create a new player div
+      playerDiv.innerHTML = '<div id="player"></div>';
+      console.log('[Student] Creating new YouTube player with video ID:', VIDEO_ID);
+      // Create new player
+      player = new YT.Player('player', {
+        height: '100%',
+        width: '100%',
+        videoId: VIDEO_ID,
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          color: 'white',
+          playsinline: 1,
+          mute: isInIframe ? 1 : 0
+        },
+        events: {
+          onReady: function (event) {
+            player = event.target;
+            window.player = event.target;
+            onPlayerReady(event);
+          },
+          onStateChange: onPlayerStateChange
+        }
+      });
+      pendingMedia = null;
+    }
+  } else if (pendingMedia.type === 'image' || pendingMedia.type === 'images') {
+    // Support both sources array and direct url
+    let imgUrl = '';
+    if (pendingMedia.sources && pendingMedia.sources[0]) {
+      imgUrl = pendingMedia.sources[0].url;
+    } else if (pendingMedia.url) {
+      imgUrl = pendingMedia.url;
+    }
+
+    if (imgUrl) {
+      // Destroy player if exists
+      if (player) {
+        player.destroy();
+        player = null;
+      }
+      playerDiv.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:contain;" alt="${pendingMedia.title || 'Image'}">`;
+      pendingMedia = null;
+    }
+  }
+}
+
+function extractVideoId(url) {
+  if (!url) return '';
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/))([^&\?\/]+)/);
+  return match ? match[1] : '';
 }

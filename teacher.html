@@ -22,7 +22,7 @@
         <p class="subtitle">Class 1 · Keep this on your laptop while casting the main screen.</p>
       </div>
       <div class="title-group" style="align-items: flex-end; text-align: right;">
-        <a class="pill-link" href="student.html" target="display-screen" rel="noopener">Open display page</a>
+        <button id="open-display-btn" class="pill-link">Open display page</button>
         <small class="subtitle">Load that window on the TV; control it from here.</small>
       </div>
     </header>
@@ -69,7 +69,8 @@
           <button id="restart">Restart from 0:00</button>
           <button id="next">Skip to next pause</button>
           <button id="fullscreen">Fullscreen the display</button>
-          <button id="clear-screen" style="background: rgba(240, 180, 41, 0.15); border-color: var(--accent);">Clear Screen</button>
+          <button id="clear-screen" style="background: rgba(240, 180, 41, 0.15); border-color: var(--accent);">Clear
+            Screen</button>
         </div>
 
         <div class="list" id="pause-list"></div>
@@ -81,6 +82,9 @@
   <script src="assets/js/loader.js"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/teacher.js"></script>
+
+  <iframe id="student-preview" src=""
+    style="position: fixed; bottom: 20px; right: 20px; width: 400px; height: 225px; border: 1px solid #ccc; z-index: 1000; pointer-events: none; display: none;"></iframe>
 </body>
 
 </html>

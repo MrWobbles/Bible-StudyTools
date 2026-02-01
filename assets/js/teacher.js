@@ -15,6 +15,8 @@ let downloadBtn = null;
 let uploadBtn = null;
 let fileInput = null;
 let questionFields = [];
+let displayWindow = null;
+let displayWindowCheckInterval = null;
 
 async function loadClassConfig() {
   try {
@@ -91,6 +93,9 @@ function initializePage() {
   const subtitle = document.querySelector('.subtitle');
   if (subtitle) subtitle.textContent = `Class ${classConfig.classNumber} · Keep this on your laptop while casting the main screen.`;
 
+  const previewIframe = document.getElementById('student-preview');
+  if (previewIframe) previewIframe.src = `${window.location.origin}/student.html?class=${classId}`;
+
   const guideTitle = document.querySelector('h3');
   if (guideTitle) guideTitle.textContent = `Class ${classConfig.classNumber} guide with notes`;
 
@@ -103,6 +108,12 @@ function initializePage() {
 
   bindControls();
   hydrateNotes();
+
+  // Set up open display button
+  const openDisplayBtn = document.getElementById('open-display-btn');
+  if (openDisplayBtn) {
+    openDisplayBtn.addEventListener('click', openDisplayWindow);
+  }
 
   if (statusEl) statusEl.textContent = 'Ready. Open the display page on the TV (student.html).';
 }
@@ -161,15 +172,15 @@ function renderOutlineWithQuestions() {
     if (Array.isArray(section.points) && section.points.length > 0) {
       const pointsContainer = document.createElement('div');
       pointsContainer.className = 'points-container';
-      
+
       section.points.forEach(pt => {
         // Support both string format (backward compatible) and object format with type
         const pointType = typeof pt === 'object' ? (pt.type || 'point') : 'point';
         const pointText = typeof pt === 'object' ? pt.text : pt;
-        
+
         const pointDiv = document.createElement('div');
         pointDiv.className = `point point-${pointType}`;
-        
+
         // Add icons for different types
         const icons = {
           verse: '📖',
@@ -179,17 +190,17 @@ function renderOutlineWithQuestions() {
           heading: '',
           point: '•'
         };
-        
+
         const icon = icons[pointType] || '•';
         if (pointType === 'heading') {
           pointDiv.innerHTML = `<strong>${pointText}</strong>`;
         } else {
           pointDiv.innerHTML = `<span class="point-icon">${icon}</span><span class="point-text">${pointText}</span>`;
         }
-        
+
         pointsContainer.appendChild(pointDiv);
       });
-      
+
       detailsEl.appendChild(pointsContainer);
     }
 
@@ -343,10 +354,10 @@ function renderMediaGallery() {
     <h3 style="margin: 10px 0 12px;">Class materials</h3>
     <div class="materials-list">
       ${allMedia.map((media, idx) => {
-        const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
-        const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
-        
-        return `
+    const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
+    const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
+
+    return `
           <div class="list-item" title="${media.title || media.type}">
             <div style="display:flex; gap:10px; align-items:center;">
               <div style="font-size:20px">${getMediaIcon(media.type)}</div>
@@ -357,33 +368,48 @@ function renderMediaGallery() {
               </div>
             </div>
             <div style="display:flex; gap:8px;">
-              ${media.type === 'link' 
-                ? `<a href="${url}" target="_blank" rel="noopener"><button>Open</button></a>` 
-                : `<button onclick="sendMediaToStudent(${idx})">Show</button>`}
+              ${media.type === 'link'
+        ? `<a href="${url}" target="_blank" rel="noopener"><button>Open</button></a>`
+        : `<button onclick="sendMediaToStudent(${idx})">Show</button>`}
             </div>
           </div>
         `;
-      }).join('')}
+  }).join('')}
     </div>
   `;
 
   mediaPanel.innerHTML = mediaHTML;
-  
+
   // Store media list for sendMediaToStudent function
   window.teacherMediaList = allMedia;
 }
 
-function getMediaIcon(type) {
-  const icons = {
-    video: '▶️',
-    pdf: '📄',
-    images: '🖼️',
-    audio: '🔊',
-    document: '📋',
-    link: '🔗',
-    presentation: '📊'
-  };
-  return icons[type] || '📁';
+function openDisplayWindow() {
+  if (displayWindow && !displayWindow.closed) {
+    displayWindow.location.href = `${window.location.origin}/student.html?class=${classId}`;
+    displayWindow.focus();
+  } else {
+    displayWindow = window.open(`${window.location.origin}/student.html?class=${classId}`, 'display-screen', 'width=1280,height=720');
+  }
+
+  // Show the preview iframe
+  const previewIframe = document.getElementById('student-preview');
+  if (previewIframe) {
+    previewIframe.style.display = 'block';
+  }
+
+  // Start checking if the window is closed
+  if (displayWindowCheckInterval) clearInterval(displayWindowCheckInterval);
+  displayWindowCheckInterval = setInterval(() => {
+    if (displayWindow && displayWindow.closed) {
+      const previewIframe = document.getElementById('student-preview');
+      if (previewIframe) {
+        previewIframe.style.display = 'none';
+      }
+      clearInterval(displayWindowCheckInterval);
+      displayWindowCheckInterval = null;
+    }
+  }, 1000);
 }
 
 function sendMediaToStudent(index) {
@@ -391,7 +417,7 @@ function sendMediaToStudent(index) {
     console.error('[Teacher] Invalid media index:', index);
     return;
   }
-  
+
   const media = window.teacherMediaList[index];
   console.log('[Teacher] Sending media to student:', media);
   sendCommand('displayMedia', { media });
