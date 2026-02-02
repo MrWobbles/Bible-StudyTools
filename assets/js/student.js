@@ -510,14 +510,14 @@ async function renderVerseMedia(media) {
     const allParagraphs = verseData.lines
       .map(line => line.trim())
       .filter(Boolean)
-      .map(line => `<p style="margin:0; padding:0; line-height:2.4; font-size:40px;">${escapeHtml(line)}</p>`)
+      .map(line => `<p style="margin:0; padding:0; line-height:2.4; font-size:72px;">${escapeHtml(line)}</p>`)
       .join('');
 
     playerDiv.innerHTML = `
       <div style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: rgba(0 0 0 / 75%);margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);">
-        <div style="font-size:18px; color:var(--muted); margin-bottom:20px;">${escapeHtml(sourceLabel)}</div>
-        <h2 style="margin:0 0 20px 0; font-size:48px;">${escapeHtml(title)}</h2>
-        <div id="verse-content" style="font-size:40px; overflow:hidden; flex:1; padding-bottom:80px;">
+        <div style="font-size:28px; color:var(--muted); margin-bottom:20px;">${escapeHtml(sourceLabel)}</div>
+        <h2 style="margin:0 0 30px 0; font-size:80px;">${escapeHtml(title)}</h2>
+        <div id="verse-content" style="font-size:72px; overflow:hidden; flex:1; padding-bottom:80px;">
           ${allParagraphs}
         </div>
       </div>

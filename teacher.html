@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/teacher.css" />
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="apple-touch-icon" href="assets/images/icon.png" />
@@ -63,17 +64,24 @@
 
   <div class="verse-bar">
     <div class="controls-bar">
-      <button class="primary" id="toggle">Play / Pause</button>
-      <button id="play">Play</button>
-      <button id="pause">Pause</button>
-      <button id="restart">Restart</button>
-      <button id="next">Next pause</button>
-      <button id="fullscreen">Fullscreen</button>
-      <button id="clear-screen" style="background: rgba(240, 180, 41, 0.15); border-color: var(--accent);">Clear
-        Screen</button>
-      <span class="controls-divider"></span>
-      <button id="global-verse-prev">← Prev verse</button>
-      <button id="global-verse-next">Next verse →</button>
+      <button class="primary" id="toggle" data-control-type="video" title="Play / Pause"><span
+          class="material-icons">play_circle</span></button>
+      <button id="play" data-control-type="video" title="Play"><span class="material-icons">play_arrow</span></button>
+      <button id="pause" data-control-type="video" title="Pause"><span class="material-icons">pause</span></button>
+      <button id="restart" data-control-type="video" title="Restart"><span
+          class="material-icons">restart_alt</span></button>
+      <button id="next" data-control-type="video" title="Next pause"><span
+          class="material-icons">skip_next</span></button>
+      <button id="fullscreen" data-control-type="video" title="Fullscreen"><span
+          class="material-icons">fullscreen</span></button>
+      <button id="clear-screen" data-control-type="all" title="Clear Screen"
+        style="background: rgba(240, 180, 41, 0.15); border-color: var(--accent);"><span
+          class="material-icons">clear</span></button>
+      <span class="controls-divider" data-control-type="video"></span>
+      <button id="global-verse-prev" data-control-type="verse" title="Previous verse"><span
+          class="material-icons">navigate_before</span>Previous</button>
+      <button id="global-verse-next" data-control-type="verse" title="Next verse">Next<span
+          class="material-icons">navigate_next</span></button>
     </div>
   </div>
 
@@ -87,7 +95,7 @@
   </div>
 
   <iframe id="student-preview" src=""
-    style="position: fixed; bottom: 20px; right: 20px; width: 400px; height: 225px; border: 1px solid #ccc; z-index: 1000; pointer-events: none; display: none;"></iframe>
+    style="position: fixed; bottom: 90px; right: 20px; width: 400px; height: 225px; border: 1px solid #ccc; z-index: 1000; pointer-events: none; display: none;"></iframe>
 </body>
 
 </html>

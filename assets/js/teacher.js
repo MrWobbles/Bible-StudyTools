@@ -6,6 +6,7 @@ let CHANNEL_KEY = 'class-control';
 let STORAGE_FALLBACK_KEY = 'class-control-storage';
 let NOTES_KEY = 'class-teacher-notes';
 let QUESTION_PREFIX = 'class-question-';
+let currentMediaType = null;
 
 let channel = null;
 let statusEl = null;
@@ -509,11 +510,15 @@ function sendMediaToStudent(index) {
 
   const media = window.teacherMediaList[index];
   console.log('[Teacher] Sending media to student:', media);
+  currentMediaType = media.type || 'unknown';
+  updateControlVisibility();
   sendCommand('displayMedia', { media });
 }
 
 function sendVerseToStudent(reference, translation = 'nkjv') {
   if (!reference || !reference.trim()) return;
+  currentMediaType = 'verse';
+  updateControlVisibility();
   sendCommand('displayMedia', {
     media: {
       type: 'verse',
@@ -717,6 +722,31 @@ function formatTime(totalSeconds) {
   const m = Math.floor(totalSeconds / 60);
   const s = Math.floor(totalSeconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateControlVisibility() {
+  const controlsBar = document.querySelector('.controls-bar');
+  if (!controlsBar) return;
+
+  // Get all control elements
+  const allControls = controlsBar.querySelectorAll('[data-control-type]');
+
+  allControls.forEach(control => {
+    const controlType = control.getAttribute('data-control-type');
+
+    // Always show 'all' type controls (clear screen)
+    if (controlType === 'all') {
+      control.style.display = '';
+      return;
+    }
+
+    // Show controls that match current media type
+    if (controlType === currentMediaType) {
+      control.style.display = '';
+    } else {
+      control.style.display = 'none';
+    }
+  });
 }
 
 if (document.readyState === 'loading') {
