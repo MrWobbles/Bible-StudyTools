@@ -491,9 +491,6 @@ async function renderVerseMedia(media) {
     player = null;
   }
 
-  const translation = (media.translation || 'web').trim();
-  const endpoint = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(translation)}`;
-
   playerDiv.innerHTML = `
     <div style="padding:24px; display:flex; flex-direction:column; gap:12px; height:100%; overflow:auto;">
       <div style="font-size:14px; color:var(--muted);">Loading passage…</div>
@@ -501,23 +498,24 @@ async function renderVerseMedia(media) {
   `;
 
   try {
-    const res = await fetch(endpoint);
-    if (!res.ok) throw new Error('Failed to fetch passage');
-    const data = await res.json();
+    const preferredTranslations = media.translation
+      ? [media.translation]
+      : ['nkjv', 'kjv'];
 
-    const title = data.reference || reference;
-    const text = (data.text || '').trim();
+    const verseData = await fetchVerseData(reference, preferredTranslations);
+    if (!verseData) throw new Error('Failed to fetch passage');
 
-    const allParagraphs = text
-      .split('\n')
-      .map(t => t.trim())
+    const title = verseData.title || reference;
+    const sourceLabel = verseData.sourceLabel || 'Scripture';
+    const allParagraphs = verseData.lines
+      .map(line => line.trim())
       .filter(Boolean)
-      .map(t => `<p style="margin:0; padding:0; line-height:2.4; font-size:40px;">${escapeHtml(t)}</p>`)
+      .map(line => `<p style="margin:0; padding:0; line-height:2.4; font-size:40px;">${escapeHtml(line)}</p>`)
       .join('');
 
     playerDiv.innerHTML = `
       <div style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: rgba(0 0 0 / 75%);margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);">
-        <div style="font-size:18px; color:var(--muted); margin-bottom:20px;">World English Bible (public domain)</div>
+        <div style="font-size:18px; color:var(--muted); margin-bottom:20px;">${escapeHtml(sourceLabel)}</div>
         <h2 style="margin:0 0 20px 0; font-size:48px;">${escapeHtml(title)}</h2>
         <div id="verse-content" style="font-size:40px; overflow:hidden; flex:1; padding-bottom:80px;">
           ${allParagraphs}
@@ -532,6 +530,55 @@ async function renderVerseMedia(media) {
         Unable to load passage. Please check the reference and try again.
       </div>
     `;
+  }
+}
+
+async function fetchVerseData(reference, preferredTranslations) {
+  for (const translation of preferredTranslations) {
+    const labs = await fetchFromLabs(reference, translation);
+    if (labs) return labs;
+
+    const bibleApi = await fetchFromBibleApi(reference, translation);
+    if (bibleApi) return bibleApi;
+  }
+
+  return null;
+}
+
+async function fetchFromLabs(reference, translation) {
+  const version = String(translation || '').toUpperCase();
+  const url = `https://labs.bible.org/api/?passage=${encodeURIComponent(reference)}&version=${encodeURIComponent(version)}&type=json`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const lines = data.map(item => `${item.verse} ${item.text}`);
+    const sourceLabel = `${version} via labs.bible.org`;
+    return { title: reference, lines, sourceLabel };
+  } catch (err) {
+    return null;
+  }
+}
+
+async function fetchFromBibleApi(reference, translation) {
+  const version = String(translation || '').toLowerCase();
+  const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(version)}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = (data.text || '').trim();
+    if (!text) return null;
+
+    const lines = text.split('\n').map(t => t.trim()).filter(Boolean);
+    const sourceLabel = `${data.translation_name || version.toUpperCase()} via bible-api.com`;
+    return { title: data.reference || reference, lines, sourceLabel };
+  } catch (err) {
+    return null;
   }
 }
 

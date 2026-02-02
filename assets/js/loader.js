@@ -182,35 +182,7 @@ function renderMediaGallery() {
     });
   }
 
-  // Add media gallery below pause list - includes additional class-level media and all section media
-  const additionalMedia = classConfig.media.filter(m => !m.primary);
-  const allGalleryMedia = [...additionalMedia, ...allSectionMedia];
-
-  if (allGalleryMedia.length > 0) {
-    let galleryContainer = videoCard.querySelector('#media-gallery');
-    if (!galleryContainer) {
-      galleryContainer = document.createElement('div');
-      galleryContainer.id = 'media-gallery';
-      galleryContainer.className = 'media-gallery';
-      videoCard.appendChild(galleryContainer);
-    }
-
-    galleryContainer.innerHTML = `
-      <h4 style="margin: 16px 0 10px; font-size: 16px; font-weight: 600;">Additional materials</h4>
-      <div style="display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
-        ${allGalleryMedia.map((media, idx) => renderMediaThumbnail(media, idx)).join('')}
-      </div>
-    `;
-
-    // Add click handlers for media items
-    galleryContainer.querySelectorAll('.media-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const mediaIndex = parseInt(item.dataset.mediaIndex);
-        const media = allGalleryMedia[mediaIndex];
-        openMediaInViewer(media);
-      });
-    });
-  }
+  // Media gallery removed - all media controlled from teacher view
 }
 
 function renderMediaThumbnail(media, index) {

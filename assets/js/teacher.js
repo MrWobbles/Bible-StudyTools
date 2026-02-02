@@ -313,13 +313,17 @@ function parseTimeFromSummary(summary) {
 function renderMediaGallery() {
   if (!classConfig.media || classConfig.media.length === 0) return;
 
-  // Collect all section media from outline
-  let allSectionMedia = [];
+  const orderedMedia = [];
+  const primaryMedia = classConfig.media.filter(m => m.primary);
+  const otherClassMedia = classConfig.media.filter(m => !m.primary);
+
+  orderedMedia.push(...primaryMedia);
+
   if (classConfig.outline) {
     classConfig.outline.forEach(section => {
       if (section.media && section.media.length > 0) {
         section.media.forEach(media => {
-          allSectionMedia.push({
+          orderedMedia.push({
             ...media,
             sectionTitle: section.summary
           });
@@ -328,73 +332,89 @@ function renderMediaGallery() {
     });
   }
 
-  // Combine class-level media with section media
-  const allMedia = [...classConfig.media, ...allSectionMedia];
+  orderedMedia.push(...otherClassMedia);
 
-  // Find the control panel container
-  const controlPanel = document.querySelector('section.card.sticky');
-  if (!controlPanel) return;
-
-  // Ensure media panel exists after the control panel (right column)
-  let mediaPanel = document.getElementById('media-panel');
-  if (!mediaPanel) {
-    mediaPanel = document.createElement('section');
-    mediaPanel.className = 'card';
-    mediaPanel.id = 'media-panel';
-    mediaPanel.style.marginTop = '14px';
-    // Insert after controlPanel to keep controls on top and materials below
-    if (controlPanel.parentNode) {
-      controlPanel.parentNode.insertBefore(mediaPanel, controlPanel.nextSibling);
-    }
+  let mediaDrawer = document.getElementById('media-drawer');
+  if (!mediaDrawer) {
+    mediaDrawer = document.createElement('aside');
+    mediaDrawer.id = 'media-drawer';
+    mediaDrawer.className = 'media-drawer';
+    mediaDrawer.innerHTML = `
+      <div class="media-drawer-header">
+        <div>
+          <div class="tag">Media resources</div>
+          <h3 style="margin: 6px 0 0;">Lesson media</h3>
+        </div>
+        <button id="media-close-btn">Close</button>
+      </div>
+      <div class="media-drawer-body" id="media-panel"></div>
+    `;
+    document.body.appendChild(mediaDrawer);
   }
+
+  let verseDrawer = document.getElementById('verse-drawer');
+  if (!verseDrawer) {
+    verseDrawer = document.createElement('aside');
+    verseDrawer.id = 'verse-drawer';
+    verseDrawer.className = 'verse-drawer';
+    verseDrawer.innerHTML = `
+      <div class="media-drawer-header">
+        <div>
+          <div class="tag">Bible verse</div>
+          <h3 style="margin: 6px 0 0;">Quick verse</h3>
+        </div>
+        <button id="verse-close-btn">Close</button>
+      </div>
+      <div class="media-drawer-body" id="verse-panel"></div>
+    `;
+    document.body.appendChild(verseDrawer);
+  }
+
+  const mediaPanel = document.getElementById('media-panel');
+  if (!mediaPanel) return;
 
   // Render a compact vertical list of class materials
   const mediaHTML = `
-    <div class="tag">Media resources</div>
-    <h3 style="margin: 10px 0 12px;">Class materials</h3>
-    <div class="materials-list">
-      ${allMedia.map((media, idx) => {
+    <div class="media-list">
+      ${orderedMedia.map((media, idx) => {
     const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
     const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
 
     return `
-          <div class="list-item" title="${media.title || media.type}">
-            <div style="display:flex; gap:10px; align-items:center;">
-              <div style="font-size:20px">${getMediaIcon(media.type)}</div>
-              <div style="min-width:0;">
-                <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${media.title || media.type}</div>
-                <div style="font-size:12px; color:var(--muted)">${media.type}${media.primary ? ' (primary)' : ''}</div>
-                ${sectionLabel}
-              </div>
-            </div>
-            <div style="display:flex; gap:8px;">
-              ${media.type === 'link'
-        ? `<a href="${url}" target="_blank" rel="noopener"><button>Open</button></a>`
-        : `<button onclick="sendMediaToStudent(${idx})">Show</button>`}
+        <div class="media-item" data-media-index="${idx}" data-media-type="${media.type}" data-media-url="${url}" title="${media.title || media.type}">
+          <div style="display:flex; gap:10px; align-items:center; min-width:0;">
+            <div style="font-size:18px">${getMediaIcon(media.type)}</div>
+            <div style="min-width:0;">
+              <div class="media-item-title">${media.title || media.type}</div>
+              <div class="media-item-meta">${media.type}${media.primary ? ' (primary)' : ''}</div>
+              ${sectionLabel}
             </div>
           </div>
+        </div>
         `;
   }).join('')}
-    </div>
-    <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
-      <div class="tag">Bible verse</div>
-      <h3 style="margin: 8px 0 10px;">Quick verse</h3>
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <input id="verse-ref-input" type="text" placeholder="e.g., John 3:16–18" style="flex:1; min-width:200px;" />
-        <input id="verse-translation-input" type="text" value="web" style="width:80px;" />
-        <button id="verse-send-btn">Show</button>
-      </div>
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <button id="verse-prev" style="flex:1;">← Previous</button>
-        <button id="verse-next" style="flex:1;">Next →</button>
-      </div>
-      <div style="font-size:12px; color:var(--muted); margin-top:6px;">
-        Uses World English Bible (public domain) via bible-api.com
-      </div>
     </div>
   `;
 
   mediaPanel.innerHTML = mediaHTML;
+
+  const versePanel = document.getElementById('verse-panel');
+  if (!versePanel) return;
+
+  versePanel.innerHTML = `
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input id="verse-ref-input" type="text" placeholder="e.g., John 3:16–18" style="flex:1; min-width:200px;" />
+      <input id="verse-translation-input" type="text" value="nkjv" style="width:80px;" />
+      <button id="verse-send-btn">Show</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button id="verse-prev" style="flex:1;">← Previous</button>
+      <button id="verse-next" style="flex:1;">Next →</button>
+    </div>
+    <div style="font-size:12px; color:var(--muted); margin-top:6px;">
+      Defaults to NKJV via labs.bible.org, falls back to KJV and bible-api.com
+    </div>
+  `;
 
   const verseRefInput = document.getElementById('verse-ref-input');
   const verseTranslationInput = document.getElementById('verse-translation-input');
@@ -405,8 +425,52 @@ function renderMediaGallery() {
       sendVerseToStudent(verseRefInput.value, verseTranslationInput?.value || 'web');
   }
 
+  mediaPanel.querySelectorAll('.media-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = Number(item.dataset.mediaIndex);
+      const type = item.dataset.mediaType || '';
+      const url = item.dataset.mediaUrl || '';
+      if (type === 'link' && url && url !== '#') {
+        window.open(url, '_blank', 'noopener');
+      } else if (Number.isInteger(idx)) {
+        sendMediaToStudent(idx);
+      }
+    });
+  });
+
+  const toggleBtn = document.getElementById('toggle-media-btn');
+  const closeBtn = document.getElementById('media-close-btn');
+  const page = document.querySelector('.page');
+  if (toggleBtn) {
+    toggleBtn.onclick = () => {
+      mediaDrawer.classList.toggle('open');
+      page.classList.toggle('media-drawer-open');
+    };
+  }
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      mediaDrawer.classList.remove('open');
+      page.classList.remove('media-drawer-open');
+    };
+  }
+
+  const verseToggleBtn = document.getElementById('toggle-verse-btn');
+  const verseCloseBtn = document.getElementById('verse-close-btn');
+  if (verseToggleBtn) {
+    verseToggleBtn.onclick = () => {
+      verseDrawer.classList.toggle('open');
+      page.classList.toggle('verse-drawer-open');
+    };
+  }
+  if (verseCloseBtn) {
+    verseCloseBtn.onclick = () => {
+      verseDrawer.classList.remove('open');
+      page.classList.remove('verse-drawer-open');
+    };
+  }
+
   // Store media list for sendMediaToStudent function
-  window.teacherMediaList = allMedia;
+  window.teacherMediaList = orderedMedia;
 }
 
 function openDisplayWindow() {
@@ -448,13 +512,13 @@ function sendMediaToStudent(index) {
   sendCommand('displayMedia', { media });
 }
 
-function sendVerseToStudent(reference, translation = 'web') {
+function sendVerseToStudent(reference, translation = 'nkjv') {
   if (!reference || !reference.trim()) return;
   sendCommand('displayMedia', {
     media: {
       type: 'verse',
       reference: reference.trim(),
-      translation: (translation || 'web').trim(),
+      translation: (translation || 'nkjv').trim(),
       title: reference.trim()
     }
   });
@@ -549,6 +613,11 @@ function bindControls() {
   const verseNextBtn = document.getElementById('verse-next');
   if (versePrevBtn) versePrevBtn.onclick = () => sendCommand('versePrevious');
   if (verseNextBtn) verseNextBtn.onclick = () => sendCommand('verseNext');
+
+  const globalVersePrev = document.getElementById('global-verse-prev');
+  const globalVerseNext = document.getElementById('global-verse-next');
+  if (globalVersePrev) globalVersePrev.onclick = () => sendCommand('versePrevious');
+  if (globalVerseNext) globalVerseNext.onclick = () => sendCommand('verseNext');
 
   if (downloadBtn) downloadBtn.onclick = downloadNotes;
   if (uploadBtn) uploadBtn.onclick = () => fileInput?.click();

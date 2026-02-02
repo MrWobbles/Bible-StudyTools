@@ -58,30 +58,33 @@
           </div>
         </section>
       </section>
+    </div>
+  </div>
 
-      <section class="card sticky">
-        <div class="tag">Live controls</div>
-        <h3 style="margin: 10px 0 12px;">Send commands to the display</h3>
-        <div class="controls-grid">
-          <button class="primary" id="toggle">Play / Pause</button>
-          <button id="play">Play</button>
-          <button id="pause">Pause</button>
-          <button id="restart">Restart from 0:00</button>
-          <button id="next">Skip to next pause</button>
-          <button id="fullscreen">Fullscreen the display</button>
-          <button id="clear-screen" style="background: rgba(240, 180, 41, 0.15); border-color: var(--accent);">Clear
-            Screen</button>
-        </div>
-
-        <div class="list" id="pause-list"></div>
-        <div class="status" id="status">No commands sent yet.</div>
-      </section>
+  <div class="verse-bar">
+    <div class="controls-bar">
+      <button class="primary" id="toggle">Play / Pause</button>
+      <button id="play">Play</button>
+      <button id="pause">Pause</button>
+      <button id="restart">Restart</button>
+      <button id="next">Next pause</button>
+      <button id="fullscreen">Fullscreen</button>
+      <button id="clear-screen" style="background: rgba(240, 180, 41, 0.15); border-color: var(--accent);">Clear
+        Screen</button>
+      <span class="controls-divider"></span>
+      <button id="global-verse-prev">← Prev verse</button>
+      <button id="global-verse-next">Next verse →</button>
     </div>
   </div>
 
   <script src="assets/js/loader.js"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/teacher.js"></script>
+
+  <div class="drawer-toggles">
+    <button id="toggle-media-btn" class="pill-link">Media resources</button>
+    <button id="toggle-verse-btn" class="pill-link">Quick verse</button>
+  </div>
 
   <iframe id="student-preview" src=""
     style="position: fixed; bottom: 20px; right: 20px; width: 400px; height: 225px; border: 1px solid #ccc; z-index: 1000; pointer-events: none; display: none;"></iframe>
