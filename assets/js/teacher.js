@@ -624,6 +624,11 @@ function bindControls() {
   if (globalVersePrev) globalVersePrev.onclick = () => sendCommand('versePrevious');
   if (globalVerseNext) globalVerseNext.onclick = () => sendCommand('verseNext');
 
+  const verseFontDecrease = document.getElementById('verse-font-decrease');
+  const verseFontIncrease = document.getElementById('verse-font-increase');
+  if (verseFontDecrease) verseFontDecrease.onclick = () => sendCommand('verseFontDecrease');
+  if (verseFontIncrease) verseFontIncrease.onclick = () => sendCommand('verseFontIncrease');
+
   if (downloadBtn) downloadBtn.onclick = downloadNotes;
   if (uploadBtn) uploadBtn.onclick = () => fileInput?.click();
   if (fileInput) fileInput.onchange = importNotes;

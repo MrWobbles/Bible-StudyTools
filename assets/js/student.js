@@ -8,6 +8,11 @@ let CHANNEL_KEY = 'class1-control';
 let STORAGE_FALLBACK_KEY = 'class1-control-storage';
 let pendingMedia = null;
 let verseScrollContainer = null;
+let versePages = [];
+let currentVersePageIndex = 0;
+let verseFontSize = 72;
+let verseLineHeight = 1.6;
+let currentVerseLines = [];
 
 // Function to update player reference when a new video is loaded
 window.updatePlayerReference = function (newPlayer) {
@@ -188,6 +193,12 @@ function handleRemoteCommand(event) {
       break;
     case 'versePrevious':
       previousVersePage();
+      break;
+    case 'verseFontIncrease':
+      adjustVerseFont(4);
+      break;
+    case 'verseFontDecrease':
+      adjustVerseFont(-4);
       break;
     default:
       break;
@@ -507,23 +518,21 @@ async function renderVerseMedia(media) {
 
     const title = verseData.title || reference;
     const sourceLabel = verseData.sourceLabel || 'Scripture';
-    const allParagraphs = verseData.lines
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(line => `<p style="margin:0; padding:0; line-height:2.4; font-size:72px;">${escapeHtml(line)}</p>`)
-      .join('');
+    currentVerseLines = Array.isArray(verseData.lines) ? verseData.lines : [];
 
     playerDiv.innerHTML = `
-      <div style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: rgba(0 0 0 / 75%);margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);">
-        <div style="font-size:28px; color:var(--muted); margin-bottom:20px;">${escapeHtml(sourceLabel)}</div>
-        <h2 style="margin:0 0 30px 0; font-size:80px;">${escapeHtml(title)}</h2>
-        <div id="verse-content" style="font-size:72px; overflow:hidden; flex:1; padding-bottom:80px;">
-          ${allParagraphs}
+      <div class="verse-frame" style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: rgba(0 0 0 / 75%);margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);">
+        <div class="verse-meta">
+          <div class="verse-source">${escapeHtml(sourceLabel)}</div>
+          <h2 class="verse-title">${escapeHtml(title)}</h2>
         </div>
+        <div id="verse-content" class="verse-content" style="font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:hidden; flex:1; padding-bottom:80px;"></div>
       </div>
     `;
 
     verseScrollContainer = document.getElementById('verse-content');
+    buildVersePages(currentVerseLines);
+    ensureVersePagesFit();
   } catch (err) {
     playerDiv.innerHTML = `
       <div style="padding:24px; color:var(--muted);">
@@ -591,16 +600,229 @@ function escapeHtml(str) {
     .replaceAll("'", '&#39;');
 }
 
+function adjustVerseFont(delta) {
+  if (!currentVerseLines.length) return;
+  const nextSize = Math.min(120, Math.max(40, verseFontSize + delta));
+  if (nextSize === verseFontSize) return;
+  verseFontSize = nextSize;
+  applyVerseTypography();
+  buildVersePages(currentVerseLines);
+  ensureVersePagesFit();
+}
+
+function applyVerseTypography() {
+  const container = verseScrollContainer || document.getElementById('verse-content');
+  if (!container) return;
+  container.style.fontSize = `${verseFontSize}px`;
+  container.style.lineHeight = `${verseLineHeight}`;
+}
+
+function wrapLineByWords(text, maxChars) {
+  const limit = Math.max(1, Number(maxChars) || 100);
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+
+  const lines = [];
+  let current = '';
+
+  words.forEach(word => {
+    if (!current) {
+      current = word;
+      return;
+    }
+
+    const next = `${current} ${word}`;
+    if (next.length <= limit) {
+      current = next;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  });
+
+  if (current) lines.push(current);
+  return lines;
+}
+
+function estimateMaxCharsPerLine(container, computedStyle, safetyBuffer = 12) {
+  const width = container?.clientWidth || 0;
+  if (!width) return Math.max(1, 100 - safetyBuffer);
+
+  const measurer = document.createElement('span');
+  measurer.style.position = 'absolute';
+  measurer.style.visibility = 'hidden';
+  measurer.style.pointerEvents = 'none';
+  measurer.style.left = '-9999px';
+  measurer.style.top = '0';
+  measurer.style.whiteSpace = 'nowrap';
+  measurer.style.fontSize = computedStyle.fontSize;
+  measurer.style.fontFamily = computedStyle.fontFamily;
+  measurer.style.fontWeight = computedStyle.fontWeight;
+  measurer.style.letterSpacing = computedStyle.letterSpacing;
+  measurer.textContent = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  document.body.appendChild(measurer);
+
+  const measuredWidth = measurer.getBoundingClientRect().width || 1;
+  document.body.removeChild(measurer);
+
+  const avgCharWidth = measuredWidth / measurer.textContent.length;
+  const maxChars = Math.floor(width / avgCharWidth);
+  return Math.max(1, maxChars - safetyBuffer);
+}
+
+function buildVersePages(lines) {
+  const container = verseScrollContainer || document.getElementById('verse-content');
+  if (!container) return;
+
+  container.innerHTML = '';
+  versePages = [];
+  currentVersePageIndex = 0;
+
+  const rawLines = (lines || []).map(line => line.trim()).filter(Boolean);
+  if (!rawLines.length) return;
+
+  const computed = window.getComputedStyle(container);
+  const cleanedLines = rawLines;
+
+  const paddingTop = parseFloat(computed.paddingTop) || 0;
+  const paddingBottom = parseFloat(computed.paddingBottom) || 0;
+  const availableHeight = Math.max(0, container.clientHeight - paddingTop - paddingBottom);
+  if (!availableHeight) {
+    const fallbackPage = document.createElement('div');
+    fallbackPage.className = 'verse-page';
+    fallbackPage.style.display = 'block';
+    fallbackPage.style.height = '100%';
+    fallbackPage.style.overflow = 'hidden';
+    fallbackPage.innerHTML = cleanedLines
+      .map(line => `<p style="margin:0; padding:0;">${line}</p>`)
+      .join('');
+    container.appendChild(fallbackPage);
+    versePages.push(fallbackPage);
+    return;
+  }
+  const measurer = document.createElement('div');
+  measurer.style.position = 'absolute';
+  measurer.style.visibility = 'hidden';
+  measurer.style.pointerEvents = 'none';
+  measurer.style.left = '-9999px';
+  measurer.style.top = '0';
+  measurer.style.width = `${container.clientWidth}px`;
+  measurer.style.fontSize = computed.fontSize;
+  measurer.style.lineHeight = computed.lineHeight;
+  measurer.style.fontFamily = computed.fontFamily;
+  measurer.style.fontWeight = computed.fontWeight;
+  measurer.style.letterSpacing = computed.letterSpacing;
+  measurer.style.whiteSpace = 'normal';
+  document.body.appendChild(measurer);
+
+  let currentPage = document.createElement('div');
+  currentPage.className = 'verse-page';
+  currentPage.style.display = 'none';
+  currentPage.style.height = '100%';
+  currentPage.style.overflow = 'hidden';
+  let currentHeight = 0;
+
+  const finalizePage = () => {
+    if (currentPage.childNodes.length === 0) return;
+    container.appendChild(currentPage);
+    versePages.push(currentPage);
+    currentPage = document.createElement('div');
+    currentPage.className = 'verse-page';
+    currentPage.style.display = 'none';
+    currentPage.style.height = '100%';
+    currentPage.style.overflow = 'hidden';
+    currentHeight = 0;
+  };
+
+  cleanedLines.forEach(line => {
+    measurer.innerHTML = `<p style="margin:0; padding:0;">${line}</p>`;
+    const para = measurer.firstElementChild;
+    const paraHeight = para ? para.getBoundingClientRect().height : 0;
+
+    if (currentHeight + paraHeight > availableHeight && currentPage.childNodes.length > 0) {
+      finalizePage();
+    }
+
+    const p = document.createElement('p');
+    p.style.margin = '0';
+    p.style.padding = '0';
+    p.innerHTML = line;
+    currentPage.appendChild(p);
+    currentHeight += paraHeight;
+  });
+
+  finalizePage();
+  document.body.removeChild(measurer);
+
+  if (versePages.length > 0) {
+    versePages[0].style.display = 'block';
+  }
+}
+
+function ensureVersePagesFit() {
+  const container = verseScrollContainer || document.getElementById('verse-content');
+  if (!container || !versePages.length) return;
+
+  const maxIterations = 10;
+  let iterations = 0;
+
+  while (iterations < maxIterations) {
+    const containerHeight = container.clientHeight;
+    if (!containerHeight) break;
+
+    const hasOverflow = versePages.some(page => pageOverflows(page, containerHeight));
+    if (!hasOverflow) break;
+
+    const nextSize = Math.max(40, verseFontSize - 2);
+    if (nextSize === verseFontSize) break;
+    verseFontSize = nextSize;
+    applyVerseTypography();
+    buildVersePages(currentVerseLines);
+    iterations += 1;
+  }
+}
+
+function pageOverflows(page, containerHeight) {
+  if (!page) return false;
+  const prevDisplay = page.style.display;
+  const prevVisibility = page.style.visibility;
+  const prevPosition = page.style.position;
+  const prevPointerEvents = page.style.pointerEvents;
+  const prevWidth = page.style.width;
+
+  page.style.display = 'block';
+  page.style.visibility = 'hidden';
+  page.style.position = 'absolute';
+  page.style.pointerEvents = 'none';
+  page.style.width = '100%';
+
+  const overflow = page.scrollHeight > containerHeight + 1;
+
+  page.style.display = prevDisplay;
+  page.style.visibility = prevVisibility;
+  page.style.position = prevPosition;
+  page.style.pointerEvents = prevPointerEvents;
+  page.style.width = prevWidth;
+
+  return overflow;
+}
+
 function nextVersePage() {
-  if (!verseScrollContainer) return;
-  const scrollHeight = verseScrollContainer.clientHeight;
-  verseScrollContainer.scrollTop += scrollHeight;
+  if (!versePages.length) return;
+  const nextIndex = Math.min(versePages.length - 1, currentVersePageIndex + 1);
+  if (nextIndex === currentVersePageIndex) return;
+  versePages[currentVersePageIndex].style.display = 'none';
+  versePages[nextIndex].style.display = 'block';
+  currentVersePageIndex = nextIndex;
 }
 
 function previousVersePage() {
-  if (!verseScrollContainer) return;
-  const scrollHeight = verseScrollContainer.clientHeight;
-  verseScrollContainer.scrollTop = Math.max(0, verseScrollContainer.scrollTop - scrollHeight);
+  if (!versePages.length) return;
+  const prevIndex = Math.max(0, currentVersePageIndex - 1);
+  if (prevIndex === currentVersePageIndex) return;
+  versePages[currentVersePageIndex].style.display = 'none';
+  versePages[prevIndex].style.display = 'block';
+  currentVersePageIndex = prevIndex;
 }
 
 function extractVideoId(url) {

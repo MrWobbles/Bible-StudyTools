@@ -195,6 +195,41 @@ nav {
   z-index: 5;
 }
 
+.verse-meta {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.verse-source {
+  font-size: 20px;
+  color: var(--muted);
+}
+
+.verse-title {
+  margin: 0;
+  font-size: 56px;
+}
+
+body.fullscreen-mode .verse-meta {
+  position: fixed;
+  top: 12px;
+  left: 24px;
+  right: 24px;
+  z-index: 10000;
+  margin: 0;
+  gap: 4px;
+  pointer-events: none;
+}
+
+body.fullscreen-mode .verse-source {
+  font-size: 14px;
+}
+
+body.fullscreen-mode .verse-title {
+  font-size: 28px;
+}
+
 .controls {
   display: grid;
   gap: 10px;
