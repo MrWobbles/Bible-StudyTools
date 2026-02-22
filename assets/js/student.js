@@ -10,9 +10,10 @@ let pendingMedia = null;
 let verseScrollContainer = null;
 let versePages = [];
 let currentVersePageIndex = 0;
-let verseFontSize = 72;
+let verseFontSize = 120;
 let verseLineHeight = 1.6;
 let currentVerseLines = [];
+let lastProcessedCommandId = null;
 
 // Function to update player reference when a new video is loaded
 window.updatePlayerReference = function (newPlayer) {
@@ -140,6 +141,14 @@ function setupControlChannel() {
 function handleRemoteCommand(event) {
   const data = event.data || event;
   if (!data || !data.type) return;
+
+  // Deduplicate: skip if we just processed this exact command
+  const commandId = `${data.type}-${data.sentAt}`;
+  if (commandId === lastProcessedCommandId) {
+    console.log('[Student] Ignoring duplicate command:', data.type);
+    return;
+  }
+  lastProcessedCommandId = commandId;
 
   console.log('[Student] Received command:', data.type, data);
 
@@ -521,12 +530,12 @@ async function renderVerseMedia(media) {
     currentVerseLines = Array.isArray(verseData.lines) ? verseData.lines : [];
 
     playerDiv.innerHTML = `
-      <div class="verse-frame" style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: rgba(0 0 0 / 75%);margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);">
-        <div class="verse-meta">
-          <div class="verse-source">${escapeHtml(sourceLabel)}</div>
-          <h2 class="verse-title">${escapeHtml(title)}</h2>
+      <div class="verse-frame" style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: white;margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);position:relative;">
+        <div id="verse-content" class="verse-content" style="font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:hidden; flex:1; padding-bottom:80px; color: #000;"></div>
+        <div class="verse-meta" style="position:absolute;bottom:40px;right:40px;text-align:right;height:75px;top:auto;">
+          <h2 class="verse-title" style="color: #000;font-size:24px;margin:0 0 8px 0;">${escapeHtml(title)}</h2>
+          <div class="verse-source" style="color: #666;font-size:18px;">${escapeHtml(sourceLabel)}</div>
         </div>
-        <div id="verse-content" class="verse-content" style="font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:hidden; flex:1; padding-bottom:80px;"></div>
       </div>
     `;
 
@@ -602,12 +611,11 @@ function escapeHtml(str) {
 
 function adjustVerseFont(delta) {
   if (!currentVerseLines.length) return;
-  const nextSize = Math.min(120, Math.max(40, verseFontSize + delta));
+  const nextSize = Math.max(60, Math.min(180, verseFontSize + delta));
   if (nextSize === verseFontSize) return;
   verseFontSize = nextSize;
   applyVerseTypography();
   buildVersePages(currentVerseLines);
-  ensureVersePagesFit();
 }
 
 function applyVerseTypography() {
@@ -670,6 +678,32 @@ function estimateMaxCharsPerLine(container, computedStyle, safetyBuffer = 12) {
   return Math.max(1, maxChars - safetyBuffer);
 }
 
+function splitLongLine(text, measurer, maxHeight) {
+  // Split long verse text into chunks that fit within maxHeight
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return [text]; // Can't split further
+
+  const chunks = [];
+  let current = '';
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    measurer.innerHTML = `<p style="margin:0; padding:0;">${candidate}</p>`;
+    const para = measurer.firstElementChild;
+    const height = para ? para.getBoundingClientRect().height : 0;
+
+    if (height <= maxHeight) {
+      current = candidate;
+    } else {
+      if (current) chunks.push(current);
+      current = word;
+    }
+  }
+
+  if (current) chunks.push(current);
+  return chunks.length > 0 ? chunks : [text];
+}
+
 function buildVersePages(lines) {
   const container = verseScrollContainer || document.getElementById('verse-content');
   if (!container) return;
@@ -713,6 +747,8 @@ function buildVersePages(lines) {
   measurer.style.fontWeight = computed.fontWeight;
   measurer.style.letterSpacing = computed.letterSpacing;
   measurer.style.whiteSpace = 'normal';
+  measurer.style.margin = '0';
+  measurer.style.padding = '0';
   document.body.appendChild(measurer);
 
   let currentPage = document.createElement('div');
@@ -734,22 +770,49 @@ function buildVersePages(lines) {
     currentHeight = 0;
   };
 
-  cleanedLines.forEach(line => {
+  cleanedLines.forEach((line, index) => {
     measurer.innerHTML = `<p style="margin:0; padding:0;">${line}</p>`;
     const para = measurer.firstElementChild;
-    const paraHeight = para ? para.getBoundingClientRect().height : 0;
+    let paraHeight = para ? para.getBoundingClientRect().height : 0;
 
-    if (currentHeight + paraHeight > availableHeight && currentPage.childNodes.length > 0) {
-      finalizePage();
+    if (paraHeight === 0) {
+      console.log(`[Verse] Skipping verse ${index} - paraHeight is 0:`, line.substring(0, 50));
+      return; // Skip this line but continue with next
     }
 
-    const p = document.createElement('p');
-    p.style.margin = '0';
-    p.style.padding = '0';
-    p.innerHTML = line;
-    currentPage.appendChild(p);
-    currentHeight += paraHeight;
+    // Use 95% of available height as threshold to prevent overflow
+    const pageHeightThreshold = availableHeight * 0.95;
+
+    // If a single line is taller than available height, split it into chunks
+    let linesToAdd = [line];
+    if (paraHeight > pageHeightThreshold) {
+      console.log(`[Verse] Line ${index} too long (${paraHeight}px > ${pageHeightThreshold}px), splitting...`, line.substring(0, 50));
+      linesToAdd = splitLongLine(line, measurer, pageHeightThreshold * 0.9);
+      console.log(`[Verse] Split into ${linesToAdd.length} chunks`);
+    }
+
+    // Add all chunks from this line
+    linesToAdd.forEach((chunk, chunkIdx) => {
+      if (currentHeight + paraHeight > pageHeightThreshold && currentPage.childNodes.length > 0) {
+        console.log(`[Verse] Page ${versePages.length} finalized with ${currentPage.childNodes.length} lines, height ${currentHeight}/${pageHeightThreshold}`);
+        finalizePage();
+      }
+
+      const p = document.createElement('p');
+      p.style.margin = '0';
+      p.style.padding = '0';
+      p.innerHTML = chunk;
+      currentPage.appendChild(p);
+
+      // Measure the actual rendered height of this chunk
+      measurer.innerHTML = `<p style="margin:0; padding:0;">${chunk}</p>`;
+      const chunkPara = measurer.firstElementChild;
+      const chunkHeight = chunkPara ? chunkPara.getBoundingClientRect().height : 0;
+      currentHeight += chunkHeight;
+    });
   });
+
+  console.log(`[Verse] Total pages created: ${versePages.length + (currentPage.childNodes.length > 0 ? 1 : 0)}`);
 
   finalizePage();
   document.body.removeChild(measurer);
@@ -810,19 +873,29 @@ function pageOverflows(page, containerHeight) {
 function nextVersePage() {
   if (!versePages.length) return;
   const nextIndex = Math.min(versePages.length - 1, currentVersePageIndex + 1);
-  if (nextIndex === currentVersePageIndex) return;
+  console.log(`[Verse Nav] Next: current=${currentVersePageIndex}, next=${nextIndex}, total pages=${versePages.length}`);
+  if (nextIndex === currentVersePageIndex) {
+    console.log(`[Verse Nav] Already at last page`);
+    return;
+  }
   versePages[currentVersePageIndex].style.display = 'none';
   versePages[nextIndex].style.display = 'block';
   currentVersePageIndex = nextIndex;
+  console.log(`[Verse Nav] Displaying page ${currentVersePageIndex}`);
 }
 
 function previousVersePage() {
   if (!versePages.length) return;
   const prevIndex = Math.max(0, currentVersePageIndex - 1);
-  if (prevIndex === currentVersePageIndex) return;
+  console.log(`[Verse Nav] Previous: current=${currentVersePageIndex}, prev=${prevIndex}, total pages=${versePages.length}`);
+  if (prevIndex === currentVersePageIndex) {
+    console.log(`[Verse Nav] Already at first page`);
+    return;
+  }
   versePages[currentVersePageIndex].style.display = 'none';
   versePages[prevIndex].style.display = 'block';
   currentVersePageIndex = prevIndex;
+  console.log(`[Verse Nav] Displaying page ${currentVersePageIndex}`);
 }
 
 function extractVideoId(url) {

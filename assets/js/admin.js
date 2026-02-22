@@ -32,11 +32,11 @@ async function loadLessonPlans() {
     console.log('Fetching lessonPlans.json from: assets/data/lessonPlans.json');
     const response = await fetch('assets/data/lessonPlans.json');
     console.log('Response status:', response.status, response.statusText);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     console.log('Parsed JSON data:', data);
     allLessonPlans = data.lessonPlans || [];
@@ -240,7 +240,7 @@ async function saveLessonPlansToFile() {
     });
 
     console.log('API response status:', response.status, response.statusText);
-    
+
     if (response.ok) {
       const result = await response.json();
       console.log('[✓] Lesson plans saved successfully:', result);
@@ -285,7 +285,6 @@ function renderClassListForLessonPlan() {
       item.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <span class="class-item-number">Class ${displayNumber}</span>
             <span class="class-item-title">${cls.title}</span>
           </div>
           <button class="btn-icon" onclick="removeClassFromLessonPlan(${index})" title="Remove">⊘</button>
@@ -371,7 +370,7 @@ function removeClassFromLessonPlan(classIndex) {
 // Create new class
 function createNewClass() {
   const newClassId = generateGUID();
-  
+
   const newClass = {
     id: newClassId,
     classNumber: allClasses.length + 1, // Keep for backward compatibility, but won't be used as identifier
@@ -383,14 +382,14 @@ function createNewClass() {
     outline: [],
     content: {
       html: '<p>Start writing your class content here...</p>',
-      json: {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Start writing your class content here..."}]}]},
+      json: { "type": "doc", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Start writing your class content here..." }] }] },
       text: 'Start writing your class content here...'
     }
   };
-  
+
   allClasses.push(newClass);
   console.log('Created new class:', newClass);
-  
+
   // Add to current lesson plan if one is open
   if (currentLessonPlan !== null) {
     const plan = allLessonPlans[currentLessonPlan];
@@ -399,14 +398,14 @@ function createNewClass() {
     }
     renderClassListForLessonPlan();
   }
-  
+
   // Select the new class for editing
   selectClass(allClasses.length - 1);
-  
+
   // Auto-save the new class AND the lesson plan
   console.log('Auto-saving new class...');
   saveClassToFile();
-  
+
   if (currentLessonPlan !== null) {
     console.log('Auto-saving lesson plan...');
     saveLessonPlansToFile();
@@ -419,7 +418,7 @@ function openContentEditor() {
     alert('Please select a class first');
     return;
   }
-  
+
   const cls = allClasses[currentClass];
   const classId = cls.id || cls.classNumber; // Support both old and new format
   window.open(`editor.html?class=${classId}`, '_blank');
@@ -495,7 +494,7 @@ function renderOutlineList(cls) {
   const outlineList = document.getElementById('outline-list');
   outlineList.innerHTML = '';
 
-   // Guard against missing outline array
+  // Guard against missing outline array
   const outline = Array.isArray(cls.outline) ? cls.outline : [];
   outline.forEach((section, index) => {
     const safeSection = section || {};
@@ -861,7 +860,7 @@ function saveMedia() {
 
   renderMediaList(allClasses[currentClass]);
   closeModal('media-modal');
-  
+
   // Auto-save after media changes
   saveClassToFile();
 }
@@ -871,7 +870,7 @@ function deleteMedia(index) {
   if (confirm('Delete this media item?')) {
     allClasses[currentClass].media.splice(index, 1);
     renderMediaList(allClasses[currentClass]);
-    
+
     // Auto-save after deletion
     saveClassToFile();
   }
@@ -1007,7 +1006,7 @@ function saveSection() {
 
   renderOutlineList(allClasses[currentClass]);
   closeModal('section-modal');
-  
+
   // Auto-save after section changes
   saveClassToFile();
 }
@@ -1017,7 +1016,7 @@ function deleteSection(index) {
   if (confirm('Delete this section?')) {
     allClasses[currentClass].outline.splice(index, 1);
     renderOutlineList(allClasses[currentClass]);
-    
+
     // Auto-save after deletion
     saveClassToFile();
   }
@@ -1034,7 +1033,7 @@ function saveClass() {
 
   // Ensure all unsaved changes in sections are included
   // (saveSection updates allClasses in memory, so this final save captures all changes)
-  
+
   // Save classes automatically
   saveClassToFile();
 }
@@ -1068,7 +1067,7 @@ async function saveClassToFile() {
     });
 
     console.log('API response status:', response.status, response.statusText);
-    
+
     if (response.ok) {
       const result = await response.json();
       console.log('[✓] Save successful:', result);
@@ -1343,7 +1342,7 @@ async function downloadYouTubeVideo() {
     } catch (apiErr) {
       // API download failed - provide manual download instructions
       console.warn('API download failed:', apiErr.message);
-      
+
       const manualDownloadUrl = youtubeUrl;
       const instructions = `
 YouTube is blocking automated downloads.
@@ -1360,7 +1359,7 @@ For now, you can:
 
 Copy the URL and use an external downloader.
       `;
-      
+
       alert(instructions);
       button.textContent = originalText;
       button.disabled = false;

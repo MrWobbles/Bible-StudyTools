@@ -18,7 +18,7 @@ async function loadClassConfig() {
         : [raw];
 
     // Find class by either id (GUID) or classNumber for backward compatibility
-    classConfig = classesArr.find(c => 
+    classConfig = classesArr.find(c =>
       c.classNumber?.toString() === classId || c.id === classId
     ) || classesArr[0] || {};
 
@@ -64,7 +64,7 @@ function initializePageFromConfig() {
   if (!classConfig) return;
 
   // Update page title
-  document.title = `${classConfig.title} — Class ${classConfig.classNumber}`;
+  document.title = `${classConfig.title}`;
 
   // Update header
   const titleGroup = document.querySelector('.title-group');
@@ -73,7 +73,7 @@ function initializePageFromConfig() {
     const subtitle = titleGroup.querySelector('.subtitle');
     if (h1) h1.textContent = classConfig.title;
     if (subtitle) {
-      subtitle.textContent = `Class ${classConfig.classNumber} · ${classConfig.subtitle} · ${classConfig.instructor}`;
+      subtitle.textContent = `${classConfig.subtitle} · ${classConfig.instructor}`;
     }
   }
 

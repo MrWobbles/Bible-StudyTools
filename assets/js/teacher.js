@@ -32,7 +32,7 @@ async function loadClassConfig() {
         : [raw];
 
     // Find class by either id (GUID) or classNumber for backward compatibility
-    classConfig = classesArr.find(c => 
+    classConfig = classesArr.find(c =>
       c.classNumber?.toString() === classId || c.id === classId
     ) || classesArr[0] || {};
 
@@ -82,7 +82,7 @@ async function loadClassConfig() {
 }
 
 function initializePage() {
-  document.title = `Presenter View — ${classConfig.title} · Class ${classConfig.classNumber}`;
+  document.title = `Presenter View — ${classConfig.title}`;
 
   statusEl = document.getElementById('status');
   pauseListEl = document.getElementById('pause-list');
@@ -95,13 +95,13 @@ function initializePage() {
   if (h1) h1.textContent = `Presenter View · ${classConfig.title}`;
 
   const subtitle = document.querySelector('.subtitle');
-  if (subtitle) subtitle.textContent = `Class ${classConfig.classNumber} · Keep this on your laptop while casting the main screen.`;
+  if (subtitle) subtitle.textContent = `${classConfig.subtitle || ''} · Keep this on your laptop while casting the main screen.`;
 
   const previewIframe = document.getElementById('student-preview');
   if (previewIframe) previewIframe.src = `${window.location.origin}/student.html?class=${classId}`;
 
   const guideTitle = document.querySelector('h3');
-  if (guideTitle) guideTitle.textContent = `Class ${classConfig.classNumber} guide with notes`;
+  if (guideTitle) guideTitle.textContent = `${classConfig.title} guide with notes`;
 
   renderOutlineWithQuestions();
 
@@ -525,13 +525,13 @@ function setupOutlineTabs() {
 function switchToTab(tabName) {
   const tabs = document.querySelectorAll('.outline-tab');
   const tabContents = document.querySelectorAll('.tab-content');
-  
+
   tabs.forEach(t => t.classList.remove('active'));
   tabContents.forEach(c => c.classList.remove('active'));
-  
+
   const tab = document.querySelector(`.outline-tab[data-tab="${tabName}"]`);
   const content = document.getElementById(`${tabName}-content`);
-  
+
   if (tab) tab.classList.add('active');
   if (content) content.classList.add('active');
 }
@@ -539,16 +539,16 @@ function switchToTab(tabName) {
 // Setup click handlers for Q&A pause markers
 function setupQAPauseMarkerHandlers() {
   const markers = document.querySelectorAll('.qa-pause-marker');
-  
+
   markers.forEach(marker => {
     marker.addEventListener('click', () => {
       const sectionId = marker.dataset.sectionId;
       const sectionTitle = marker.dataset.sectionTitle;
-      
+
       if (sectionId) {
         // Switch to the Class Guide tab
         switchToTab('guide');
-        
+
         // Wait a moment for tab to switch, then open the section
         setTimeout(() => {
           openQASection(sectionId);
@@ -566,20 +566,20 @@ function openQASection(sectionId) {
   // Find all accordion elements in the guide content
   const guideContent = document.getElementById('guide-content');
   if (!guideContent) return;
-  
+
   const allAccordions = guideContent.querySelectorAll('details.accordion');
-  
+
   // Close all sections first
   allAccordions.forEach(accordion => {
     accordion.removeAttribute('open');
   });
-  
+
   // Find and open the target section
   const targetAccordion = guideContent.querySelector(`details.accordion[data-section-id="${sectionId}"]`);
-  
+
   if (targetAccordion) {
     targetAccordion.setAttribute('open', 'open');
-    
+
     // Scroll to the section smoothly
     setTimeout(() => {
       targetAccordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -595,7 +595,7 @@ function renderGeneratedOutline() {
 
   // Display the actual editor content (HTML from TipTap editor)
   const editorContent = classConfig.content;
-  
+
   if (!editorContent || !editorContent.html) {
     displayContainer.innerHTML = '';
     return;
@@ -603,7 +603,7 @@ function renderGeneratedOutline() {
 
   // Render the editor content and make verse references clickable
   let html = editorContent.html;
-  
+
   // Bible verse reference pattern (matches formats like: John 3:16, Romans 5:1-8, 1 Corinthians 13, etc.)
   const bibleBooks = [
     'Genesis', 'Gen', 'Exodus', 'Ex', 'Exo', 'Leviticus', 'Lev', 'Numbers', 'Num', 'Deuteronomy', 'Deut', 'Deu',
@@ -622,19 +622,19 @@ function renderGeneratedOutline() {
     'Hebrews', 'Heb', 'James', 'Jam', 'Jas', '1 Peter', '2 Peter', 'Peter', 'Pet',
     '1 John', '2 John', '3 John', 'Jude', 'Revelation', 'Rev'
   ];
-  
+
   const versePattern = new RegExp(
     `\\b(\\d\\s+)?(${bibleBooks.join('|')})\\s+\\d+(?::\\d+)?(?:[–-]\\d+(?::\\d+)?)?\\b`,
     'gi'
   );
-  
+
   // Replace verse references with clickable spans
   html = html.replace(versePattern, (match) => {
     return `<span class="verse-reference" data-verse="${match.trim()}">${match}</span>`;
   });
-  
+
   displayContainer.innerHTML = html;
-  
+
   // Add click handlers to verse references
   const verseRefs = displayContainer.querySelectorAll('.verse-reference');
   verseRefs.forEach(ref => {
@@ -650,12 +650,12 @@ function renderGeneratedOutline() {
       }
     });
   });
-  
+
   // Add Q&A break markers if generatedOutline exists
   if (classConfig.generatedOutline && classConfig.generatedOutline.length > 0) {
     insertQABreakMarkers(displayContainer, classConfig.generatedOutline);
   }
-  
+
   // Add click handlers to external links - require Alt key to open
   const links = displayContainer.querySelectorAll('a[href]');
   links.forEach(link => {
@@ -674,7 +674,7 @@ function renderGeneratedOutline() {
       }
     });
   });
-  
+
   // Set up click handlers for Q&A pause markers (from TipTap editor)
   setupQAPauseMarkerHandlers();
 }
@@ -683,27 +683,27 @@ function renderGeneratedOutline() {
 function insertQABreakMarkers(container, generatedOutline) {
   // Find all headings in the content
   const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
-  
+
   generatedOutline.forEach((section) => {
     // Check if this section has Q&A break points
-    const qaBreaks = section.points?.filter(p => 
+    const qaBreaks = section.points?.filter(p =>
       typeof p === 'object' && p.type === 'qa-break'
     ) || [];
-    
+
     if (qaBreaks.length === 0) return;
-    
+
     // Find the heading that matches this section
     let matchingHeading = null;
     headings.forEach(heading => {
       const headingText = heading.textContent.trim().toLowerCase();
       const sectionText = section.summary.trim().toLowerCase();
-      
+
       // Check for partial match
       if (headingText.includes(sectionText) || sectionText.includes(headingText)) {
         matchingHeading = heading;
       }
     });
-    
+
     if (matchingHeading) {
       // Create Q&A break marker
       qaBreaks.forEach((qaBreak) => {
@@ -722,7 +722,7 @@ function insertQABreakMarkers(container, generatedOutline) {
             </button>
           </div>
         `;
-        
+
         // Insert after the heading's parent section
         const insertPoint = matchingHeading.parentElement.nextSibling;
         if (insertPoint) {
@@ -730,7 +730,7 @@ function insertQABreakMarkers(container, generatedOutline) {
         } else {
           matchingHeading.parentElement.parentNode.appendChild(marker);
         }
-        
+
         // Add click handler to switch to class guide tab
         const btn = marker.querySelector('.qa-break-btn');
         if (btn) {
@@ -740,13 +740,13 @@ function insertQABreakMarkers(container, generatedOutline) {
             const editorTab = document.querySelector('.outline-tab[data-tab="editor"]');
             const guideContent = document.getElementById('guide-content');
             const editorContent = document.getElementById('editor-content');
-            
+
             if (guidTab && editorTab && guideContent && editorContent) {
               guidTab.classList.add('active');
               editorTab.classList.remove('active');
               guideContent.classList.add('active');
               editorContent.classList.remove('active');
-              
+
               // Try to open the matching section in the class guide
               const accordion = document.querySelector(`details.accordion[data-section-id="${section.id}"]`);
               if (accordion) {
