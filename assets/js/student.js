@@ -6,9 +6,16 @@ let VIDEO_ID = '';
 let pausePoints = [];
 let CHANNEL_KEY = 'class1-control';
 let STORAGE_FALLBACK_KEY = 'class1-control-storage';
+let pendingMedia = null;
+let verseScrollContainer = null;
+let versePages = [];
+let currentVersePageIndex = 0;
+let verseFontSize = 72;
+let verseLineHeight = 1.6;
+let currentVerseLines = [];
 
 // Function to update player reference when a new video is loaded
-window.updatePlayerReference = function(newPlayer) {
+window.updatePlayerReference = function (newPlayer) {
   player = newPlayer;
   window.player = newPlayer;
   console.log('[Student] Player reference updated');
@@ -21,65 +28,106 @@ window.onPlayerReady = onPlayerReady;
 window.onPlayerStateChange = onPlayerStateChange;
 
 function initConfig() {
+  const classId = new URLSearchParams(window.location.search).get('class') || '1';
   const config = window.BIBLE_STUDY_CONFIG || {};
   VIDEO_ID = config.videoId || '';
   // Normalize pausePoints: allow seconds (number) or "MM:SS" strings
   pausePoints = Array.isArray(config.pausePoints)
     ? config.pausePoints.map((p) => ({
-        ...p,
-        time: parseTimeValue(p.time),
-      })).filter((p) => Number.isFinite(p.time))
+      ...p,
+      time: parseTimeValue(p.time),
+    })).filter((p) => Number.isFinite(p.time))
     : [];
-  CHANNEL_KEY = config.channelName || 'class1-control';
+  CHANNEL_KEY = config.channelName || `class${classId}-control`;
   STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
 }
 
 // Wait for config to load, then initialize YouTube API
 window.addEventListener('load', () => {
-  initConfig();
-  const tag = document.createElement('script');
-  tag.src = 'https://www.youtube.com/iframe_api';
-  document.head.appendChild(tag);
+  function initAfterConfig() {
+    initConfig();
+    setupControlChannel();
+
+    if (window.self !== window.top) {
+      const scale = 400 / 1280;
+      document.body.style.transform = `scale(${scale})`;
+      document.body.style.transformOrigin = 'top left';
+      document.body.style.width = '1280px';
+      document.body.style.height = '720px';
+      document.body.style.overflow = 'hidden';
+    }
+
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+  }
+
+  if (window.BIBLE_STUDY_CONFIG_READY) {
+    initAfterConfig();
+  } else {
+    window.addEventListener('bibleStudyConfigReady', initAfterConfig, { once: true });
+  }
 });
 
-setupControlChannel();
+// Check if we're in an iframe (preview mode)
+const isInIframe = window.self !== window.top;
 
 function onYouTubeIframeAPIReady() {
-  player = new YT.Player('player', {
-    height: '100%',
-    width: '100%',
-    videoId: VIDEO_ID,
-    playerVars: {
-      rel: 0,
-      modestbranding: 1,
-      color: 'white',
-      playsinline: 1
-    },
-    events: {
-      onReady: function(event) {
-        player = event.target;
-        window.player = event.target;
-        onPlayerReady(event);
+  try {
+    player = new YT.Player('player', {
+      height: '100%',
+      width: '100%',
+      videoId: VIDEO_ID,
+      playerVars: {
+        rel: 0,
+        modestbranding: 1,
+        color: 'white',
+        playsinline: 1,
+        mute: isInIframe ? 1 : 0
       },
-      onStateChange: onPlayerStateChange
+      events: {
+        onReady: function (event) {
+          player = event.target;
+          window.player = event.target;
+          onPlayerReady(event);
+        },
+        onStateChange: onPlayerStateChange
+      }
+    });
+  } catch (error) {
+    console.error('Error initializing YouTube player:', error);
+    // Fallback: show error message in the player div
+    const playerDiv = document.getElementById('player');
+    if (playerDiv) {
+      playerDiv.innerHTML = '<p style="color: red; text-align: center; padding: 20px;">Error loading video player. Please check your browser extensions or try refreshing the page.</p>';
     }
-  });
+  }
 }
 
 function onPlayerReady() {
   renderPauseList();
   resetNextPause();
   bindControls();
+  handlePendingMedia();
 }
 
 function setupControlChannel() {
+  console.log('[Student] Setting up control channel:', CHANNEL_KEY, 'STORAGE_FALLBACK_KEY:', STORAGE_FALLBACK_KEY);
+  console.log('[Student] Is in iframe:', window.self !== window.top);
+
   if ('BroadcastChannel' in window) {
     channel = new BroadcastChannel(CHANNEL_KEY);
-    channel.onmessage = handleRemoteCommand;
+    channel.onmessage = (event) => {
+      console.log('[Student] BroadcastChannel message received');
+      handleRemoteCommand(event);
+    };
+    console.log('[Student] BroadcastChannel set up');
   }
 
   window.addEventListener('storage', event => {
+    console.log('[Student] Storage event received, key:', event.key);
     if (event.key !== STORAGE_FALLBACK_KEY || !event.newValue) return;
+    console.log('[Student] Processing storage event');
     try {
       const data = JSON.parse(event.newValue);
       handleRemoteCommand({ data });
@@ -118,13 +166,20 @@ function handleRemoteCommand(event) {
       }
       break;
     case 'fullscreen':
-      console.log('[Student] Executing fullscreen command');
-      goFullscreen();
+      // Only execute fullscreen in the actual window, not in iframe preview
+      if (!isInIframe) {
+        console.log('[Student] Executing fullscreen command');
+        goFullscreen();
+      } else {
+        console.log('[Student] Ignoring fullscreen command in iframe');
+      }
       break;
     case 'displayMedia':
-      if (data.media && typeof window.openMediaInViewer === 'function') {
-        console.log('[Student] Opening media from teacher command:', data.media);
-        window.openMediaInViewer(data.media);
+      console.log('[Student] Received displayMedia:', data.media);
+      pendingMedia = data.media;
+      // Try to handle immediately if DOM is ready, otherwise it will be handled on player ready
+      if (document.readyState === 'complete') {
+        handlePendingMedia();
       }
       break;
     case 'clearScreen':
@@ -132,6 +187,18 @@ function handleRemoteCommand(event) {
         console.log('[Student] Clearing screen and returning to default view');
         window.returnToDefaultView();
       }
+      break;
+    case 'verseNext':
+      nextVersePage();
+      break;
+    case 'versePrevious':
+      previousVersePage();
+      break;
+    case 'verseFontIncrease':
+      adjustVerseFont(4);
+      break;
+    case 'verseFontDecrease':
+      adjustVerseFont(-4);
       break;
     default:
       break;
@@ -260,9 +327,9 @@ function goFullscreen() {
 
   function isFullscreenActive() {
     return !!(
-      document.fullscreenElement || 
-      document.webkitFullscreenElement || 
-      document.mozFullScreenElement || 
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
       document.msFullscreenElement ||
       document.body.classList.contains('fullscreen-mode')
     );
@@ -330,8 +397,436 @@ function bindControls() {
   document.getElementById('fullscreen').onclick = goFullscreen;
 }
 
-function formatTime(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = Math.floor(totalSeconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
+function handlePendingMedia() {
+  console.log('[Student] handlePendingMedia called, pendingMedia:', pendingMedia);
+  if (!pendingMedia) {
+    console.log('[Student] No pending media, returning');
+    return;
+  }
+
+  // Always use .player-shell as the container since YouTube API replaces #player with an iframe
+  const playerDiv = document.querySelector('.player-shell');
+  console.log('[Student] playerDiv:', playerDiv);
+  if (!playerDiv) {
+    console.log('[Student] No player div found, returning');
+    return;
+  }
+
+  console.log('[Student] Processing media:', pendingMedia);
+
+  if (pendingMedia.type === 'video') {
+    // Support both sources array and direct url
+    let videoUrl = '';
+    let videoId = '';
+
+    if (pendingMedia.sources && pendingMedia.sources[0]) {
+      const source = pendingMedia.sources[0];
+      videoId = source.videoId || '';
+      videoUrl = source.url || '';
+    } else if (pendingMedia.url) {
+      videoUrl = pendingMedia.url;
+    } else if (pendingMedia.videoId) {
+      videoId = pendingMedia.videoId;
+    }
+
+    const newVideoId = videoId || extractVideoId(videoUrl);
+    console.log('[Student] Extracted video ID:', newVideoId, 'from URL:', videoUrl);
+
+    if (newVideoId) {
+      VIDEO_ID = newVideoId;
+      // Destroy existing player if any
+      if (player) {
+        player.destroy();
+        player = null;
+      }
+      // Clear the container and create a new player div
+      playerDiv.innerHTML = '<div id="player"></div>';
+      console.log('[Student] Creating new YouTube player with video ID:', VIDEO_ID);
+      // Create new player
+      player = new YT.Player('player', {
+        height: '100%',
+        width: '100%',
+        videoId: VIDEO_ID,
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          color: 'white',
+          playsinline: 1,
+          mute: isInIframe ? 1 : 0
+        },
+        events: {
+          onReady: function (event) {
+            player = event.target;
+            window.player = event.target;
+            onPlayerReady(event);
+          },
+          onStateChange: onPlayerStateChange
+        }
+      });
+      pendingMedia = null;
+    }
+  } else if (pendingMedia.type === 'image' || pendingMedia.type === 'images') {
+    // Support both sources array and direct url
+    let imgUrl = '';
+    if (pendingMedia.sources && pendingMedia.sources[0]) {
+      imgUrl = pendingMedia.sources[0].url;
+    } else if (pendingMedia.url) {
+      imgUrl = pendingMedia.url;
+    }
+
+    if (imgUrl) {
+      // Destroy player if exists
+      if (player) {
+        player.destroy();
+        player = null;
+      }
+      playerDiv.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:contain;" alt="${pendingMedia.title || 'Image'}">`;
+      pendingMedia = null;
+    }
+  } else if (pendingMedia.type === 'verse') {
+    const media = pendingMedia;
+    pendingMedia = null;
+    renderVerseMedia(media);
+  }
+}
+
+async function renderVerseMedia(media) {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
+  const reference = (media.reference || media.title || '').trim();
+  if (!reference) return;
+
+  if (player) {
+    player.destroy();
+    player = null;
+  }
+
+  playerDiv.innerHTML = `
+    <div style="padding:24px; display:flex; flex-direction:column; gap:12px; height:100%; overflow:auto;">
+      <div style="font-size:14px; color:var(--muted);">Loading passage…</div>
+    </div>
+  `;
+
+  try {
+    const preferredTranslations = media.translation
+      ? [media.translation]
+      : ['nkjv', 'kjv'];
+
+    const verseData = await fetchVerseData(reference, preferredTranslations);
+    if (!verseData) throw new Error('Failed to fetch passage');
+
+    const title = verseData.title || reference;
+    const sourceLabel = verseData.sourceLabel || 'Scripture';
+    currentVerseLines = Array.isArray(verseData.lines) ? verseData.lines : [];
+
+    playerDiv.innerHTML = `
+      <div class="verse-frame" style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: rgba(0 0 0 / 75%);margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);">
+        <div class="verse-meta">
+          <div class="verse-source">${escapeHtml(sourceLabel)}</div>
+          <h2 class="verse-title">${escapeHtml(title)}</h2>
+        </div>
+        <div id="verse-content" class="verse-content" style="font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:hidden; flex:1; padding-bottom:80px;"></div>
+      </div>
+    `;
+
+    verseScrollContainer = document.getElementById('verse-content');
+    buildVersePages(currentVerseLines);
+    ensureVersePagesFit();
+  } catch (err) {
+    playerDiv.innerHTML = `
+      <div style="padding:24px; color:var(--muted);">
+        Unable to load passage. Please check the reference and try again.
+      </div>
+    `;
+  }
+}
+
+async function fetchVerseData(reference, preferredTranslations) {
+  for (const translation of preferredTranslations) {
+    const labs = await fetchFromLabs(reference, translation);
+    if (labs) return labs;
+
+    const bibleApi = await fetchFromBibleApi(reference, translation);
+    if (bibleApi) return bibleApi;
+  }
+
+  return null;
+}
+
+async function fetchFromLabs(reference, translation) {
+  const version = String(translation || '').toUpperCase();
+  const url = `https://labs.bible.org/api/?passage=${encodeURIComponent(reference)}&version=${encodeURIComponent(version)}&type=json`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const lines = data.map(item => `${item.verse} ${item.text}`);
+    const sourceLabel = `${version} via labs.bible.org`;
+    return { title: reference, lines, sourceLabel };
+  } catch (err) {
+    return null;
+  }
+}
+
+async function fetchFromBibleApi(reference, translation) {
+  const version = String(translation || '').toLowerCase();
+  const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(version)}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = (data.text || '').trim();
+    if (!text) return null;
+
+    const lines = text.split('\n').map(t => t.trim()).filter(Boolean);
+    const sourceLabel = `${data.translation_name || version.toUpperCase()} via bible-api.com`;
+    return { title: data.reference || reference, lines, sourceLabel };
+  } catch (err) {
+    return null;
+  }
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function adjustVerseFont(delta) {
+  if (!currentVerseLines.length) return;
+  const nextSize = Math.min(120, Math.max(40, verseFontSize + delta));
+  if (nextSize === verseFontSize) return;
+  verseFontSize = nextSize;
+  applyVerseTypography();
+  buildVersePages(currentVerseLines);
+  ensureVersePagesFit();
+}
+
+function applyVerseTypography() {
+  const container = verseScrollContainer || document.getElementById('verse-content');
+  if (!container) return;
+  container.style.fontSize = `${verseFontSize}px`;
+  container.style.lineHeight = `${verseLineHeight}`;
+}
+
+function wrapLineByWords(text, maxChars) {
+  const limit = Math.max(1, Number(maxChars) || 100);
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+
+  const lines = [];
+  let current = '';
+
+  words.forEach(word => {
+    if (!current) {
+      current = word;
+      return;
+    }
+
+    const next = `${current} ${word}`;
+    if (next.length <= limit) {
+      current = next;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  });
+
+  if (current) lines.push(current);
+  return lines;
+}
+
+function estimateMaxCharsPerLine(container, computedStyle, safetyBuffer = 12) {
+  const width = container?.clientWidth || 0;
+  if (!width) return Math.max(1, 100 - safetyBuffer);
+
+  const measurer = document.createElement('span');
+  measurer.style.position = 'absolute';
+  measurer.style.visibility = 'hidden';
+  measurer.style.pointerEvents = 'none';
+  measurer.style.left = '-9999px';
+  measurer.style.top = '0';
+  measurer.style.whiteSpace = 'nowrap';
+  measurer.style.fontSize = computedStyle.fontSize;
+  measurer.style.fontFamily = computedStyle.fontFamily;
+  measurer.style.fontWeight = computedStyle.fontWeight;
+  measurer.style.letterSpacing = computedStyle.letterSpacing;
+  measurer.textContent = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  document.body.appendChild(measurer);
+
+  const measuredWidth = measurer.getBoundingClientRect().width || 1;
+  document.body.removeChild(measurer);
+
+  const avgCharWidth = measuredWidth / measurer.textContent.length;
+  const maxChars = Math.floor(width / avgCharWidth);
+  return Math.max(1, maxChars - safetyBuffer);
+}
+
+function buildVersePages(lines) {
+  const container = verseScrollContainer || document.getElementById('verse-content');
+  if (!container) return;
+
+  container.innerHTML = '';
+  versePages = [];
+  currentVersePageIndex = 0;
+
+  const rawLines = (lines || []).map(line => line.trim()).filter(Boolean);
+  if (!rawLines.length) return;
+
+  const computed = window.getComputedStyle(container);
+  const cleanedLines = rawLines;
+
+  const paddingTop = parseFloat(computed.paddingTop) || 0;
+  const paddingBottom = parseFloat(computed.paddingBottom) || 0;
+  const availableHeight = Math.max(0, container.clientHeight - paddingTop - paddingBottom);
+  if (!availableHeight) {
+    const fallbackPage = document.createElement('div');
+    fallbackPage.className = 'verse-page';
+    fallbackPage.style.display = 'block';
+    fallbackPage.style.height = '100%';
+    fallbackPage.style.overflow = 'hidden';
+    fallbackPage.innerHTML = cleanedLines
+      .map(line => `<p style="margin:0; padding:0;">${line}</p>`)
+      .join('');
+    container.appendChild(fallbackPage);
+    versePages.push(fallbackPage);
+    return;
+  }
+  const measurer = document.createElement('div');
+  measurer.style.position = 'absolute';
+  measurer.style.visibility = 'hidden';
+  measurer.style.pointerEvents = 'none';
+  measurer.style.left = '-9999px';
+  measurer.style.top = '0';
+  measurer.style.width = `${container.clientWidth}px`;
+  measurer.style.fontSize = computed.fontSize;
+  measurer.style.lineHeight = computed.lineHeight;
+  measurer.style.fontFamily = computed.fontFamily;
+  measurer.style.fontWeight = computed.fontWeight;
+  measurer.style.letterSpacing = computed.letterSpacing;
+  measurer.style.whiteSpace = 'normal';
+  document.body.appendChild(measurer);
+
+  let currentPage = document.createElement('div');
+  currentPage.className = 'verse-page';
+  currentPage.style.display = 'none';
+  currentPage.style.height = '100%';
+  currentPage.style.overflow = 'hidden';
+  let currentHeight = 0;
+
+  const finalizePage = () => {
+    if (currentPage.childNodes.length === 0) return;
+    container.appendChild(currentPage);
+    versePages.push(currentPage);
+    currentPage = document.createElement('div');
+    currentPage.className = 'verse-page';
+    currentPage.style.display = 'none';
+    currentPage.style.height = '100%';
+    currentPage.style.overflow = 'hidden';
+    currentHeight = 0;
+  };
+
+  cleanedLines.forEach(line => {
+    measurer.innerHTML = `<p style="margin:0; padding:0;">${line}</p>`;
+    const para = measurer.firstElementChild;
+    const paraHeight = para ? para.getBoundingClientRect().height : 0;
+
+    if (currentHeight + paraHeight > availableHeight && currentPage.childNodes.length > 0) {
+      finalizePage();
+    }
+
+    const p = document.createElement('p');
+    p.style.margin = '0';
+    p.style.padding = '0';
+    p.innerHTML = line;
+    currentPage.appendChild(p);
+    currentHeight += paraHeight;
+  });
+
+  finalizePage();
+  document.body.removeChild(measurer);
+
+  if (versePages.length > 0) {
+    versePages[0].style.display = 'block';
+  }
+}
+
+function ensureVersePagesFit() {
+  const container = verseScrollContainer || document.getElementById('verse-content');
+  if (!container || !versePages.length) return;
+
+  const maxIterations = 10;
+  let iterations = 0;
+
+  while (iterations < maxIterations) {
+    const containerHeight = container.clientHeight;
+    if (!containerHeight) break;
+
+    const hasOverflow = versePages.some(page => pageOverflows(page, containerHeight));
+    if (!hasOverflow) break;
+
+    const nextSize = Math.max(40, verseFontSize - 2);
+    if (nextSize === verseFontSize) break;
+    verseFontSize = nextSize;
+    applyVerseTypography();
+    buildVersePages(currentVerseLines);
+    iterations += 1;
+  }
+}
+
+function pageOverflows(page, containerHeight) {
+  if (!page) return false;
+  const prevDisplay = page.style.display;
+  const prevVisibility = page.style.visibility;
+  const prevPosition = page.style.position;
+  const prevPointerEvents = page.style.pointerEvents;
+  const prevWidth = page.style.width;
+
+  page.style.display = 'block';
+  page.style.visibility = 'hidden';
+  page.style.position = 'absolute';
+  page.style.pointerEvents = 'none';
+  page.style.width = '100%';
+
+  const overflow = page.scrollHeight > containerHeight + 1;
+
+  page.style.display = prevDisplay;
+  page.style.visibility = prevVisibility;
+  page.style.position = prevPosition;
+  page.style.pointerEvents = prevPointerEvents;
+  page.style.width = prevWidth;
+
+  return overflow;
+}
+
+function nextVersePage() {
+  if (!versePages.length) return;
+  const nextIndex = Math.min(versePages.length - 1, currentVersePageIndex + 1);
+  if (nextIndex === currentVersePageIndex) return;
+  versePages[currentVersePageIndex].style.display = 'none';
+  versePages[nextIndex].style.display = 'block';
+  currentVersePageIndex = nextIndex;
+}
+
+function previousVersePage() {
+  if (!versePages.length) return;
+  const prevIndex = Math.max(0, currentVersePageIndex - 1);
+  if (prevIndex === currentVersePageIndex) return;
+  versePages[currentVersePageIndex].style.display = 'none';
+  versePages[prevIndex].style.display = 'block';
+  currentVersePageIndex = prevIndex;
+}
+
+function extractVideoId(url) {
+  if (!url) return '';
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/))([^&\?\/]+)/);
+  return match ? match[1] : '';
 }

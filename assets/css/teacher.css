@@ -34,7 +34,7 @@ body {
     linear-gradient(135deg, #071327 0%, #0b1f36 50%, #0a1c31 100%);
   color: var(--text);
   min-height: 100vh;
-  padding: 28px 16px 40px;
+  padding: 28px 16px 100px 16px;
   display: flex;
   justify-content: center;
   font-size: 16px;
@@ -89,6 +89,19 @@ h1 {
 
 .pill-link:hover {
   transform: translateY(-1px);
+}
+
+.drawer-toggles {
+  position: fixed;
+  left: 16px;
+  top: 120px;
+  display: grid;
+  gap: 10px;
+  z-index: 1100;
+}
+
+.drawer-toggles .pill-link {
+  justify-content: center;
 }
 
 .layout {
@@ -156,6 +169,153 @@ button:hover {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 12px 14px;
+}
+
+.media-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: min(420px, 92vw);
+  background: var(--panel);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-drawer.open {
+  transform: translateX(0);
+}
+
+.verse-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: min(420px, 92vw);
+  background: var(--panel);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+}
+
+.verse-drawer.open {
+  transform: translateX(0);
+}
+
+.media-drawer-header {
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.media-drawer-body {
+  padding: 12px 16px 18px;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+}
+
+.media-list {
+  display: grid;
+  gap: 0;
+}
+
+.media-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.media-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.media-item-title {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verse-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 80px;
+  background: rgba(0, 0, 0, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+  backdrop-filter: blur(10px);
+}
+
+.verse-bar button {
+  padding: 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 48px;
+}
+
+.verse-bar button .material-icons {
+  font-size: 24px;
+  line-height: 24px;
+}
+
+.controls-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.controls-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 6px;
+}
+
+.media-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.media-item button {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 10px;
 }
 
 .list-item strong {
@@ -445,12 +605,6 @@ details.accordion a {
   resize: vertical;
 }
 
-.sticky {
-  position: sticky;
-  top: 16px;
-  align-self: start;
-}
-
 #media-panel {
   position: sticky;
   top: 16px;
@@ -464,4 +618,20 @@ details.accordion a {
   background: rgba(255, 255, 255, 0.12) !important;
   transform: translateY(-2px);
   border-color: var(--accent) !important;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+.page.media-drawer-open {
+  margin-left: min(420px, 92vw);
+  transition: margin-left 0.25s ease;
+}
+
+.page.verse-drawer-open {
+  margin-left: min(420px, 92vw);
+  transition: margin-left 0.25s ease;
 }

@@ -6,6 +6,7 @@ let CHANNEL_KEY = 'class-control';
 let STORAGE_FALLBACK_KEY = 'class-control-storage';
 let NOTES_KEY = 'class-teacher-notes';
 let QUESTION_PREFIX = 'class-question-';
+let currentMediaType = null;
 
 let channel = null;
 let statusEl = null;
@@ -15,6 +16,8 @@ let downloadBtn = null;
 let uploadBtn = null;
 let fileInput = null;
 let questionFields = [];
+let displayWindow = null;
+let displayWindowCheckInterval = null;
 
 async function loadClassConfig() {
   try {
@@ -94,6 +97,9 @@ function initializePage() {
   const subtitle = document.querySelector('.subtitle');
   if (subtitle) subtitle.textContent = `Class ${classConfig.classNumber} · Keep this on your laptop while casting the main screen.`;
 
+  const previewIframe = document.getElementById('student-preview');
+  if (previewIframe) previewIframe.src = `${window.location.origin}/student.html?class=${classId}`;
+
   const guideTitle = document.querySelector('h3');
   if (guideTitle) guideTitle.textContent = `Class ${classConfig.classNumber} guide with notes`;
 
@@ -106,6 +112,12 @@ function initializePage() {
 
   bindControls();
   hydrateNotes();
+
+  // Set up open display button
+  const openDisplayBtn = document.getElementById('open-display-btn');
+  if (openDisplayBtn) {
+    openDisplayBtn.addEventListener('click', openDisplayWindow);
+  }
 
   if (statusEl) statusEl.textContent = 'Ready. Open the display page on the TV (student.html).';
 }
@@ -164,15 +176,15 @@ function renderOutlineWithQuestions() {
     if (Array.isArray(section.points) && section.points.length > 0) {
       const pointsContainer = document.createElement('div');
       pointsContainer.className = 'points-container';
-      
+
       section.points.forEach(pt => {
         // Support both string format (backward compatible) and object format with type
         const pointType = typeof pt === 'object' ? (pt.type || 'point') : 'point';
         const pointText = typeof pt === 'object' ? pt.text : pt;
-        
+
         const pointDiv = document.createElement('div');
         pointDiv.className = `point point-${pointType}`;
-        
+
         // Add icons for different types
         const icons = {
           verse: '📖',
@@ -182,17 +194,17 @@ function renderOutlineWithQuestions() {
           heading: '',
           point: '•'
         };
-        
+
         const icon = icons[pointType] || '•';
         if (pointType === 'heading') {
           pointDiv.innerHTML = `<strong>${pointText}</strong>`;
         } else {
           pointDiv.innerHTML = `<span class="point-icon">${icon}</span><span class="point-text">${pointText}</span>`;
         }
-        
+
         pointsContainer.appendChild(pointDiv);
       });
-      
+
       detailsEl.appendChild(pointsContainer);
     }
 
@@ -305,13 +317,17 @@ function parseTimeFromSummary(summary) {
 function renderMediaGallery() {
   if (!classConfig.media || classConfig.media.length === 0) return;
 
-  // Collect all section media from outline
-  let allSectionMedia = [];
+  const orderedMedia = [];
+  const primaryMedia = classConfig.media.filter(m => m.primary);
+  const otherClassMedia = classConfig.media.filter(m => !m.primary);
+
+  orderedMedia.push(...primaryMedia);
+
   if (classConfig.outline) {
     classConfig.outline.forEach(section => {
       if (section.media && section.media.length > 0) {
         section.media.forEach(media => {
-          allSectionMedia.push({
+          orderedMedia.push({
             ...media,
             sectionTitle: section.summary
           });
@@ -320,60 +336,145 @@ function renderMediaGallery() {
     });
   }
 
-  // Combine class-level media with section media
-  const allMedia = [...classConfig.media, ...allSectionMedia];
+  orderedMedia.push(...otherClassMedia);
 
-  // Find the control panel container
-  const controlPanel = document.querySelector('section.card.sticky');
-  if (!controlPanel) return;
-
-  // Ensure media panel exists after the control panel (right column)
-  let mediaPanel = document.getElementById('media-panel');
-  if (!mediaPanel) {
-    mediaPanel = document.createElement('section');
-    mediaPanel.className = 'card';
-    mediaPanel.id = 'media-panel';
-    mediaPanel.style.marginTop = '14px';
-    // Insert after controlPanel to keep controls on top and materials below
-    if (controlPanel.parentNode) {
-      controlPanel.parentNode.insertBefore(mediaPanel, controlPanel.nextSibling);
-    }
+  let mediaDrawer = document.getElementById('media-drawer');
+  if (!mediaDrawer) {
+    mediaDrawer = document.createElement('aside');
+    mediaDrawer.id = 'media-drawer';
+    mediaDrawer.className = 'media-drawer';
+    mediaDrawer.innerHTML = `
+      <div class="media-drawer-header">
+        <div>
+          <div class="tag">Media resources</div>
+          <h3 style="margin: 6px 0 0;">Lesson media</h3>
+        </div>
+        <button id="media-close-btn">Close</button>
+      </div>
+      <div class="media-drawer-body" id="media-panel"></div>
+    `;
+    document.body.appendChild(mediaDrawer);
   }
+
+  let verseDrawer = document.getElementById('verse-drawer');
+  if (!verseDrawer) {
+    verseDrawer = document.createElement('aside');
+    verseDrawer.id = 'verse-drawer';
+    verseDrawer.className = 'verse-drawer';
+    verseDrawer.innerHTML = `
+      <div class="media-drawer-header">
+        <div>
+          <div class="tag">Bible verse</div>
+          <h3 style="margin: 6px 0 0;">Quick verse</h3>
+        </div>
+        <button id="verse-close-btn">Close</button>
+      </div>
+      <div class="media-drawer-body" id="verse-panel"></div>
+    `;
+    document.body.appendChild(verseDrawer);
+  }
+
+  const mediaPanel = document.getElementById('media-panel');
+  if (!mediaPanel) return;
 
   // Render a compact vertical list of class materials
   const mediaHTML = `
-    <div class="tag">Media resources</div>
-    <h3 style="margin: 10px 0 12px;">Class materials</h3>
-    <div class="materials-list">
-      ${allMedia.map((media, idx) => {
-        const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
-        const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
-        
-        return `
-          <div class="list-item" title="${media.title || media.type}">
-            <div style="display:flex; gap:10px; align-items:center;">
-              <span class="material-symbols-outlined" style="font-size:20px;">${getMediaIcon(media.type)}</span>
-              <div style="min-width:0;">
-                <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${media.title || media.type}</div>
-                <div style="font-size:12px; color:var(--muted)">${media.type}${media.primary ? ' (primary)' : ''}</div>
-                ${sectionLabel}
-              </div>
-            </div>
-            <div style="display:flex; gap:8px;">
-              ${media.type === 'link' 
-                ? `<a href="${url}" target="_blank" rel="noopener"><button>Open</button></a>` 
-                : `<button onclick="sendMediaToStudent(${idx})">Show</button>`}
+    <div class="media-list">
+      ${orderedMedia.map((media, idx) => {
+    const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
+    const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
+
+    return `
+        <div class="media-item" data-media-index="${idx}" data-media-type="${media.type}" data-media-url="${url}" title="${media.title || media.type}">
+          <div style="display:flex; gap:10px; align-items:center; min-width:0;">
+            <span class="material-symbols-outlined" style="font-size:20px;">${getMediaIcon(media.type)}</span>
+            <div style="min-width:0;">
+              <div class="media-item-title">${media.title || media.type}</div>
+              <div class="media-item-meta">${media.type}${media.primary ? ' (primary)' : ''}</div>
+              ${sectionLabel}
             </div>
           </div>
+        </div>
         `;
-      }).join('')}
+  }).join('')}
     </div>
   `;
 
   mediaPanel.innerHTML = mediaHTML;
-  
+
+  const versePanel = document.getElementById('verse-panel');
+  if (!versePanel) return;
+
+  versePanel.innerHTML = `
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input id="verse-ref-input" type="text" placeholder="e.g., John 3:16–18" style="flex:1; min-width:200px;" />
+      <input id="verse-translation-input" type="text" value="nkjv" style="width:80px;" />
+      <button id="verse-send-btn">Show</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button id="verse-prev" style="flex:1;">← Previous</button>
+      <button id="verse-next" style="flex:1;">Next →</button>
+    </div>
+    <div style="font-size:12px; color:var(--muted); margin-top:6px;">
+      Defaults to NKJV via labs.bible.org, falls back to KJV and bible-api.com
+    </div>
+  `;
+
+  const verseRefInput = document.getElementById('verse-ref-input');
+  const verseTranslationInput = document.getElementById('verse-translation-input');
+  const verseSendBtn = document.getElementById('verse-send-btn');
+
+  if (verseSendBtn && verseRefInput) {
+    verseSendBtn.onclick = () =>
+      sendVerseToStudent(verseRefInput.value, verseTranslationInput?.value || 'web');
+  }
+
+  mediaPanel.querySelectorAll('.media-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = Number(item.dataset.mediaIndex);
+      const type = item.dataset.mediaType || '';
+      const url = item.dataset.mediaUrl || '';
+      if (type === 'link' && url && url !== '#') {
+        window.open(url, '_blank', 'noopener');
+      } else if (Number.isInteger(idx)) {
+        sendMediaToStudent(idx);
+      }
+    });
+  });
+
+  const toggleBtn = document.getElementById('toggle-media-btn');
+  const closeBtn = document.getElementById('media-close-btn');
+  const page = document.querySelector('.page');
+  if (toggleBtn) {
+    toggleBtn.onclick = () => {
+      mediaDrawer.classList.toggle('open');
+      page.classList.toggle('media-drawer-open');
+    };
+  }
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      mediaDrawer.classList.remove('open');
+      page.classList.remove('media-drawer-open');
+    };
+  }
+
+  const verseToggleBtn = document.getElementById('toggle-verse-btn');
+  const verseCloseBtn = document.getElementById('verse-close-btn');
+  if (verseToggleBtn) {
+    verseToggleBtn.onclick = () => {
+      verseDrawer.classList.toggle('open');
+      page.classList.toggle('verse-drawer-open');
+    };
+  }
+  if (verseCloseBtn) {
+    verseCloseBtn.onclick = () => {
+      verseDrawer.classList.remove('open');
+      page.classList.remove('verse-drawer-open');
+    };
+  }
+
   // Store media list for sendMediaToStudent function
-  window.teacherMediaList = allMedia;
+  window.teacherMediaList = orderedMedia;
 }
 
 function getMediaIcon(type) {
@@ -384,9 +485,38 @@ function getMediaIcon(type) {
     audio: 'audio_file',
     document: 'assignment',
     link: 'link',
-    presentation: 'bar_chart'
+    presentation: 'bar_chart',
+    verse: '📖'
   };
   return icons[type] || 'folder';
+}
+
+function openDisplayWindow() {
+  if (displayWindow && !displayWindow.closed) {
+    displayWindow.location.href = `${window.location.origin}/student.html?class=${classId}`;
+    displayWindow.focus();
+  } else {
+    displayWindow = window.open(`${window.location.origin}/student.html?class=${classId}`, 'display-screen', 'width=1280,height=720');
+  }
+
+  // Show the preview iframe
+  const previewIframe = document.getElementById('student-preview');
+  if (previewIframe) {
+    previewIframe.style.display = 'block';
+  }
+
+  // Start checking if the window is closed
+  if (displayWindowCheckInterval) clearInterval(displayWindowCheckInterval);
+  displayWindowCheckInterval = setInterval(() => {
+    if (displayWindow && displayWindow.closed) {
+      const previewIframe = document.getElementById('student-preview');
+      if (previewIframe) {
+        previewIframe.style.display = 'none';
+      }
+      clearInterval(displayWindowCheckInterval);
+      displayWindowCheckInterval = null;
+    }
+  }, 1000);
 }
 
 function sendMediaToStudent(index) {
@@ -394,10 +524,26 @@ function sendMediaToStudent(index) {
     console.error('[Teacher] Invalid media index:', index);
     return;
   }
-  
+
   const media = window.teacherMediaList[index];
   console.log('[Teacher] Sending media to student:', media);
+  currentMediaType = media.type || 'unknown';
+  updateControlVisibility();
   sendCommand('displayMedia', { media });
+}
+
+function sendVerseToStudent(reference, translation = 'nkjv') {
+  if (!reference || !reference.trim()) return;
+  currentMediaType = 'verse';
+  updateControlVisibility();
+  sendCommand('displayMedia', {
+    media: {
+      type: 'verse',
+      reference: reference.trim(),
+      translation: (translation || 'nkjv').trim(),
+      title: reference.trim()
+    }
+  });
 }
 
 function sendCommand(type, payload = {}) {
@@ -484,6 +630,21 @@ function bindControls() {
   if (nextBtn) nextBtn.onclick = () => sendCommand('nextPause');
   if (fullscreenBtn) fullscreenBtn.onclick = () => sendCommand('fullscreen');
   if (clearScreenBtn) clearScreenBtn.onclick = () => sendCommand('clearScreen');
+
+  const versePrevBtn = document.getElementById('verse-prev');
+  const verseNextBtn = document.getElementById('verse-next');
+  if (versePrevBtn) versePrevBtn.onclick = () => sendCommand('versePrevious');
+  if (verseNextBtn) verseNextBtn.onclick = () => sendCommand('verseNext');
+
+  const globalVersePrev = document.getElementById('global-verse-prev');
+  const globalVerseNext = document.getElementById('global-verse-next');
+  if (globalVersePrev) globalVersePrev.onclick = () => sendCommand('versePrevious');
+  if (globalVerseNext) globalVerseNext.onclick = () => sendCommand('verseNext');
+
+  const verseFontDecrease = document.getElementById('verse-font-decrease');
+  const verseFontIncrease = document.getElementById('verse-font-increase');
+  if (verseFontDecrease) verseFontDecrease.onclick = () => sendCommand('verseFontDecrease');
+  if (verseFontIncrease) verseFontIncrease.onclick = () => sendCommand('verseFontIncrease');
 
   if (downloadBtn) downloadBtn.onclick = downloadNotes;
   if (uploadBtn) uploadBtn.onclick = () => fileInput?.click();
@@ -583,6 +744,31 @@ function formatTime(totalSeconds) {
   const m = Math.floor(totalSeconds / 60);
   const s = Math.floor(totalSeconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateControlVisibility() {
+  const controlsBar = document.querySelector('.controls-bar');
+  if (!controlsBar) return;
+
+  // Get all control elements
+  const allControls = controlsBar.querySelectorAll('[data-control-type]');
+
+  allControls.forEach(control => {
+    const controlType = control.getAttribute('data-control-type');
+
+    // Always show 'all' type controls (clear screen)
+    if (controlType === 'all') {
+      control.style.display = '';
+      return;
+    }
+
+    // Show controls that match current media type
+    if (controlType === currentMediaType) {
+      control.style.display = '';
+    } else {
+      control.style.display = 'none';
+    }
+  });
 }
 
 if (document.readyState === 'loading') {
