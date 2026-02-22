@@ -112,6 +112,8 @@ async function generateOutlineStructure(content, options = {}) {
 
 The content may be unstructured text, paragraphs, notes, or bullet points. Your job is to organize it into logical sections.
 
+IMPORTANT: When you identify a section that would benefit from Q&A discussion with the class guide, add a special point with type "qa-break" to mark where the teacher should pause for discussion questions.
+
 Your response MUST be valid JSON in this exact format:
 [
   {
@@ -119,8 +121,9 @@ Your response MUST be valid JSON in this exact format:
     "summary": "Brief section summary",
     "defaultOpen": true,
     "points": [
-      "Key point 1",
-      "Key point 2"
+      {"type": "point", "text": "Key point 1"},
+      {"type": "point", "text": "Key point 2"},
+      {"type": "qa-break", "text": "Pause for Q&A - See class guide"}
     ],
     "verses": [
       "John 3:16",
@@ -137,9 +140,10 @@ Your response MUST be valid JSON in this exact format:
 ]
 
 Guidelines:
-- Create 3-7 logical sections based on the content themes
+- Create any number of logical sections based on the content themes
 - Each section should have a clear, descriptive summary
-- Extract or infer key points as bullet items
+- Extract or infer key points as objects with type "point" and text
+- Add type "qa-break" points where discussion would enhance learning (after major concepts, before transitions, etc.)
 - Identify any Bible verse references mentioned or relevant to the topic
 - Generate 2-4 thoughtful discussion questions per section
 - Use descriptive, lowercase-with-hyphens IDs based on section content

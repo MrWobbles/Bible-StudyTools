@@ -635,3 +635,405 @@ details.accordion a {
   margin-left: min(420px, 92vw);
   transition: margin-left 0.25s ease;
 }
+
+/* Tab Interface Styles */
+.outline-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.outline-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.outline-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  transform: none;
+}
+
+.outline-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: transparent;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.editor-content-display {
+  margin-top: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  max-height: 600px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+.editor-content-display:empty::before {
+  content: 'No editor content available. Create content in the editor and save it to the class.';
+  color: var(--muted);
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Style the editor content display */
+.editor-content-display h1,
+.editor-content-display h2,
+.editor-content-display h3,
+.editor-content-display h4,
+.editor-content-display h5,
+.editor-content-display h6 {
+  color: var(--accent);
+  margin: 16px 0 8px;
+}
+
+.editor-content-display h1 { font-size: 24px; }
+.editor-content-display h2 { font-size: 20px; }
+.editor-content-display h3 { font-size: 18px; }
+.editor-content-display h4 { font-size: 16px; }
+
+.editor-content-display p {
+  margin: 8px 0;
+  color: var(--text);
+}
+
+.editor-content-display ul,
+.editor-content-display ol {
+  margin: 8px 0;
+  padding-left: 24px;
+  color: var(--text);
+}
+
+.editor-content-display li {
+  margin: 4px 0;
+}
+
+.editor-content-display strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.editor-content-display em {
+  font-style: italic;
+}
+
+.editor-content-display a {
+  color: #5ba3ff;
+  text-decoration: underline;
+}
+
+.editor-content-display blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 16px;
+  margin: 12px 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.editor-content-display code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.editor-content-display pre {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.editor-content-display table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.editor-content-display table td,
+.editor-content-display table th {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px;
+}
+
+.editor-content-display table th {
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 700;
+}
+
+/* Clickable verse references */
+.verse-reference {
+  color: #5ba3ff;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.verse-reference:hover {
+  background: rgba(73, 161, 255, 0.2);
+  color: #7db8ff;
+}
+
+.generated-outline-display {
+  margin-top: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.generated-outline-display:empty::before {
+  content: 'No generated outline available. Create one in the editor and save it to the class.';
+  color: var(--muted);
+  font-size: 14px;
+  font-style: italic;
+}
+
+.generated-outline-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.generated-outline-section:last-child {
+  border-bottom: none;
+}
+
+.generated-outline-section h4 {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.generated-outline-points,
+.generated-outline-verses,
+.generated-outline-questions {
+  margin: 8px 0;
+  padding-left: 8px;
+}
+
+.generated-outline-points strong,
+.generated-outline-verses strong,
+.generated-outline-questions strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.generated-outline-points ul,
+.generated-outline-questions ol {
+  margin: 4px 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.generated-outline-points li,
+.generated-outline-questions li {
+  margin: 4px 0;
+}
+
+.verse-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.verse-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(73, 161, 255, 0.15);
+  border: 1px solid rgba(73, 161, 255, 0.3);
+  border-radius: 6px;
+  color: #5ba3ff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Q&A Break Markers */
+.qa-break-marker {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(240, 180, 41, 0.1);
+  border: 2px solid rgba(240, 180, 41, 0.3);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 20px 0;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(240, 180, 41, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(240, 180, 41, 0.6);
+  }
+}
+
+.qa-break-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0b1f36;
+}
+
+.qa-break-icon .material-icons {
+  font-size: 24px;
+}
+
+.qa-break-content {
+  flex: 1;
+}
+
+.qa-break-content strong {
+  display: block;
+  color: var(--accent);
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.qa-break-content p {
+  margin: 8px 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.qa-break-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #0b1f36;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.qa-break-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(240, 180, 41, 0.4);
+}
+
+.qa-break-btn .material-icons {
+  font-size: 18px;
+}
+
+/* Q&A Pause Marker Styles (from TipTap editor) */
+.qa-pause-marker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(111, 207, 151, 0.2) 0%, rgba(111, 207, 151, 0.08) 100%);
+  border: 2px solid rgba(111, 207, 151, 0.5);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin: 20px 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.qa-pause-marker:hover {
+  background: linear-gradient(135deg, rgba(111, 207, 151, 0.3) 0%, rgba(111, 207, 151, 0.12) 100%);
+  border-color: rgba(111, 207, 151, 0.7);
+  transform: translateX(6px);
+  box-shadow: 0 6px 16px rgba(111, 207, 151, 0.25);
+}
+
+.qa-pause-marker::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 70%;
+  background: linear-gradient(180deg, #6fcf97 0%, #4db880 100%);
+  border-radius: 0 4px 4px 0;
+}
+
+.qa-pause-marker::after {
+  content: '→';
+  position: absolute;
+  right: 20px;
+  font-size: 24px;
+  color: rgba(111, 207, 151, 0.7);
+  transition: all 0.3s ease;
+}
+
+.qa-pause-marker:hover::after {
+  right: 16px;
+  color: #6fcf97;
+}
+
+.qa-pause-icon {
+  font-size: 36px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(111, 207, 151, 0.4));
+}
+
+.qa-pause-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.qa-pause-title {
+  font-weight: 700;
+  font-size: 17px;
+  color: #6fcf97;
+  letter-spacing: 0.3px;
+}
+
+.qa-pause-subtitle {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.qa-pause-marker:active {
+  transform: translateX(3px);
+}

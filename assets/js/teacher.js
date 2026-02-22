@@ -108,6 +108,12 @@ function initializePage() {
   // Render media gallery
   renderMediaGallery();
 
+  // Set up tab switching
+  setupOutlineTabs();
+
+  // Render generated outline
+  renderGeneratedOutline();
+
   channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_KEY) : null;
 
   bindControls();
@@ -140,6 +146,7 @@ function renderOutlineWithQuestions() {
     const isOpen = section.defaultOpen ? ' open' : '';
     const detailsEl = document.createElement('details');
     detailsEl.className = `accordion${isOpen}`;
+    detailsEl.setAttribute('data-section-id', section.id || '');
 
     const summaryEl = document.createElement('summary');
     summaryEl.textContent = section.summary;
@@ -489,6 +496,269 @@ function getMediaIcon(type) {
     verse: '📖'
   };
   return icons[type] || 'folder';
+}
+
+function setupOutlineTabs() {
+  const tabs = document.querySelectorAll('.outline-tab');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Remove active class from all tabs and contents
+      tabs.forEach(t => t.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+
+      // Add active class to clicked tab
+      tab.classList.add('active');
+
+      // Show corresponding content
+      const tabName = tab.dataset.tab;
+      const content = document.getElementById(`${tabName}-content`);
+      if (content) {
+        content.classList.add('active');
+      }
+    });
+  });
+}
+
+// Switch to a specific tab programmatically
+function switchToTab(tabName) {
+  const tabs = document.querySelectorAll('.outline-tab');
+  const tabContents = document.querySelectorAll('.tab-content');
+  
+  tabs.forEach(t => t.classList.remove('active'));
+  tabContents.forEach(c => c.classList.remove('active'));
+  
+  const tab = document.querySelector(`.outline-tab[data-tab="${tabName}"]`);
+  const content = document.getElementById(`${tabName}-content`);
+  
+  if (tab) tab.classList.add('active');
+  if (content) content.classList.add('active');
+}
+
+// Setup click handlers for Q&A pause markers
+function setupQAPauseMarkerHandlers() {
+  const markers = document.querySelectorAll('.qa-pause-marker');
+  
+  markers.forEach(marker => {
+    marker.addEventListener('click', () => {
+      const sectionId = marker.dataset.sectionId;
+      const sectionTitle = marker.dataset.sectionTitle;
+      
+      if (sectionId) {
+        // Switch to the Class Guide tab
+        switchToTab('guide');
+        
+        // Wait a moment for tab to switch, then open the section
+        setTimeout(() => {
+          openQASection(sectionId);
+        }, 150);
+      } else {
+        // No section linked, just switch to guide tab
+        switchToTab('guide');
+      }
+    });
+  });
+}
+
+// Open a specific Q&A section and close all others
+function openQASection(sectionId) {
+  // Find all accordion elements in the guide content
+  const guideContent = document.getElementById('guide-content');
+  if (!guideContent) return;
+  
+  const allAccordions = guideContent.querySelectorAll('details.accordion');
+  
+  // Close all sections first
+  allAccordions.forEach(accordion => {
+    accordion.removeAttribute('open');
+  });
+  
+  // Find and open the target section
+  const targetAccordion = guideContent.querySelector(`details.accordion[data-section-id="${sectionId}"]`);
+  
+  if (targetAccordion) {
+    targetAccordion.setAttribute('open', 'open');
+    
+    // Scroll to the section smoothly
+    setTimeout(() => {
+      targetAccordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  } else {
+    console.warn(`Could not find section with ID: ${sectionId}`);
+  }
+}
+
+function renderGeneratedOutline() {
+  const displayContainer = document.querySelector('.editor-content-display');
+  if (!displayContainer) return;
+
+  // Display the actual editor content (HTML from TipTap editor)
+  const editorContent = classConfig.content;
+  
+  if (!editorContent || !editorContent.html) {
+    displayContainer.innerHTML = '';
+    return;
+  }
+
+  // Render the editor content and make verse references clickable
+  let html = editorContent.html;
+  
+  // Bible verse reference pattern (matches formats like: John 3:16, Romans 5:1-8, 1 Corinthians 13, etc.)
+  const bibleBooks = [
+    'Genesis', 'Gen', 'Exodus', 'Ex', 'Exo', 'Leviticus', 'Lev', 'Numbers', 'Num', 'Deuteronomy', 'Deut', 'Deu',
+    'Joshua', 'Josh', 'Judges', 'Judg', 'Ruth', '1 Samuel', '2 Samuel', 'Samuel', 'Sam', '1 Kings', '2 Kings', 'Kings',
+    '1 Chronicles', '2 Chronicles', 'Chronicles', 'Chron', 'Chr', 'Ezra', 'Nehemiah', 'Neh', 'Esther', 'Est',
+    'Job', 'Psalm', 'Psalms', 'Ps', 'Proverbs', 'Prov', 'Pro', 'Ecclesiastes', 'Eccles', 'Ecc',
+    'Song of Solomon', 'Song', 'Isaiah', 'Isa', 'Jeremiah', 'Jer', 'Lamentations', 'Lam',
+    'Ezekiel', 'Ezek', 'Eze', 'Daniel', 'Dan', 'Hosea', 'Hos', 'Joel', 'Amos', 'Obadiah', 'Obad',
+    'Jonah', 'Jon', 'Micah', 'Mic', 'Nahum', 'Nah', 'Habakkuk', 'Hab', 'Zephaniah', 'Zeph',
+    'Haggai', 'Hag', 'Zechariah', 'Zech', 'Zec', 'Malachi', 'Mal',
+    'Matthew', 'Matt', 'Mat', 'Mark', 'Luke', 'John', 'Acts',
+    'Romans', 'Rom', '1 Corinthians', '2 Corinthians', 'Corinthians', 'Cor',
+    'Galatians', 'Gal', 'Ephesians', 'Eph', 'Philippians', 'Phil',
+    'Colossians', 'Col', '1 Thessalonians', '2 Thessalonians', 'Thessalonians', 'Thess', 'Thes',
+    '1 Timothy', '2 Timothy', 'Timothy', 'Tim', 'Titus', 'Tit', 'Philemon', 'Philem',
+    'Hebrews', 'Heb', 'James', 'Jam', 'Jas', '1 Peter', '2 Peter', 'Peter', 'Pet',
+    '1 John', '2 John', '3 John', 'Jude', 'Revelation', 'Rev'
+  ];
+  
+  const versePattern = new RegExp(
+    `\\b(\\d\\s+)?(${bibleBooks.join('|')})\\s+\\d+(?::\\d+)?(?:[–-]\\d+(?::\\d+)?)?\\b`,
+    'gi'
+  );
+  
+  // Replace verse references with clickable spans
+  html = html.replace(versePattern, (match) => {
+    return `<span class="verse-reference" data-verse="${match.trim()}">${match}</span>`;
+  });
+  
+  displayContainer.innerHTML = html;
+  
+  // Add click handlers to verse references
+  const verseRefs = displayContainer.querySelectorAll('.verse-reference');
+  verseRefs.forEach(ref => {
+    ref.addEventListener('click', () => {
+      const verse = ref.dataset.verse;
+      if (verse) {
+        sendVerseToStudent(verse);
+        // Visual feedback
+        ref.style.background = 'rgba(240, 180, 41, 0.3)';
+        setTimeout(() => {
+          ref.style.background = '';
+        }, 500);
+      }
+    });
+  });
+  
+  // Add Q&A break markers if generatedOutline exists
+  if (classConfig.generatedOutline && classConfig.generatedOutline.length > 0) {
+    insertQABreakMarkers(displayContainer, classConfig.generatedOutline);
+  }
+  
+  // Add click handlers to external links - require Alt key to open
+  const links = displayContainer.querySelectorAll('a[href]');
+  links.forEach(link => {
+    link.addEventListener('click', (e) => {
+      // Only allow opening if Alt key is held
+      if (!e.altKey) {
+        e.preventDefault();
+        // Show visual feedback that Alt is required
+        const originalColor = link.style.color;
+        link.style.color = '#ffc107';
+        link.title = 'Hold Alt while clicking to open link';
+        setTimeout(() => {
+          link.style.color = originalColor;
+          link.title = '';
+        }, 1000);
+      }
+    });
+  });
+  
+  // Set up click handlers for Q&A pause markers (from TipTap editor)
+  setupQAPauseMarkerHandlers();
+}
+
+// Insert Q&A break markers into the editor content display
+function insertQABreakMarkers(container, generatedOutline) {
+  // Find all headings in the content
+  const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+  
+  generatedOutline.forEach((section) => {
+    // Check if this section has Q&A break points
+    const qaBreaks = section.points?.filter(p => 
+      typeof p === 'object' && p.type === 'qa-break'
+    ) || [];
+    
+    if (qaBreaks.length === 0) return;
+    
+    // Find the heading that matches this section
+    let matchingHeading = null;
+    headings.forEach(heading => {
+      const headingText = heading.textContent.trim().toLowerCase();
+      const sectionText = section.summary.trim().toLowerCase();
+      
+      // Check for partial match
+      if (headingText.includes(sectionText) || sectionText.includes(headingText)) {
+        matchingHeading = heading;
+      }
+    });
+    
+    if (matchingHeading) {
+      // Create Q&A break marker
+      qaBreaks.forEach((qaBreak) => {
+        const marker = document.createElement('div');
+        marker.className = 'qa-break-marker';
+        marker.innerHTML = `
+          <div class="qa-break-icon">
+            <span class="material-icons">forum</span>
+          </div>
+          <div class="qa-break-content">
+            <strong>Q&A Discussion Point</strong>
+            <p>${qaBreak.text || 'Pause for discussion - See class guide'}</p>
+            <button class="qa-break-btn" data-section-id="${section.id}">
+              <span class="material-icons">assignment</span>
+              View Class Guide
+            </button>
+          </div>
+        `;
+        
+        // Insert after the heading's parent section
+        const insertPoint = matchingHeading.parentElement.nextSibling;
+        if (insertPoint) {
+          matchingHeading.parentElement.parentNode.insertBefore(marker, insertPoint);
+        } else {
+          matchingHeading.parentElement.parentNode.appendChild(marker);
+        }
+        
+        // Add click handler to switch to class guide tab
+        const btn = marker.querySelector('.qa-break-btn');
+        if (btn) {
+          btn.addEventListener('click', () => {
+            // Switch to class guide tab
+            const guidTab = document.querySelector('.outline-tab[data-tab="guide"]');
+            const editorTab = document.querySelector('.outline-tab[data-tab="editor"]');
+            const guideContent = document.getElementById('guide-content');
+            const editorContent = document.getElementById('editor-content');
+            
+            if (guidTab && editorTab && guideContent && editorContent) {
+              guidTab.classList.add('active');
+              editorTab.classList.remove('active');
+              guideContent.classList.add('active');
+              editorContent.classList.remove('active');
+              
+              // Try to open the matching section in the class guide
+              const accordion = document.querySelector(`details.accordion[data-section-id="${section.id}"]`);
+              if (accordion) {
+                accordion.setAttribute('open', '');
+                accordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+          });
+        }
+      });
+    }
+  });
 }
 
 function openDisplayWindow() {

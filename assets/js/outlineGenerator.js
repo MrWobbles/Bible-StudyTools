@@ -214,7 +214,10 @@ function formatOutlineHTML(outline) {
                     <div class="outline-points">
                         <strong>Key Points:</strong>
                         <ul>
-                            ${section.points.map(point => `<li>${point}</li>`).join('')}
+                            ${section.points.map(point => {
+                                const text = typeof point === 'object' ? point.text : point;
+                                return `<li>${text}</li>`;
+                            }).join('')}
                         </ul>
                     </div>
                 ` : ''}

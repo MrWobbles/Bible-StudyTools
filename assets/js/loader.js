@@ -322,7 +322,10 @@ function renderOutline() {
     .map((section, idx) => {
       const isOpen = section.defaultOpen ? ' open' : '';
       const pointsHtml = section.points
-        .map(point => `<li>${point}</li>`)
+        .map(point => {
+          const text = typeof point === 'object' ? point.text : point;
+          return `<li>${text}</li>`;
+        })
         .join('');
 
       return `

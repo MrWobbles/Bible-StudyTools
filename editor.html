@@ -23,8 +23,6 @@
             </div>
             <div class="header-right">
                 <button id="btn-save" class="btn btn-primary">Save</button>
-                <button id="btn-preview" class="btn btn-secondary">Preview</button>
-                <button id="btn-history" class="btn btn-secondary">History</button>
                 <button id="btn-view-teacher" class="btn btn-secondary">View Teacher</button>
                 <a href="admin.html" class="btn btn-secondary">Back to Admin</a>
             </div>
@@ -131,6 +129,9 @@
                         <button class="toolbar-btn" data-action="insertLink" title="Insert Link">
                             <span class="material-symbols-outlined">link</span>
                         </button>
+                        <button class="toolbar-btn" data-action="insertQAPause" title="Insert Q&A Pause" style="background: rgba(111, 207, 151, 0.15);">
+                            <span class="material-symbols-outlined">forum</span>
+                        </button>
                     </div>
 
                     <div class="toolbar-divider"></div>
@@ -154,6 +155,9 @@
                         </button>
                         <button class="toolbar-btn" id="btn-generate-outline" title="Generate Outline">
                             <span class="material-symbols-outlined">account_tree</span>
+                        </button>
+                        <button class="toolbar-btn" id="btn-ai-assistant" title="AI Assistant" style="background: rgba(240, 180, 41, 0.1);">
+                            <span class="material-symbols-outlined">psychology</span>
                         </button>
                     </div>
                 </div>
@@ -310,6 +314,81 @@
                 <button id="btn-apply-outline" class="btn btn-primary" disabled>Apply to Class</button>
                 <button id="btn-enhance-outline" class="btn btn-secondary" disabled style="display: none;">Enhance with AI</button>
                 <button class="btn btn-secondary modal-close" data-modal="outline-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Assistant Modal -->
+    <div id="ai-assistant-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 8px;">psychology</span>AI Assistant</h3>
+                <button class="modal-close" data-modal="ai-assistant-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="ai-status" style="padding: 10px; border-radius: 6px; margin-bottom: 12px; display: none;">
+                    <!-- AI status will be shown here -->
+                </div>
+                
+                <label for="ai-question" style="display: block; margin-bottom: 6px; font-weight: 600;">Ask a question about your content:</label>
+                <textarea id="ai-question" rows="3" placeholder="e.g., What multimedia resources would you suggest to help engagement and retention?" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
+                
+                <div style="margin-top: 10px; font-size: 13px; color: var(--text-muted);">
+                    <p style="margin: 4px 0;"><strong>Suggested questions:</strong></p>
+                    <button class="ai-suggestion-btn" data-question="What multimedia resources would you suggest to help engagement and retention?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">lightbulb</span> Multimedia suggestions</button>
+                    <button class="ai-suggestion-btn" data-question="What are the key themes in this content?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">target</span> Key themes</button>
+                    <button class="ai-suggestion-btn" data-question="What discussion questions would work well with this content?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">forum</span> Discussion questions</button>
+                    <button class="ai-suggestion-btn" data-question="How can I make this content more accessible to beginners?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">school</span> Simplify for beginners</button>
+                    <button class="ai-suggestion-btn" data-question="What Bible passages would complement this lesson?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">menu_book</span> Related scriptures</button>
+                </div>
+                
+                <button id="btn-ask-ai" class="btn btn-primary" style="margin-top: 12px; width: 100%;">
+                    <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">send</span>
+                    Ask AI
+                </button>
+                
+                <div id="ai-response-container" style="margin-top: 20px; display: none;">
+                    <h4 style="margin: 0 0 10px; display: flex; align-items: center; gap: 8px;">
+                        <span class="material-symbols-outlined">smart_toy</span>
+                        AI Response:
+                    </h4>
+                    <div id="ai-response" style="background: #1a1f28; color: #f8f9fa; padding: 16px; border-radius: 8px; border-left: 4px solid var(--accent); white-space: pre-wrap; line-height: 1.6; max-height: 400px; overflow-y: auto;">
+                        <!-- AI response will appear here -->
+                    </div>
+                    <button id="btn-copy-response" class="btn btn-secondary" style="margin-top: 10px;">
+                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">content_copy</span>
+                        Copy Response
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close" data-modal="ai-assistant-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Q&A Pause Modal -->
+    <div id="qa-pause-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Insert Q&A Pause Marker</h3>
+                <button class="modal-close" data-modal="qa-pause-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 12px; color: var(--text-muted);">
+                    Insert a marker to indicate where teachers should pause for discussion questions.
+                </p>
+                <label for="qa-section-select">Link to section (optional):</label>
+                <select id="qa-section-select" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 12px;">
+                    <option value="">-- Generic pause --</option>
+                </select>
+                <p style="font-size: 12px; color: var(--text-muted);">
+                    If you link to a section, clicking the marker will show the discussion questions for that section.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-insert-qa-pause" class="btn btn-primary">Insert Marker</button>
+                <button class="btn btn-secondary modal-close" data-modal="qa-pause-modal">Cancel</button>
             </div>
         </div>
     </div>

@@ -11,6 +11,76 @@ import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import Underline from '@tiptap/extension-underline';
+import { Node, mergeAttributes } from '@tiptap/core';
+
+// Custom Q&A Pause Marker Node Extension
+const QAPauseMarker = Node.create({
+    name: 'qaPauseMarker',
+    group: 'block',
+    atom: true,
+
+    addAttributes() {
+        return {
+            sectionId: {
+                default: null,
+            },
+            sectionTitle: {
+                default: 'Discussion Questions',
+            },
+        };
+    },
+
+    parseHTML() {
+        return [
+            {
+                tag: 'div.qa-pause-marker',
+            },
+        ];
+    },
+
+    renderHTML({ node, HTMLAttributes }) {
+        return [
+            'div',
+            mergeAttributes(HTMLAttributes, {
+                class: 'qa-pause-marker',
+                'data-section-id': node.attrs.sectionId,
+                'data-section-title': node.attrs.sectionTitle,
+            }),
+            [
+                'div',
+                { class: 'qa-pause-icon' },
+                '💬',
+            ],
+            [
+                'div',
+                { class: 'qa-pause-content' },
+                [
+                    'div',
+                    { class: 'qa-pause-title' },
+                    'Pause for Q&A',
+                ],
+                [
+                    'div',
+                    { class: 'qa-pause-subtitle' },
+                    node.attrs.sectionTitle,
+                ],
+            ],
+        ];
+    },
+
+    addCommands() {
+        return {
+            insertQAPause:
+                (attributes) =>
+                ({ commands }) => {
+                    return commands.insertContent({
+                        type: this.name,
+                        attrs: attributes,
+                    });
+                },
+        };
+    },
+});
 
 let editor = null;
 let currentDocument = null;
@@ -18,6 +88,7 @@ let autoSaveTimer = null;
 let isDirty = false;
 let currentClassId = null; // Can be either GUID or legacy classNumber
 let allClasses = [];
+let generatedOutline = null; // Stores the generated outline from the outline generator
 
 // Initialize editor on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -56,6 +127,7 @@ function initializeEditor() {
                     class: 'editor-image',
                 },
             }),
+            QAPauseMarker,
             Table.configure({
                 resizable: true,
             }),
@@ -78,6 +150,55 @@ function initializeEditor() {
     });
 
     console.log('Editor initialized:', editor);
+    
+    // Add click handler for Q&A pause markers
+    document.getElementById('editor').addEventListener('click', handleQAPauseClick);
+}
+
+// Handle clicks on Q&A pause markers
+function handleQAPauseClick(e) {
+    const marker = e.target.closest('.qa-pause-marker');
+    if (marker) {
+        const sectionId = marker.dataset.sectionId;
+        const sectionTitle = marker.dataset.sectionTitle;
+        
+        if (sectionId && generatedOutline) {
+            // Find the section and show its questions
+            const section = generatedOutline.find(s => s.id === sectionId);
+            if (section && section.questions && section.questions.length > 0) {
+                showQAQuestions(section);
+            } else {
+                alert('No questions found for this section.');
+            }
+        } else {
+            alert('This is a generic Q&A pause marker. Generate or apply an outline to link it to specific questions.');
+        }
+    }
+}
+
+// Show Q&A questions in a modal or sidebar
+function showQAQuestions(section) {
+    let questionsHTML = `<div class="qa-questions-display">
+        <h3>${section.summary}</h3>
+        <ol class="question-list">`;
+    
+    section.questions.forEach(q => {
+        questionsHTML += `<li>
+            <div class="question-prompt">${q.prompt}</div>
+            ${q.answer ? `<div class="question-answer"><strong>Suggested answer:</strong> ${q.answer}</div>` : ''}
+        </li>`;
+    });
+    
+    questionsHTML += '</ol></div>';
+    
+    // Show in an alert for now (could enhance to a nicer modal later)
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = questionsHTML;
+    const textContent = section.questions.map((q, i) => 
+        `${i + 1}. ${q.prompt}${q.answer ? '\n   Answer: ' + q.answer : ''}`
+    ).join('\n\n');
+    
+    alert(`Questions for: ${section.summary}\n\n${textContent}`);
 }
 
 // Setup Event Listeners
@@ -114,9 +235,6 @@ function setupEventListeners() {
     // Save button
     document.getElementById('btn-save').addEventListener('click', saveDocument);
 
-    // Preview button
-    document.getElementById('btn-preview').addEventListener('click', showPreview);
-
     // View Teacher button
     document.getElementById('btn-view-teacher').addEventListener('click', viewTeacher);
 
@@ -145,6 +263,9 @@ function setupEventListeners() {
     // Link insertion
     document.getElementById('btn-insert-link').addEventListener('click', insertLink);
 
+    // Q&A Pause insertion
+    document.getElementById('btn-insert-qa-pause').addEventListener('click', insertQAPauseMarker);
+
     // Search functionality
     document.getElementById('btn-find-next').addEventListener('click', findNext);
     document.getElementById('btn-replace').addEventListener('click', replaceOne);
@@ -159,6 +280,19 @@ function setupEventListeners() {
     // Outline method radio buttons
     document.querySelectorAll('input[name="outline-method"]').forEach(radio => {
         radio.addEventListener('change', handleOutlineMethodChange);
+    });
+
+    // AI Assistant
+    document.getElementById('btn-ai-assistant').addEventListener('click', openAIAssistant);
+    document.getElementById('btn-ask-ai').addEventListener('click', askAIQuestion);
+    document.getElementById('btn-copy-response').addEventListener('click', copyAIResponse);
+    
+    // AI suggestion buttons
+    document.querySelectorAll('.ai-suggestion-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const question = e.target.dataset.question;
+            document.getElementById('ai-question').value = question;
+        });
     });
 
     // Keyboard shortcuts
@@ -196,6 +330,7 @@ function handleToolbarAction(action) {
         insertImage: () => openModal('image-modal'),
         insertTable: () => insertTable(),
         insertLink: () => openModal('link-modal'),
+        insertQAPause: () => openModal('qa-pause-modal'),
     };
 
     if (actions[action]) {
@@ -277,12 +412,160 @@ function insertTable() {
         .run();
 }
 
+// Insert Q&A Pause Marker
+function insertQAPauseMarker() {
+    const sectionSelect = document.getElementById('qa-section-select');
+    const selectedOption = sectionSelect.options[sectionSelect.selectedIndex];
+    
+    const sectionId = selectedOption.value || null;
+    const sectionTitle = selectedOption.text !== '-- Generic pause --' 
+        ? selectedOption.text 
+        : 'Discussion Questions';
+    
+    editor.chain()
+        .focus()
+        .insertQAPause({
+            sectionId: sectionId,
+            sectionTitle: sectionTitle,
+        })
+        .run();
+    
+    closeModal('qa-pause-modal');
+}
+
 // Modal Functions
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
+        // Populate Q&A section dropdown if opening that modal
+        if (modalId === 'qa-pause-modal') {
+            populateQASectionDropdown();
+        }
         modal.style.display = 'flex';
     }
+}
+
+// Populate the Q&A section dropdown with available sections from the generated outline
+function populateQASectionDropdown() {
+    const select = document.getElementById('qa-section-select');
+    select.innerHTML = '<option value="">-- Generic pause --</option>';
+    
+    if (generatedOutline && Array.isArray(generatedOutline)) {
+        generatedOutline.forEach(section => {
+            if (section.questions && section.questions.length > 0) {
+                const option = document.createElement('option');
+                option.value = section.id;
+                option.textContent = section.summary;
+                select.appendChild(option);
+            }
+        });
+    }
+}
+
+// Automatically inject Q&A pause markers based on outline qa-break points
+function injectQAPauseMarkers(outline) {
+    if (!outline || !Array.isArray(outline) || !editor) {
+        console.log('Cannot inject markers: missing outline or editor');
+        return;
+    }
+
+    // Get the current document JSON structure
+    const docJSON = editor.getJSON();
+    
+    // Track sections with qa-break points or questions
+    const sectionsWithQA = outline.filter(section => {
+        const hasQABreak = section.points && section.points.some(point => 
+            typeof point === 'object' && point.type === 'qa-break'
+        );
+        const hasQuestions = section.questions && section.questions.length > 0;
+        return hasQABreak || hasQuestions;
+    });
+
+    if (sectionsWithQA.length === 0) {
+        console.log('No Q&A breaks or questions found in outline');
+        return;
+    }
+
+    console.log(`Found ${sectionsWithQA.length} sections with Q&A:`, sectionsWithQA.map(s => s.summary));
+
+    // Get all content blocks (paragraphs, headings, etc.)
+    const contentBlocks = docJSON.content || [];
+    const totalBlocks = contentBlocks.length;
+    
+    if (totalBlocks === 0) {
+        console.log('No content blocks in document');
+        return;
+    }
+
+    // Strategy: Distribute markers evenly throughout the document
+    // This works even if the document doesn't have headings that match the AI outline
+    let newContent = [];
+    const markerInterval = Math.floor(totalBlocks / (sectionsWithQA.length + 1));
+    let currentSectionIdx = 0;
+    let blocksSinceLastMarker = 0;
+
+    for (let i = 0; i < contentBlocks.length; i++) {
+        const node = contentBlocks[i];
+        newContent.push(node);
+        blocksSinceLastMarker++;
+        
+        // Try to find matching heading first (if exists)
+        let matchingSection = null;
+        if (node.type === 'heading' && node.content) {
+            const headingText = node.content.map(n => n.text || '').join('').trim();
+            matchingSection = sectionsWithQA.find(section => {
+                const summary = section.summary.trim().toLowerCase();
+                const heading = headingText.toLowerCase();
+                return summary.includes(heading) || heading.includes(summary) || 
+                       summary === heading;
+            });
+            
+            if (matchingSection) {
+                console.log(`Matched heading "${headingText}" to section "${matchingSection.summary}"`);
+            }
+        }
+        
+        // Insert marker after heading match OR at regular intervals
+        const shouldInsertMarker = matchingSection || 
+            (blocksSinceLastMarker >= markerInterval && 
+             currentSectionIdx < sectionsWithQA.length &&
+             i < contentBlocks.length - 1);
+        
+        if (shouldInsertMarker && currentSectionIdx < sectionsWithQA.length) {
+            const section = matchingSection || sectionsWithQA[currentSectionIdx];
+            
+            newContent.push({
+                type: 'qaPauseMarker',
+                attrs: {
+                    sectionId: section.id,
+                    sectionTitle: section.summary,
+                },
+            });
+            
+            console.log(`Inserted marker for section: ${section.summary}`);
+            currentSectionIdx++;
+            blocksSinceLastMarker = 0;
+        }
+    }
+    
+    // Insert any remaining markers at the end
+    while (currentSectionIdx < sectionsWithQA.length) {
+        const section = sectionsWithQA[currentSectionIdx];
+        newContent.push({
+            type: 'qaPauseMarker',
+            attrs: {
+                sectionId: section.id,
+                sectionTitle: section.summary,
+            },
+        });
+        console.log(`Inserted marker at end for section: ${section.summary}`);
+        currentSectionIdx++;
+    }
+    
+    // Set the new content with markers
+    editor.commands.setContent({ type: 'doc', content: newContent });
+    
+    console.log(`✓ Successfully injected ${sectionsWithQA.length} Q&A pause markers`);
 }
 
 function closeModal(modalId) {
@@ -504,9 +787,9 @@ async function saveDocument() {
             if (classIndex !== -1) {
                 allClasses[classIndex].content = content;
                 
-                // Also save the generated outline if it exists
+                // Also save the generated outline if it exists (to separate field)
                 if (generatedOutline && generatedOutline.length > 0) {
-                    allClasses[classIndex].outline = generatedOutline;
+                    allClasses[classIndex].generatedOutline = generatedOutline;
                 }
                 
                 // Save back to server
@@ -532,7 +815,7 @@ async function saveDocument() {
                 id: currentDocument?.id || 'general-content',
                 title: document.getElementById('document-title').textContent,
                 content: content,
-                outline: generatedOutline || [],
+                generatedOutline: generatedOutline || [],
                 lastModified: new Date().toISOString(),
             };
             localStorage.setItem('bible-study-content', JSON.stringify(currentDocument));
@@ -719,6 +1002,14 @@ function viewTeacher() {
     window.open(`teacher.html?class=${currentClassId}`, 'TeacherView', 'width=1200,height=800');
 }
 
+// Open Outline Modal - checks LLM availability and opens modal
+async function openOutlineModal() {
+    openModal('outline-modal');
+    
+    // Check LLM availability
+    const statusDiv = document.getElementById('llm-status');
+    try {
+        const llmAvailable = await checkOllamaAvailability();
         
         if (llmAvailable) {
             statusDiv.style.display = 'block';
@@ -828,6 +1119,11 @@ async function generateAndShowOutline() {
         // Update outline navigator with generated structure
         updateOutlineNavigatorFromGenerated(generatedOutline);
         
+        // Automatically inject Q&A pause markers where the AI identified qa-breaks
+        if (useAI) {
+            injectQAPauseMarkers(generatedOutline);
+        }
+        
         console.log('Generated outline:', generatedOutline);
         
         // Success feedback
@@ -926,6 +1222,9 @@ async function enhanceCurrentOutline() {
         const html = formatOutlineHTML(generatedOutline);
         previewDiv.innerHTML = html;
         
+        // Inject Q&A markers after enhancement
+        injectQAPauseMarkers(generatedOutline);
+        
         enhanceBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">check_circle</span>Enhanced';
         setTimeout(() => {
             enhanceBtn.textContent = 'Enhance with AI';
@@ -991,6 +1290,10 @@ async function applyOutlineToClass() {
         // Find and update the class (support both id and classNumber)
         const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
         if (classIndex !== -1) {
+            // Save to generatedOutline field (for viewing in teacher tab)
+            allClasses[classIndex].generatedOutline = generatedOutline;
+            
+            // Also save to outline field (this replaces the guide with the generated outline)
             allClasses[classIndex].outline = generatedOutline;
             
             // Save back to server
@@ -1016,6 +1319,121 @@ async function applyOutlineToClass() {
     } catch (error) {
         console.error('Apply outline failed:', error);
         alert('Failed to apply outline: ' + error.message);
+    }
+}
+
+// AI Assistant Functions
+async function openAIAssistant() {
+    openModal('ai-assistant-modal');
+    
+    // Check AI availability
+    const statusDiv = document.getElementById('ai-status');
+    try {
+        const aiAvailable = await checkOllamaAvailability();
+        
+        if (aiAvailable) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#d4edda';
+            statusDiv.style.color = '#155724';
+            statusDiv.style.border = '1px solid #c3e6cb';
+            statusDiv.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">check_circle</span> AI is ready to help!';
+        } else {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#fff3cd';
+            statusDiv.style.color = '#856404';
+            statusDiv.style.border = '1px solid #ffc107';
+            statusDiv.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">warning</span> Ollama is not running. Please start Ollama to use AI features.';
+        }
+    } catch (error) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#f8d7da';
+        statusDiv.style.color = '#721c24';
+        statusDiv.style.border = '1px solid #f5c6cb';
+        statusDiv.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">error</span> Could not connect to AI service.';
+    }
+}
+
+async function askAIQuestion() {
+    const questionInput = document.getElementById('ai-question');
+    const question = questionInput.value.trim();
+    
+    if (!question) {
+        alert('Please enter a question');
+        return;
+    }
+    
+    const askBtn = document.getElementById('btn-ask-ai');
+    const responseContainer = document.getElementById('ai-response-container');
+    const responseDiv = document.getElementById('ai-response');
+    
+    // Show loading state
+    askBtn.disabled = true;
+    askBtn.innerHTML = '<span class="material-symbols-outlined rotating" style="vertical-align: middle; font-size: 18px;">progress_activity</span> Thinking...';
+    responseContainer.style.display = 'block';
+    responseDiv.innerHTML = '<em style="color: #666;">AI is analyzing your content...</em>';
+    
+    try {
+        // Check if AI is available
+        const aiAvailable = await checkOllamaAvailability();
+        if (!aiAvailable) {
+            throw new Error('AI service is not available. Please ensure Ollama is running.');
+        }
+        
+        // Get editor content
+        const editorText = editor.getText();
+        const editorHTML = editor.getHTML();
+        
+        if (!editorText || editorText.trim().length < 10) {
+            throw new Error('Please add some content to your document before asking questions.');
+        }
+        
+        // Build context-aware prompt
+        const systemPrompt = `You are a helpful Bible study curriculum assistant. The user is creating Bible study content and needs your expertise.
+
+Here is the content they are working on:
+
+${editorText}
+
+Please answer their question thoughtfully, considering the content they've created. Provide practical, actionable suggestions that would enhance their Bible study lesson.`;
+        
+        // Generate AI response
+        const response = await generateCompletion(question, {
+            system: systemPrompt,
+            temperature: 0.7,
+            model: 'llama3.1'
+        });
+        
+        // Display response
+        responseDiv.innerHTML = response || 'No response received from AI.';
+        
+    } catch (error) {
+        console.error('AI question failed:', error);
+        responseDiv.innerHTML = `<span style="color: #721c24;">❌ Error: ${error.message}</span>`;
+    } finally {
+        // Reset button
+        askBtn.disabled = false;
+        askBtn.innerHTML = '<span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">send</span> Ask AI';
+    }
+}
+
+async function copyAIResponse() {
+    const responseDiv = document.getElementById('ai-response');
+    const text = responseDiv.textContent;
+    
+    try {
+        await navigator.clipboard.writeText(text);
+        
+        const copyBtn = document.getElementById('btn-copy-response');
+        const originalHTML = copyBtn.innerHTML;
+        copyBtn.innerHTML = '<span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">check</span> Copied!';
+        copyBtn.style.background = '#28a745';
+        
+        setTimeout(() => {
+            copyBtn.innerHTML = originalHTML;
+            copyBtn.style.background = '';
+        }, 2000);
+    } catch (error) {
+        alert('Failed to copy: ' + error.message);
     }
 }
 

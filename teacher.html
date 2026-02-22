@@ -31,8 +31,18 @@
     <div class="layout">
       <section class="card" id="question-bank">
         <div class="tag">Outline & prompts</div>
-        <h3 style="margin: 10px 0 8px;">Class guide with notes</h3>
-        <div class="list"></div>
+        <div class="outline-tabs">
+          <button class="outline-tab active" data-tab="guide">Class Guide</button>
+          <button class="outline-tab" data-tab="editor">Editor Notes</button>
+        </div>
+        <div id="guide-content" class="tab-content active">
+          <h3 style="margin: 10px 0 8px;">Class guide with notes</h3>
+          <div class="list"></div>
+        </div>
+        <div id="editor-content" class="tab-content">
+          <h3 style="margin: 10px 0 8px;">Notes from text editor</h3>
+          <div class="editor-content-display"></div>
+        </div>
 
         <section class="card notes" style="margin-top: 14px;">
           <div class="tag">Rich text notes</div>
