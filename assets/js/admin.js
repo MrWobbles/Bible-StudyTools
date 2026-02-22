@@ -6,6 +6,11 @@ let currentClass = null;
 let currentMediaIndex = null;
 let currentSectionIndex = null;
 
+// Generate GUID for class IDs
+function generateGUID() {
+  return 'class-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
 // Load data on page load
 window.addEventListener('DOMContentLoaded', async () => {
   console.log('Page loading...');
@@ -209,16 +214,17 @@ function goBackToLessonPlans() {
 
 // Save lesson plans to file
 async function saveLessonPlansToFile() {
+  console.log('saveLessonPlansToFile called with', allLessonPlans.length, 'lesson plans');
   const jsonData = { lessonPlans: allLessonPlans };
 
   // If running in Electron, save directly to file system
   if (window.bst && window.bst.saveFile) {
     try {
       await window.bst.saveFile('lessonPlans.json', JSON.stringify(jsonData, null, 2));
-      console.log('Lesson plans saved successfully');
+      console.log('[✓] Lesson plans saved via Electron');
       return;
     } catch (err) {
-      console.error('Failed to save lesson plans:', err);
+      console.error('Failed to save lesson plans via Electron:', err);
       alert('Failed to save lesson plans: ' + err.message);
       return;
     }
@@ -226,18 +232,23 @@ async function saveLessonPlansToFile() {
 
   // Try API endpoint (web server mode)
   try {
+    console.log('Attempting API save to /api/save/lessonplans...');
     const response = await fetch('/api/save/lessonplans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(jsonData),
     });
 
+    console.log('API response status:', response.status, response.statusText);
+    
     if (response.ok) {
       const result = await response.json();
-      console.log('✓ ' + result.message);
+      console.log('[✓] Lesson plans saved successfully:', result);
       return;
     } else {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API error response:', errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
   } catch (err) {
     console.warn('API save failed, falling back to download:', err);
@@ -249,6 +260,7 @@ async function saveLessonPlansToFile() {
     link.download = 'lessonPlans.json';
     link.click();
     URL.revokeObjectURL(url);
+    console.log('Lesson plans downloaded - please replace assets/data/lessonPlans.json with the downloaded file.');
   }
 }
 
@@ -263,8 +275,9 @@ function renderClassListForLessonPlan() {
   const planClassIds = plan.classes || [];
 
   // Show classes that are in this lesson plan
-  planClassIds.forEach((classNum) => {
-    const cls = allClasses.find((c) => c.classNumber === classNum);
+  let displayNumber = 1;
+  planClassIds.forEach((classId) => {
+    const cls = allClasses.find((c) => c.id === classId || c.classNumber === classId); // Support both old and new format
     if (cls) {
       const index = allClasses.indexOf(cls);
       const item = document.createElement('div');
@@ -272,7 +285,7 @@ function renderClassListForLessonPlan() {
       item.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <span class="class-item-number">Class ${cls.classNumber}</span>
+            <span class="class-item-number">Class ${displayNumber}</span>
             <span class="class-item-title">${cls.title}</span>
           </div>
           <button class="btn-icon" onclick="removeClassFromLessonPlan(${index})" title="Remove">⊘</button>
@@ -284,6 +297,7 @@ function renderClassListForLessonPlan() {
         }
       });
       classList.appendChild(item);
+      displayNumber++;
     }
   });
 
@@ -304,7 +318,10 @@ function showAvailableClassesModal() {
   const planClassIds = plan.classes || [];
 
   // Find classes not yet in this plan
-  const availableClasses = allClasses.filter((cls) => !planClassIds.includes(cls.classNumber));
+  const availableClasses = allClasses.filter((cls) => {
+    const classId = cls.id || cls.classNumber;
+    return !planClassIds.includes(classId);
+  });
 
   if (availableClasses.length === 0) {
     alert('All available classes are already in this lesson plan.');
@@ -316,8 +333,8 @@ function showAvailableClassesModal() {
     const index = allClasses.indexOf(cls);
     html += `
       <button class="btn-secondary" style="text-align: left; padding: 10px;" onclick="addClassToLessonPlan(${index}); closeModal('class-add-modal');">
-        <strong>Class ${cls.classNumber}</strong><br/>
-        <span style="font-size: 12px; color: var(--muted);">${cls.title}</span>
+        <strong>${cls.title}</strong><br/>
+        <span style="font-size: 12px; color: var(--muted);">${cls.subtitle || ''}</span>
       </button>
     `;
   });
@@ -331,10 +348,12 @@ function showAvailableClassesModal() {
 function addClassToLessonPlan(classIndex) {
   const cls = allClasses[classIndex];
   const plan = allLessonPlans[currentLessonPlan];
+  const classId = cls.id || cls.classNumber; // Support both old and new format
 
-  if (!plan.classes.includes(cls.classNumber)) {
-    plan.classes.push(cls.classNumber);
+  if (!plan.classes.includes(classId)) {
+    plan.classes.push(classId);
     renderClassListForLessonPlan();
+    saveLessonPlansToFile();
   }
 }
 
@@ -342,9 +361,68 @@ function addClassToLessonPlan(classIndex) {
 function removeClassFromLessonPlan(classIndex) {
   const cls = allClasses[classIndex];
   const plan = allLessonPlans[currentLessonPlan];
+  const classId = cls.id || cls.classNumber; // Support both old and new format
 
-  plan.classes = plan.classes.filter((num) => num !== cls.classNumber);
+  plan.classes = plan.classes.filter((id) => id !== classId);
   renderClassListForLessonPlan();
+  saveLessonPlansToFile();
+}
+
+// Create new class
+function createNewClass() {
+  const newClassId = generateGUID();
+  
+  const newClass = {
+    id: newClassId,
+    classNumber: allClasses.length + 1, // Keep for backward compatibility, but won't be used as identifier
+    title: 'New Class',
+    subtitle: '',
+    instructor: '',
+    channelName: `class-${allClasses.length + 1}-control`,
+    media: [],
+    outline: [],
+    content: {
+      html: '<p>Start writing your class content here...</p>',
+      json: {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Start writing your class content here..."}]}]},
+      text: 'Start writing your class content here...'
+    }
+  };
+  
+  allClasses.push(newClass);
+  console.log('Created new class:', newClass);
+  
+  // Add to current lesson plan if one is open
+  if (currentLessonPlan !== null) {
+    const plan = allLessonPlans[currentLessonPlan];
+    if (!plan.classes.includes(newClassId)) {
+      plan.classes.push(newClassId);
+    }
+    renderClassListForLessonPlan();
+  }
+  
+  // Select the new class for editing
+  selectClass(allClasses.length - 1);
+  
+  // Auto-save the new class AND the lesson plan
+  console.log('Auto-saving new class...');
+  saveClassToFile();
+  
+  if (currentLessonPlan !== null) {
+    console.log('Auto-saving lesson plan...');
+    saveLessonPlansToFile();
+  }
+}
+
+// Open content editor for current class
+function openContentEditor() {
+  if (currentClass === null) {
+    alert('Please select a class first');
+    return;
+  }
+  
+  const cls = allClasses[currentClass];
+  const classId = cls.id || cls.classNumber; // Support both old and new format
+  window.open(`editor.html?class=${classId}`, '_blank');
 }
 
 // ===== CLASS EDITING =====
@@ -363,9 +441,9 @@ function selectClass(index) {
   document.getElementById('no-selection').style.display = 'none';
   document.getElementById('edit-title').textContent = `Editing: ${cls.title}`;
   document.getElementById('save-class-btn').style.display = 'block';
+  document.getElementById('edit-content-btn').style.display = 'block';
 
   // Populate form
-  document.getElementById('classNumber').value = cls.classNumber;
   document.getElementById('classTitle').value = cls.title;
   document.getElementById('classSubtitle').value = cls.subtitle;
   document.getElementById('classInstructor').value = cls.instructor;
@@ -377,11 +455,12 @@ function selectClass(index) {
   // Render outline list
   renderOutlineList(cls);
 
-  // Update header links to include the selected class number
+  // Update header links to include the selected class ID
+  const classId = cls.id || cls.classNumber; // Support both old and new format
   const studentLink = document.getElementById('view-student-link');
   const teacherLink = document.getElementById('view-teacher-link');
-  if (studentLink) studentLink.href = `student.html?class=${cls.classNumber}`;
-  if (teacherLink) teacherLink.href = `teacher.html?class=${cls.classNumber}`;
+  if (studentLink) studentLink.href = `student.html?class=${classId}`;
+  if (teacherLink) teacherLink.href = `teacher.html?class=${classId}`;
 
   renderClassListForLessonPlan();
 }
@@ -948,7 +1027,6 @@ function deleteSection(index) {
 function saveClass() {
   const cls = allClasses[currentClass];
 
-  cls.classNumber = parseInt(document.getElementById('classNumber').value);
   cls.title = document.getElementById('classTitle').value;
   cls.subtitle = document.getElementById('classSubtitle').value;
   cls.instructor = document.getElementById('classInstructor').value;
@@ -963,16 +1041,18 @@ function saveClass() {
 
 // Save classes to file
 async function saveClassToFile() {
+  console.log('saveClassToFile called with', allClasses.length, 'classes');
   const jsonData = { classes: allClasses };
 
   // If running in Electron, save directly to file system
   if (window.bst && window.bst.saveFile) {
     try {
       await window.bst.saveFile('classes.json', JSON.stringify(jsonData, null, 2));
+      console.log('[✓] Saved via Electron');
       alert('Class saved successfully!');
       return;
     } catch (err) {
-      console.error('Failed to save class:', err);
+      console.error('Failed to save class via Electron:', err);
       alert('Failed to save class: ' + err.message);
       return;
     }
@@ -980,18 +1060,24 @@ async function saveClassToFile() {
 
   // Try API endpoint (web server mode)
   try {
+    console.log('Attempting API save to /api/save/classes...');
     const response = await fetch('/api/save/classes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(jsonData),
     });
 
+    console.log('API response status:', response.status, response.statusText);
+    
     if (response.ok) {
       const result = await response.json();
-      alert('✓ ' + result.message);
+      console.log('[✓] Save successful:', result);
+      alert('[✓] ' + result.message);
       return;
     } else {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API error response:', errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
   } catch (err) {
     console.warn('API save failed, falling back to download:', err);
@@ -1030,10 +1116,12 @@ function escapeHtml(text) {
 function setupEventListeners() {
   document.getElementById('new-lessonplan-btn').addEventListener('click', createNewLessonPlan);
   document.getElementById('back-btn').addEventListener('click', goBackToLessonPlans);
-  document.getElementById('new-class-btn').addEventListener('click', addMedia);
+  document.getElementById('new-class-btn').addEventListener('click', createNewClass);
   document.getElementById('add-media-btn').addEventListener('click', addMedia);
   document.getElementById('add-section-btn').addEventListener('click', addSection);
   document.getElementById('save-class-btn').addEventListener('click', saveClass);
+  document.getElementById('save-class-btn-bottom')?.addEventListener('click', saveClass);
+  document.getElementById('edit-content-btn')?.addEventListener('click', openContentEditor);
 
   // Keep modals open while selecting/copying; require explicit close buttons to prevent accidental closes
 }

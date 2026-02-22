@@ -17,7 +17,10 @@ async function loadClassConfig() {
         ? raw.classes
         : [raw];
 
-    classConfig = classesArr.find(c => c.classNumber?.toString() === classId) || classesArr[0] || {};
+    // Find class by either id (GUID) or classNumber for backward compatibility
+    classConfig = classesArr.find(c => 
+      c.classNumber?.toString() === classId || c.id === classId
+    ) || classesArr[0] || {};
 
     if (!classConfig || !classConfig.classNumber) {
       console.error(`Class ${classId} not found in configuration`);
@@ -222,7 +225,7 @@ function renderMediaThumbnail(media, index) {
       cursor: pointer;
       transition: all 0.2s ease;
     " data-media-index="${index}" data-media-id="${media.id || ''}">
-      <div style="font-size: 28px; margin-bottom: 8px;">${icon}</div>
+      <span class="material-symbols-outlined" style="font-size: 28px; display: block; margin-bottom: 8px;">${icon}</span>
       <small style="color: var(--text); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">${label}</small>
       ${sectionLabel}
     </div>
@@ -308,16 +311,16 @@ function openMediaInViewer(media) {
 
 function getMediaIcon(type) {
   const icons = {
-    video: '▶️',
-    pdf: '📄',
-    images: '🖼️',
-    image: '🖼️',
-    audio: '🔊',
-    document: '📋',
-    link: '🔗',
-    presentation: '📊'
+    video: 'videocam',
+    pdf: 'description',
+    images: 'image',
+    image: 'image',
+    audio: 'audio_file',
+    document: 'assignment',
+    link: 'link',
+    presentation: 'bar_chart'
   };
-  return icons[type] || '📁';
+  return icons[type] || 'folder';
 }
 
 function returnToDefaultView() {

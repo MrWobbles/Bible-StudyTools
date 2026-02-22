@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bible Study Editor - Rich Text Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/editor.css">
+</head>
+<body>
+    <div class="editor-container">
+        <!-- Header -->
+        <header class="editor-header">
+            <div class="header-left">
+                <h1>Bible Study Content Editor</h1>
+                <div class="document-info">
+                    <span id="document-title">Understanding Scripture</span>
+                    <span class="save-status" id="save-status">Saved</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="btn-save" class="btn btn-primary">Save</button>
+                <button id="btn-preview" class="btn btn-secondary">Preview</button>
+                <button id="btn-history" class="btn btn-secondary">History</button>
+                <button id="btn-view-teacher" class="btn btn-secondary">View Teacher</button>
+                <a href="admin.html" class="btn btn-secondary">Back to Admin</a>
+            </div>
+        </header>
+
+        <div class="editor-main">
+            <!-- Outline Navigator Sidebar -->
+            <aside class="outline-navigator">
+                <h3>Outline</h3>
+                <div id="outline-tree">
+                    <!-- Dynamically populated outline -->
+                </div>
+            </aside>
+
+            <!-- Editor Content Area -->
+            <main class="editor-content">
+                <!-- Toolbar -->
+                <div class="editor-toolbar" id="toolbar">
+                    <!-- Text Formatting -->
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" data-action="bold" title="Bold (Ctrl+B)">
+                            <span class="material-symbols-outlined">format_bold</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="italic" title="Italic (Ctrl+I)">
+                            <span class="material-symbols-outlined">format_italic</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="underline" title="Underline (Ctrl+U)">
+                            <span class="material-symbols-outlined">format_underlined</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="strike" title="Strikethrough">
+                            <span class="material-symbols-outlined">strikethrough_s</span>
+                        </button>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <!-- Headings -->
+                    <div class="toolbar-group">
+                        <select class="toolbar-select" id="heading-select">
+                            <option value="paragraph">Paragraph</option>
+                            <option value="h1">Heading 1</option>
+                            <option value="h2">Heading 2</option>
+                            <option value="h3">Heading 3</option>
+                            <option value="h4">Heading 4</option>
+                            <option value="h5">Heading 5</option>
+                            <option value="h6">Heading 6</option>
+                        </select>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <!-- Colors -->
+                    <div class="toolbar-group">
+                        <label class="toolbar-btn" title="Text Color">
+                            <span class="material-symbols-outlined">format_color_text</span>
+                            <input type="color" id="text-color" value="#f8f9fa">
+                        </label>
+                        <label class="toolbar-btn" title="Highlight">
+                            <span class="material-symbols-outlined">ink_highlighter</span>
+                            <input type="color" id="highlight-color" value="#f0b429">
+                        </label>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <!-- Lists -->
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" data-action="bulletList" title="Bullet List">
+                            <span class="material-symbols-outlined">format_list_bulleted</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="orderedList" title="Numbered List">
+                            <span class="material-symbols-outlined">format_list_numbered</span>
+                        </button>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <!-- Alignment & Formatting -->
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" data-action="blockquote" title="Quote">
+                            <span class="material-symbols-outlined">format_quote</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="codeBlock" title="Code Block">
+                            <span class="material-symbols-outlined">code</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="horizontalRule" title="Horizontal Line">
+                            <span class="material-symbols-outlined">horizontal_rule</span>
+                        </button>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <!-- Special Features -->
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" data-action="verseLink" title="Insert Bible Verse">
+                            <span class="material-symbols-outlined">menu_book</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="insertImage" title="Insert Image">
+                            <span class="material-symbols-outlined">image</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="insertTable" title="Insert Table">
+                            <span class="material-symbols-outlined">table</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="insertLink" title="Insert Link">
+                            <span class="material-symbols-outlined">link</span>
+                        </button>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <!-- Undo/Redo -->
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" data-action="undo" title="Undo (Ctrl+Z)">
+                            <span class="material-symbols-outlined">undo</span>
+                        </button>
+                        <button class="toolbar-btn" data-action="redo" title="Redo (Ctrl+Y)">
+                            <span class="material-symbols-outlined">redo</span>
+                        </button>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <!-- Search -->
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" id="btn-search" title="Search & Replace">
+                            <span class="material-symbols-outlined">search</span>
+                        </button>
+                        <button class="toolbar-btn" id="btn-generate-outline" title="Generate Outline">
+                            <span class="material-symbols-outlined">account_tree</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Editor Instance -->
+                <div class="editor" id="editor">
+                    <!-- TipTap editor will be mounted here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Verse Reference Modal -->
+    <div id="verse-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Insert Bible Verse Reference</h3>
+                <button class="modal-close" data-modal="verse-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="verse-input">Enter verse reference (e.g., John 3:16 or Romans 5:1-8):</label>
+                <input type="text" id="verse-input" placeholder="John 3:16">
+                <div id="verse-suggestions" class="suggestions"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-insert-verse" class="btn btn-primary">Insert</button>
+                <button class="btn btn-secondary modal-close" data-modal="verse-modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search/Replace Modal -->
+    <div id="search-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Search & Replace</h3>
+                <button class="modal-close" data-modal="search-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="search-input">Search for:</label>
+                <input type="text" id="search-input" placeholder="Enter text to find">
+                
+                <label for="replace-input">Replace with:</label>
+                <input type="text" id="replace-input" placeholder="Enter replacement text">
+                
+                <div class="search-options">
+                    <label><input type="checkbox" id="case-sensitive"> Case sensitive</label>
+                    <label><input type="checkbox" id="whole-word"> Whole word</label>
+                </div>
+                
+                <div id="search-results"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-find-next" class="btn btn-secondary">Find Next</button>
+                <button id="btn-replace" class="btn btn-secondary">Replace</button>
+                <button id="btn-replace-all" class="btn btn-primary">Replace All</button>
+                <button class="btn btn-secondary modal-close" data-modal="search-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Upload Modal -->
+    <div id="image-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Insert Image</h3>
+                <button class="modal-close" data-modal="image-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="image-url">Image URL:</label>
+                <input type="text" id="image-url" placeholder="https://example.com/image.jpg">
+                
+                <p>Or upload an image:</p>
+                <input type="file" id="image-upload" accept="image/*">
+                
+                <label for="image-alt">Alt text (description):</label>
+                <input type="text" id="image-alt" placeholder="Description of image">
+            </div>
+            <div class="modal-footer">
+                <button id="btn-insert-image" class="btn btn-primary">Insert Image</button>
+                <button class="btn btn-secondary modal-close" data-modal="image-modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Link Modal -->
+    <div id="link-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Insert Link</h3>
+                <button class="modal-close" data-modal="link-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="link-text">Link text:</label>
+                <input type="text" id="link-text" placeholder="Click here">
+                
+                <label for="link-url">URL:</label>
+                <input type="text" id="link-url" placeholder="https://example.com">
+            </div>
+            <div class="modal-footer">
+                <button id="btn-insert-link" class="btn btn-primary">Insert Link</button>
+                <button class="btn btn-secondary modal-close" data-modal="link-modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Outline Generator Modal -->
+    <div id="outline-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>Generate Outline</h3>
+                <button class="modal-close" data-modal="outline-modal">&times;</button>
+            </div>
+            
+            <!-- Generation Options -->
+            <div style="padding: 16px; background: var(--bg-secondary); border-bottom: 1px solid var(--border);">
+                <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 12px;">
+                    <label style="font-weight: 600; margin: 0;">Generation Method:</label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="radio" name="outline-method" value="standard" checked>
+                        <span>Standard (Fast, requires headings)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="radio" name="outline-method" value="llm">
+                        <span>AI-Enhanced (Works with any content)</span>
+                    </label>
+                </div>
+                <div id="llm-status" style="display: none; padding: 8px; border-radius: 6px; font-size: 13px;">
+                    <!-- LLM status will be shown here -->
+                </div>
+                <div id="llm-options" style="display: none; margin-top: 12px;">
+                    <label style="display: block; margin-bottom: 4px; font-size: 13px;">Model:</label>
+                    <select id="llm-model-select" class="form-control" style="width: 200px;">
+                        <option value="llama3.1">Llama 3.1</option>
+                        <option value="mistral">Mistral</option>
+                        <option value="phi3">Phi-3 (Fastest)</option>
+                        <option value="gemma2">Gemma 2</option>
+                    </select>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                        <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">lightbulb</span> AI mode works with any text - no headings required!
+                    </p>
+                </div>
+                <button id="btn-start-generation" class="btn btn-primary" style="margin-top: 12px;">
+                    Generate Outline
+                </button>
+            </div>
+            
+            <div class="modal-body" id="outline-preview" style="max-height: 500px; overflow-y: auto; min-height: 200px;">
+                <p style="color: var(--text-muted); text-align: center; padding: 40px;">Click "Generate Outline" to analyze your content</p>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-copy-outline" class="btn btn-secondary" disabled>Copy JSON</button>
+                <button id="btn-apply-outline" class="btn btn-primary" disabled>Apply to Class</button>
+                <button id="btn-enhance-outline" class="btn btn-secondary" disabled style="display: none;">Enhance with AI</button>
+                <button class="btn btn-secondary modal-close" data-modal="outline-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@tiptap/core": "https://esm.sh/@tiptap/core@2.8.0",
+            "@tiptap/pm": "https://esm.sh/@tiptap/pm@2.8.0",
+            "@tiptap/starter-kit": "https://esm.sh/@tiptap/starter-kit@2.8.0",
+            "@tiptap/extension-color": "https://esm.sh/@tiptap/extension-color@2.8.0",
+            "@tiptap/extension-text-style": "https://esm.sh/@tiptap/extension-text-style@2.8.0",
+            "@tiptap/extension-highlight": "https://esm.sh/@tiptap/extension-highlight@2.8.0",
+            "@tiptap/extension-link": "https://esm.sh/@tiptap/extension-link@2.8.0",
+            "@tiptap/extension-image": "https://esm.sh/@tiptap/extension-image@2.8.0",
+            "@tiptap/extension-table": "https://esm.sh/@tiptap/extension-table@2.8.0",
+            "@tiptap/extension-table-row": "https://esm.sh/@tiptap/extension-table-row@2.8.0",
+            "@tiptap/extension-table-cell": "https://esm.sh/@tiptap/extension-table-cell@2.8.0",
+            "@tiptap/extension-table-header": "https://esm.sh/@tiptap/extension-table-header@2.8.0",
+            "@tiptap/extension-underline": "https://esm.sh/@tiptap/extension-underline@2.8.0"
+        }
+    }
+    </script>
+    <script src="assets/js/iconHelper.js"></script>
+    <script src="assets/js/llmService.js"></script>
+    <script src="assets/js/outlineGenerator.js"></script>
+    <script type="module" src="assets/js/editor.js"></script>
+</body>
+</html>

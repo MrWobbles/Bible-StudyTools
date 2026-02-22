@@ -38,7 +38,7 @@ app.post('/api/save/classes', async (req, res) => {
 
     // Write to file
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-    console.log('✓ Saved classes.json');
+    console.log('[✓] Saved classes.json');
 
     res.json({ success: true, message: 'Classes saved successfully' });
   } catch (err) {
@@ -63,7 +63,7 @@ app.post('/api/save/lessonplans', async (req, res) => {
 
     // Write to file
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-    console.log('✓ Saved lessonPlans.json');
+    console.log('[✓] Saved lessonPlans.json');
 
     res.json({ success: true, message: 'Lesson plans saved successfully' });
   } catch (err) {
@@ -127,7 +127,7 @@ app.post('/api/download/youtube', async (req, res) => {
     // Check if video already downloaded
     try {
       await fs.stat(filePath);
-      console.log(`✓ Video already exists: ${fileName}`);
+      console.log(`[✓] Video already exists: ${fileName}`);
       return res.json({
         success: true,
         message: 'Video already downloaded',
@@ -171,7 +171,7 @@ app.post('/api/download/youtube', async (req, res) => {
         .on('error', reject);
     });
 
-    console.log(`✓ Downloaded: ${fileName}`);
+    console.log(`[✓] Downloaded: ${fileName}`);
 
     res.json({
       success: true,

@@ -28,7 +28,10 @@ async function loadClassConfig() {
         ? raw.classes
         : [raw];
 
-    classConfig = classesArr.find(c => c.classNumber?.toString() === classId) || classesArr[0] || {};
+    // Find class by either id (GUID) or classNumber for backward compatibility
+    classConfig = classesArr.find(c => 
+      c.classNumber?.toString() === classId || c.id === classId
+    ) || classesArr[0] || {};
 
     if (!classConfig || !classConfig.classNumber) {
       console.error(`Class ${classId} not found in configuration`);
@@ -349,7 +352,7 @@ function renderMediaGallery() {
         return `
           <div class="list-item" title="${media.title || media.type}">
             <div style="display:flex; gap:10px; align-items:center;">
-              <div style="font-size:20px">${getMediaIcon(media.type)}</div>
+              <span class="material-symbols-outlined" style="font-size:20px;">${getMediaIcon(media.type)}</span>
               <div style="min-width:0;">
                 <div style="font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${media.title || media.type}</div>
                 <div style="font-size:12px; color:var(--muted)">${media.type}${media.primary ? ' (primary)' : ''}</div>
@@ -375,15 +378,15 @@ function renderMediaGallery() {
 
 function getMediaIcon(type) {
   const icons = {
-    video: '▶️',
-    pdf: '📄',
-    images: '🖼️',
-    audio: '🔊',
-    document: '📋',
-    link: '🔗',
-    presentation: '📊'
+    video: 'videocam',
+    pdf: 'description',
+    images: 'image',
+    audio: 'audio_file',
+    document: 'assignment',
+    link: 'link',
+    presentation: 'bar_chart'
   };
-  return icons[type] || '📁';
+  return icons[type] || 'folder';
 }
 
 function sendMediaToStudent(index) {

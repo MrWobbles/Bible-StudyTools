@@ -57,17 +57,16 @@
       <section class="panel" id="edit-panel">
         <div class="panel-header">
           <h2 id="edit-title">Select a class to edit</h2>
-          <button id="save-class-btn" class="btn-primary" style="display: none;">Save Changes</button>
+          <div style="display: flex; gap: 8px;">
+            <button id="edit-content-btn" class="btn-secondary" style="display: none;">Edit Content</button>
+            <button id="save-class-btn" class="btn-primary" style="display: none;">Save Changes</button>
+          </div>
         </div>
 
         <div id="editor" style="display: none;">
           <!-- Class Basics -->
           <div class="form-section">
             <h3>Class Details</h3>
-            <div class="form-group">
-              <label for="classNumber">Class Number</label>
-              <input type="number" id="classNumber" min="1" />
-            </div>
             <div class="form-group">
               <label for="classTitle">Title</label>
               <input type="text" id="classTitle" placeholder="e.g., Can I Trust the Bible?" />

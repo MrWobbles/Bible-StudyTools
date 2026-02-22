@@ -1,6 +1,7 @@
 {
   "classes": [
     {
+      "id": "class-1737481200000-a1b2c3d4e",
       "classNumber": 1,
       "title": "Can I Trust the Bible?",
       "subtitle": "Origins and Reliability",
@@ -171,9 +172,28 @@
           "title": "Class 3 (placeholder)",
           "href": "#"
         }
-      ]
+      ],
+      "content": {
+        "html": "<p>Start writing your class content here...</p>",
+        "json": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Start writing your class content here..."
+                }
+              ]
+            }
+          ]
+        },
+        "text": "Start writing your class content here..."
+      }
     },
     {
+      "id": "class-1737481200001-b2c3d4e5f",
       "classNumber": 2,
       "title": "How do we trust scripture?",
       "subtitle": "Purity, Preservation, and Trustworthiness",
@@ -224,7 +244,6 @@
             "Criticism: ",
             "God commanded the Israelites to “utterly destroy” every person living in the Canaanite cities God was giving them. They were instructed to “not leave alive anything that breathes”—to kill every man, woman, child, and animal (Deut. 20:16–17). Why would a good God have the Israelites exterminate entire groups of people, including women, children, and animals?",
             "Response (resources: https://tinyurl.com/2NEFX888",
-
             "Purity is proven under pressure but revealed by exposure—God's Word stands up to testing (Psalm 119:105; John 3:20)."
           ],
           "media": [
@@ -384,7 +403,1601 @@
           "title": "Class 3 (placeholder)",
           "href": "#"
         }
-      ]
+      ],
+      "content": {
+        "html": "<p>Start writing your class content here...</p>",
+        "json": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Start writing your class content here..."
+                }
+              ]
+            }
+          ]
+        },
+        "text": "Start writing your class content here..."
+      }
+    },
+    {
+      "id": "class-1737481200002-c3d4e5f6g",
+      "classNumber": 3,
+      "title": "Introduction",
+      "subtitle": "Be Prepared",
+      "instructor": "Sean Collins",
+      "channelName": "class3-control",
+      "media": [],
+      "outline": [],
+      "content": {
+        "html": "<p>Start writing your class content here...</p>",
+        "json": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Start writing your class content here..."
+                }
+              ]
+            }
+          ]
+        },
+        "text": "Start writing your class content here..."
+      }
+    },
+    {
+      "id": "class-1737481200003-d4e5f6g7h",
+      "classNumber": 4,
+      "title": "Introduction: Be Prepared",
+      "subtitle": "Angels & Demons",
+      "instructor": "Sean Collins",
+      "channelName": "class4-control",
+      "media": [],
+      "outline": [
+        {
+          "id": "introduction-to-the-topic",
+          "summary": "Treading on ground that churches often avoid, discussing spiritual power and temptation in scripture.",
+          "defaultOpen": true,
+          "points": [
+            "Many congregations remain at a shallow level of gospel teaching due to avoidance of spiritual topics.",
+            "The book of Ephesians calls believers to put on the whole armor of God to stand against spiritual attack."
+          ],
+          "verses": [
+            "1 Corinthians 3:1–3",
+            "Ephesians 6:10–13"
+          ],
+          "questions": [
+            {
+              "key": "question-1",
+              "prompt": "What are some consequences of avoiding spiritual topics in churches?",
+              "answer": ""
+            },
+            {
+              "key": "question-2",
+              "prompt": "How can we equip believers against temptation and spiritual attack, as called for in Ephesians 6:10–13?",
+              "answer": ""
+            }
+          ]
+        },
+        {
+          "id": "jesus-and-satanic-temptation",
+          "summary": "Jesus' temptation after forty days of fasting and the importance of understanding spiritual battle.",
+          "defaultOpen": false,
+          "points": [
+            "Temptation is unavoidable, even for Jesus.",
+            "Victory depends on the Word of God."
+          ],
+          "verses": [
+            "Luke 4:1–13",
+            "1 Corinthians 10:13"
+          ],
+          "questions": [
+            {
+              "key": "question-3",
+              "prompt": "What can we learn from Jesus' response to Satan's temptations?",
+              "answer": ""
+            },
+            {
+              "key": "question-4",
+              "prompt": "How does the Word of God play a crucial role in spiritual battle?",
+              "answer": ""
+            }
+          ]
+        },
+        {
+          "id": "recovery-and-spiritual-protection",
+          "summary": "The process of recovery and spiritual protection in the face of temptation.",
+          "defaultOpen": false,
+          "points": [
+            "There is no instant cure for temptation; recovery takes time and effort.",
+            "We will get sick spiritually, but we can repent and turn to God."
+          ],
+          "verses": [
+            "2 Corinthians 4:16",
+            "1 John 1:9"
+          ],
+          "questions": [
+            {
+              "key": "question-5",
+              "prompt": "What does it mean to 'take our next step towards God' in the face of temptation?",
+              "answer": ""
+            },
+            {
+              "key": "question-6",
+              "prompt": "How can we find what works for us in terms of spiritual protection and recovery?",
+              "answer": ""
+            }
+          ]
+        },
+        {
+          "id": "communion-and-remembrance",
+          "summary": "The significance of communion as a memorial to Christ's sacrifice.",
+          "defaultOpen": false,
+          "points": [
+            "Communion is not a mystical transformation, but a reminder of Christ's suffering and love."
+          ],
+          "verses": [
+            "Luke 22:19",
+            "1 Corinthians 11:25"
+          ],
+          "questions": [
+            {
+              "key": "question-7",
+              "prompt": "What does it mean to 'remember the decision we made' in communion?",
+              "answer": ""
+            },
+            {
+              "key": "question-8",
+              "prompt": "How can we reaffirm our hope and unity with Christ through communion?",
+              "answer": ""
+            }
+          ]
+        },
+        {
+          "id": "god-sovereignty-and-authority",
+          "summary": "God's sovereignty, authority, and relationship to angels and demons.",
+          "defaultOpen": false,
+          "points": [
+            "God alone is sovereign, the Creator and sustainer of all things."
+          ],
+          "verses": [
+            "Colossians 1:16–17",
+            "Psalm 103:19–21"
+          ],
+          "questions": [
+            {
+              "key": "question-9",
+              "prompt": "What does it mean that God is the Creator and sustainer of all things?",
+              "answer": ""
+            },
+            {
+              "key": "question-10",
+              "prompt": "How do angels and demons relate to God's sovereignty and authority?",
+              "answer": ""
+            }
+          ]
+        }
+      ],
+      "content": {
+        "html": "<p>A. Introduction</p><p>I want to start this lesson with some caution and some reassurance. We are treading on ground that churches tend to avoid for a reason - there is a lot of power that we mostly ignore in scripture, a lot of spiritual things that we gloss over in my opinion to the detriment of our faith. However, when you aren't sure of the adherence of your congregation to the scriptures, when you can't be sure of their knowledge of scriptures, opening up to these types of discussions can cause more harm than good to those who are not a ways along in their walk.</p><p>1 Corinthians 3:1–3</p><p>NKJV</p><p>And I, brethren, could not speak to you as to spiritual <em>people</em> but as to carnal, as to babes in Christ. I fed you with milk and not with solid food; for until now you were not able <em>to receive it,</em> and even now you are still not able; for you are still carnal. For where <em>there are</em> envy, strife, and divisions among you, are you not carnal and behaving like <em>mere</em> men?</p><p>This avoidance has consequences. Many congregations remain at the level of simple gospel teaching—important for salvation but not sufficient for equipping believers against temptation or spiritual attack. The book of Ephesians calls believers to put on the whole armor of God to stand against “the wiles of the devil” (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.70.6.10-70.6.13\">Ephesians 6:10–13</a>). Without that preparation, faith remains shallow and vulnerable.</p><p>Ephesians 6:10–13</p><p>NKJV</p><p>Finally, my brethren, be strong in the Lord and in the power of His might. Put on the whole armor of God, that you may be able to stand against the wiles of the devil. For we do not wrestle against flesh and blood, but against principalities, against powers, against the rulers of the darkness of this age, against spiritual <em>hosts</em> of wickedness in the heavenly <em>places</em>. Therefore take up the whole armor of God, that you may be able to withstand in the evil day, and having done all, to stand.</p><p>Luke 4:1–13 records Jesus’ temptation after forty days of fasting. Being full of the Holy Spirit, He was led into direct confrontation with Satan.</p><p>Luke 4:1–13</p><p>NKJV</p><p>Then Jesus, being filled with the Holy Spirit, returned from the Jordan and was led by the Spirit into the wilderness, being tempted for forty days by the devil. And in those days He ate nothing, and afterward, when they had ended, He was hungry. And the devil said to Him, “If You are the Son of God, command this stone to become bread.” But Jesus answered him, saying, “It is written, ‘<em>Man shall not live by bread alone,</em> <em>but by every word of God.’&nbsp;”</em> Then the devil, taking Him up on a high mountain, showed Him all the kingdoms of the world in a moment of time. And the devil said to Him, “All this authority I will give You, and their glory; for <em>this</em> has been delivered to me, and I give it to whomever I wish. Therefore, if You will worship before me, all will be Yours.” And Jesus answered and said to him, “Get behind Me, Satan! For it is written, ‘<em>You shall worship the Lord your God, and Him only you shall serve.’&nbsp;”</em> Then he brought Him to Jerusalem, set Him on the pinnacle of the temple, and said to Him, “If You are the Son of God, throw Yourself down from here. For it is written: <em>‘He shall give His angels charge over you,</em> <em>To keep you,’</em> and, <em>‘In their hands they shall bear you up,</em> <em>Lest you dash your foot against a stone.’&nbsp;”</em> And Jesus answered and said to him, “It has been said, ‘<em>You shall not tempt the Lord your God.’&nbsp;”</em> Now when the devil had ended every temptation, he departed from Him until an opportune time.</p><p>This passage teaches several truths:</p><p><strong>1) Temptation is unavoidable.</strong> Even Jesus was tempted. Paul reminds believers that “no temptation has overtaken you except such as is common to man”</p><p>1 Corinthians 10:13</p><p>NKJV</p><p>No temptation has overtaken you except such as is common to man; but God <em>is</em> faithful, who will not allow you to be tempted beyond what you are able, but with the temptation will also make the way of escape, that you may be able to bear <em>it</em>.</p><p></p><p><strong>2) Victory depends on the Word of God.</strong> Each time Satan tempted Him, Jesus replied with Scripture. The spiritual battle is not fought with emotion or reason but with truth that is already written</p><p>Psalm 119:11</p><p>NKJV</p><p>Your word I have hidden in my heart, That I might not sin against You.</p><p></p><p><strong>3) Temptation returns.</strong> Satan left “until an opportune time” (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.63.4.13\">Luke 4:13</a>). Spiritual vigilance must be continuous (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.81.5.8-81.5.9\">1 Peter 5:8–9</a>).</p><p>1 Peter 5:8–9</p><p>NKJV</p><p>Be sober, be vigilant; because your adversary the devil walks about like a roaring lion, seeking whom he may devour. Resist him, steadfast in the faith, knowing that the same sufferings are experienced by your brotherhood in the world.</p><p></p><p>We are often only taught man's methods for dealing with temptation, but man is fallible - God is sufficient for taking care of whatever spiritual problems come our way and He has shown us how these methods work by modelling our physical bodies after the same. <strong>1) There is no instant cure.</strong> You don't get to recite a verse, or say a specific prayer and suddenly be cured of your temptation, just like you don't get to have a surgery or take a drug and instantly be healthy. There is recovery, there is physical therapy for retraining, there is time needed for medication to do what it needs to do.</p><p>2 Corinthians 4:16</p><p>NKJV</p><p>Therefore we do not lose heart. Even though our outward man is perishing, yet the inward <em>man</em> is being renewed day by day.</p><p><strong>2) You are going to get sick. </strong>You're human, your immune system isn't perfect to protect you against sickness and your spirit isn't perfect to not be tempted or not fall to temptation - it's going to happen. Repent, turn away and take that next step towards God. Shame, worry, depression, anger, guilt - none of that is going to fix what you've done, just taking your next step towards God as soon as you can, accept His forgiveness and move forward.</p><p>1 John 1:9</p><p>NKJV</p><p>If we confess our sins, He is faithful and just to forgive us <em>our</em> sins and to cleanse us from all unrighteousness.</p><p><strong>3) One size does not fit all of us. </strong>We are all created in the image of God, and we are all created unique. What works for one of us may not work for another - find what works for you and run towards it. Whatever version of the Bible that you read - read it, however you can calm your mind and hear the still small voice of God in prayer - do it, whatever denomination or church or group that helps you grow closer to Him (being careful of course of false doctrine) attend there. Our goal is to be more like Christ in everything that we do, and how we do that is going to be different for each of us.</p><p>Romans 12:4–6</p><p>NKJV</p><p>For as we have many members in one body, but all the members do not have the same function, so we, <em>being</em> many, are one body in Christ, and individually members of one another. Having then gifts differing according to the grace that is given to us, <em>let us use them:</em> if prophecy, <em>let us</em> <em>prophesy</em> in proportion to our faith;</p><p></p><p>And the promised reassurance - we are sealed by the Holy Spirit to God by our profession of faith in Christ. We may suffer the fiery darts of Satan while we are here (although - we have spiritual protection there too) we can have joy through all of it because we know our future.</p><p>Ephesians 1:13</p><p>NKJV</p><p>In Him you also <em>trusted,</em> after you heard the word of truth, the gospel of your salvation; in whom also, having believed, you were <strong>sealed with the Holy Spirit of promise,</strong></p><p>No circumstance can remove us from the love of Christ</p><p>Romans 8:38–39</p><p>NKJV</p><p>For I am persuaded that neither death nor life, nor angels nor principalities nor powers, nor things present nor things to come, nor height nor depth, nor any other created thing, shall be able to separate us from the love of God which is in Christ Jesus our Lord.</p><p></p><p>With that said - I want to break with tradition a bit and do communion a bit differently. Now - this is purely symbolic, I want everyone to keep in mind that while there is a ritual around this, we are not changed by the ritual, we are not affected by the elements, this is not \"magic\".</p><p>Paul instructed believers to examine themselves before partaking (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.67.11.27-67.11.29\">1 Corinthians 11:27–29</a>). The act of communion does not change the participant. It reminds us of Christ’s sacrifice and our unity in Him. “As often as you eat this bread and drink this cup, you proclaim the Lord’s death till He comes” (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.67.11.26\">1 Corinthians 11:26</a>). Communion is a time to shift attention from ritual to remembrance, to renew gratitude for redemption, and to reaffirm our hope as we await His return.</p><p>1) The Body of Christ We take this bread and think back to when we first accepted the gift that Christ went through so much to offer to us. When we first came alive in the spirit, when we first felt His love for us that emboldened us to take that first step in our lifelong walk trying to be more like Him. When Jesus said, “This is My body which is given for you; do this in remembrance of Me” (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.63.22.19\">Luke 22:19</a>), He established communion as a memorial, not a mystical transformation. We remember His suffering, the incarnation, and the substitution that brought us from death to life (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.23.53.5\">Isaiah 53:5</a>; <a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.66.5.8\">Romans 5:8</a>; <a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.64.5.24\">John 5:24</a>).</p><p><em>Father - help us to remember the decision we made, whether long ago or more recent, to follow after you. Remind us of the zeal that we felt for you at our first conversion, at our first baptism - how clean and new and alive you made us in one simple act of obedience. You have forgiven much, and have promised to continue to forgive us, not so we can do whatever we want, but so that we have assurance that while we are trying to follow after you that we aren't going to lose everything because we are imperfect.</em></p><p>2) The Blood of Christ Christ’s blood represents cleansing, reconciliation, and authority. “This cup is the new covenant in My blood” (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.67.11.25\">1 Corinthians 11:25</a>). Through that blood, believers are: <strong>Redeemed</strong> (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.70.1.7\">Ephesians 1:7</a> “In Him we have redemption through His blood, the forgiveness of sins, according to the riches of His grace” ) <strong>Reconciled</strong> (<a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.72.1.20-72.1.22\">Colossians 1:20–22</a> “and by Him to reconcile all things to Himself, by Him, whether things on earth or things in heaven, having made peace through the blood of His cross. And you, who once were alienated and enemies in your mind by wicked works, yet now He has reconciled in the body of His flesh through death, to present you holy, and blameless, and above reproach in His sight”)</p><p><em>Father, we come before You through Jesus Christ, who has disarmed the principalities and powers of this world at the cross. I reaffirm my salvation and my faith in You: nothing can separate me from Your love Lord Jesus, You are greater than he who is in the world. I submit to You fully. By Your Spirit, I put to death the deeds of this body and commit to resist the devil's schemes . I repent of every lie, every sin, every foothold I've given the enemy whether through unbelief, occult involvement, or unrepentant sin. Cleanse me by Your blood. Fill me with Your Holy Spirit, help me to equip Your full armor. Let Your Word dwell in me richly. I stand firm and confident in the victory You have already won.</em> <em>In Jesus' name, amen.</em></p><h2>A. God alone is sovereign</h2><p>God is the Creator and sustainer of all things, visible and invisible.</p><p><a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.72.1.16-72.1.17\">Colossians 1:16–17</a>; angels are created beings, not rivals to God. ​</p><p>Colossians 1:16–17</p><p>NKJV</p><p>For by Him all things were created that are in heaven and that are on earth, visible and invisible, whether thrones or dominions or principalities or powers. All things were created through Him and for Him. And He is before all things, and in Him all things consist.</p><p></p><p>The Lord rules over all angelic hosts.</p><p><a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.19.103.19-19.103.21\">Psalm 103:19–21</a>; angels “excel in strength” yet obey His word.​</p><p>Psalm 103:19–21</p><p>NKJV</p><p>The Lord has established His throne in heaven, And His kingdom rules over all. Bless the Lord, you His angels, Who excel in strength, who do His word, Heeding the voice of His word. Bless the Lord, all <em>you</em> His hosts, <em>You</em> ministers of His, who do His pleasure.</p><p></p><p>Satan and demons are real but limited creatures under God’s ultimate authority.</p><p><a target=\"_blank\" rel=\"noreferrer\" class=\"editor-link\" href=\"https://ref.ly/logosref/bible.18.1.6-18.1.12\">Job 1:6–12</a>; Satan cannot touch Job without God’s permission.​</p><p>Job 1:6–12</p><p>NKJV</p><p>Now there was a day when the sons of God came to present themselves before the Lord, and Satan also came among them. And the Lord said to Satan, “From where do you come?” So Satan answered the Lord and said, “From going to and fro on the earth, and from walking back and forth on it.” Then the Lord said to Satan, “Have you considered My servant Job, that <em>there is</em> none like him on the earth, a blameless and upright man, one who fears God and shuns evil?” So Satan answered the Lord and said, “Does Job fear God for nothing? Have You not made a hedge around him, around his household, and around all that he has on every side? You have blessed the work of his hands, and his possessions have increased in the land. But now, stretch out Your hand and touch all that he has, and he will surely curse You to Your face!” And the Lord said to Satan, “Behold, all that he has <em>is</em> in your power; only do not lay a hand on his <em>person</em>.” So Satan went out from the presence of the Lord.</p><p></p>",
+        "json": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A. Introduction"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "I want to start this lesson with some caution and some reassurance. We are treading on ground that churches tend to avoid for a reason - there is a lot of power that we mostly ignore in scripture, a lot of spiritual things that we gloss over in my opinion to the detriment of our faith. However, when you aren't sure of the adherence of your congregation to the scriptures, when you can't be sure of their knowledge of scriptures, opening up to these types of discussions can cause more harm than good to those who are not a ways along in their walk."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "1 Corinthians 3:1–3"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And I, brethren, could not speak to you as to spiritual "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "people"
+                },
+                {
+                  "type": "text",
+                  "text": " but as to carnal, as to babes in Christ. I fed you with milk and not with solid food; for until now you were not able "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "to receive it,"
+                },
+                {
+                  "type": "text",
+                  "text": " and even now you are still not able; for you are still carnal. For where "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "there are"
+                },
+                {
+                  "type": "text",
+                  "text": " envy, strife, and divisions among you, are you not carnal and behaving like "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "mere"
+                },
+                {
+                  "type": "text",
+                  "text": " men?"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This avoidance has consequences. Many congregations remain at the level of simple gospel teaching—important for salvation but not sufficient for equipping believers against temptation or spiritual attack. The book of Ephesians calls believers to put on the whole armor of God to stand against “the wiles of the devil” ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.70.6.10-70.6.13",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Ephesians 6:10–13"
+                },
+                {
+                  "type": "text",
+                  "text": "). Without that preparation, faith remains shallow and vulnerable."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ephesians 6:10–13"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Finally, my brethren, be strong in the Lord and in the power of His might. Put on the whole armor of God, that you may be able to stand against the wiles of the devil. For we do not wrestle against flesh and blood, but against principalities, against powers, against the rulers of the darkness of this age, against spiritual "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "hosts"
+                },
+                {
+                  "type": "text",
+                  "text": " of wickedness in the heavenly "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "places"
+                },
+                {
+                  "type": "text",
+                  "text": ". Therefore take up the whole armor of God, that you may be able to withstand in the evil day, and having done all, to stand."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Luke 4:1–13 records Jesus’ temptation after forty days of fasting. Being full of the Holy Spirit, He was led into direct confrontation with Satan."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Luke 4:1–13"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Then Jesus, being filled with the Holy Spirit, returned from the Jordan and was led by the Spirit into the wilderness, being tempted for forty days by the devil. And in those days He ate nothing, and afterward, when they had ended, He was hungry. And the devil said to Him, “If You are the Son of God, command this stone to become bread.” But Jesus answered him, saying, “It is written, ‘"
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "Man shall not live by bread alone,"
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "but by every word of God.’ ”"
+                },
+                {
+                  "type": "text",
+                  "text": " Then the devil, taking Him up on a high mountain, showed Him all the kingdoms of the world in a moment of time. And the devil said to Him, “All this authority I will give You, and their glory; for "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "this"
+                },
+                {
+                  "type": "text",
+                  "text": " has been delivered to me, and I give it to whomever I wish. Therefore, if You will worship before me, all will be Yours.” And Jesus answered and said to him, “Get behind Me, Satan! For it is written, ‘"
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "You shall worship the Lord your God, and Him only you shall serve.’ ”"
+                },
+                {
+                  "type": "text",
+                  "text": " Then he brought Him to Jerusalem, set Him on the pinnacle of the temple, and said to Him, “If You are the Son of God, throw Yourself down from here. For it is written: "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "‘He shall give His angels charge over you,"
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "To keep you,’"
+                },
+                {
+                  "type": "text",
+                  "text": " and, "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "‘In their hands they shall bear you up,"
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "Lest you dash your foot against a stone.’ ”"
+                },
+                {
+                  "type": "text",
+                  "text": " And Jesus answered and said to him, “It has been said, ‘"
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "You shall not tempt the Lord your God.’ ”"
+                },
+                {
+                  "type": "text",
+                  "text": " Now when the devil had ended every temptation, he departed from Him until an opportune time."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "This passage teaches several truths:"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "1) Temptation is unavoidable."
+                },
+                {
+                  "type": "text",
+                  "text": " Even Jesus was tempted. Paul reminds believers that “no temptation has overtaken you except such as is common to man”"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "1 Corinthians 10:13"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "No temptation has overtaken you except such as is common to man; but God "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "is"
+                },
+                {
+                  "type": "text",
+                  "text": " faithful, who will not allow you to be tempted beyond what you are able, but with the temptation will also make the way of escape, that you may be able to bear "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "it"
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "2) Victory depends on the Word of God."
+                },
+                {
+                  "type": "text",
+                  "text": " Each time Satan tempted Him, Jesus replied with Scripture. The spiritual battle is not fought with emotion or reason but with truth that is already written"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Psalm 119:11"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Your word I have hidden in my heart, That I might not sin against You."
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "3) Temptation returns."
+                },
+                {
+                  "type": "text",
+                  "text": " Satan left “until an opportune time” ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.63.4.13",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Luke 4:13"
+                },
+                {
+                  "type": "text",
+                  "text": "). Spiritual vigilance must be continuous ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.81.5.8-81.5.9",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "1 Peter 5:8–9"
+                },
+                {
+                  "type": "text",
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "1 Peter 5:8–9"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Be sober, be vigilant; because your adversary the devil walks about like a roaring lion, seeking whom he may devour. Resist him, steadfast in the faith, knowing that the same sufferings are experienced by your brotherhood in the world."
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "We are often only taught man's methods for dealing with temptation, but man is fallible - God is sufficient for taking care of whatever spiritual problems come our way and He has shown us how these methods work by modelling our physical bodies after the same. "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "1) There is no instant cure."
+                },
+                {
+                  "type": "text",
+                  "text": " You don't get to recite a verse, or say a specific prayer and suddenly be cured of your temptation, just like you don't get to have a surgery or take a drug and instantly be healthy. There is recovery, there is physical therapy for retraining, there is time needed for medication to do what it needs to do."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "2 Corinthians 4:16"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Therefore we do not lose heart. Even though our outward man is perishing, yet the inward "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "man"
+                },
+                {
+                  "type": "text",
+                  "text": " is being renewed day by day."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "2) You are going to get sick. "
+                },
+                {
+                  "type": "text",
+                  "text": "You're human, your immune system isn't perfect to protect you against sickness and your spirit isn't perfect to not be tempted or not fall to temptation - it's going to happen. Repent, turn away and take that next step towards God. Shame, worry, depression, anger, guilt - none of that is going to fix what you've done, just taking your next step towards God as soon as you can, accept His forgiveness and move forward."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "1 John 1:9"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "If we confess our sins, He is faithful and just to forgive us "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "our"
+                },
+                {
+                  "type": "text",
+                  "text": " sins and to cleanse us from all unrighteousness."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "3) One size does not fit all of us. "
+                },
+                {
+                  "type": "text",
+                  "text": "We are all created in the image of God, and we are all created unique. What works for one of us may not work for another - find what works for you and run towards it. Whatever version of the Bible that you read - read it, however you can calm your mind and hear the still small voice of God in prayer - do it, whatever denomination or church or group that helps you grow closer to Him (being careful of course of false doctrine) attend there. Our goal is to be more like Christ in everything that we do, and how we do that is going to be different for each of us."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Romans 12:4–6"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "For as we have many members in one body, but all the members do not have the same function, so we, "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "being"
+                },
+                {
+                  "type": "text",
+                  "text": " many, are one body in Christ, and individually members of one another. Having then gifts differing according to the grace that is given to us, "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "let us use them:"
+                },
+                {
+                  "type": "text",
+                  "text": " if prophecy, "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "let us"
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "prophesy"
+                },
+                {
+                  "type": "text",
+                  "text": " in proportion to our faith;"
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "And the promised reassurance - we are sealed by the Holy Spirit to God by our profession of faith in Christ. We may suffer the fiery darts of Satan while we are here (although - we have spiritual protection there too) we can have joy through all of it because we know our future."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ephesians 1:13"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "In Him you also "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "trusted,"
+                },
+                {
+                  "type": "text",
+                  "text": " after you heard the word of truth, the gospel of your salvation; in whom also, having believed, you were "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "sealed with the Holy Spirit of promise,"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "No circumstance can remove us from the love of Christ"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Romans 8:38–39"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "For I am persuaded that neither death nor life, nor angels nor principalities nor powers, nor things present nor things to come, nor height nor depth, nor any other created thing, shall be able to separate us from the love of God which is in Christ Jesus our Lord."
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "With that said - I want to break with tradition a bit and do communion a bit differently. Now - this is purely symbolic, I want everyone to keep in mind that while there is a ritual around this, we are not changed by the ritual, we are not affected by the elements, this is not \"magic\"."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Paul instructed believers to examine themselves before partaking ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.67.11.27-67.11.29",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "1 Corinthians 11:27–29"
+                },
+                {
+                  "type": "text",
+                  "text": "). The act of communion does not change the participant. It reminds us of Christ’s sacrifice and our unity in Him. “As often as you eat this bread and drink this cup, you proclaim the Lord’s death till He comes” ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.67.11.26",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "1 Corinthians 11:26"
+                },
+                {
+                  "type": "text",
+                  "text": "). Communion is a time to shift attention from ritual to remembrance, to renew gratitude for redemption, and to reaffirm our hope as we await His return."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "1) The Body of Christ We take this bread and think back to when we first accepted the gift that Christ went through so much to offer to us. When we first came alive in the spirit, when we first felt His love for us that emboldened us to take that first step in our lifelong walk trying to be more like Him. When Jesus said, “This is My body which is given for you; do this in remembrance of Me” ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.63.22.19",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Luke 22:19"
+                },
+                {
+                  "type": "text",
+                  "text": "), He established communion as a memorial, not a mystical transformation. We remember His suffering, the incarnation, and the substitution that brought us from death to life ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.23.53.5",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Isaiah 53:5"
+                },
+                {
+                  "type": "text",
+                  "text": "; "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.66.5.8",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Romans 5:8"
+                },
+                {
+                  "type": "text",
+                  "text": "; "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.64.5.24",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "John 5:24"
+                },
+                {
+                  "type": "text",
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "Father - help us to remember the decision we made, whether long ago or more recent, to follow after you. Remind us of the zeal that we felt for you at our first conversion, at our first baptism - how clean and new and alive you made us in one simple act of obedience. You have forgiven much, and have promised to continue to forgive us, not so we can do whatever we want, but so that we have assurance that while we are trying to follow after you that we aren't going to lose everything because we are imperfect."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "2) The Blood of Christ Christ’s blood represents cleansing, reconciliation, and authority. “This cup is the new covenant in My blood” ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.67.11.25",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "1 Corinthians 11:25"
+                },
+                {
+                  "type": "text",
+                  "text": "). Through that blood, believers are: "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "Redeemed"
+                },
+                {
+                  "type": "text",
+                  "text": " ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.70.1.7",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Ephesians 1:7"
+                },
+                {
+                  "type": "text",
+                  "text": " “In Him we have redemption through His blood, the forgiveness of sins, according to the riches of His grace” ) "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ],
+                  "text": "Reconciled"
+                },
+                {
+                  "type": "text",
+                  "text": " ("
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.72.1.20-72.1.22",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Colossians 1:20–22"
+                },
+                {
+                  "type": "text",
+                  "text": " “and by Him to reconcile all things to Himself, by Him, whether things on earth or things in heaven, having made peace through the blood of His cross. And you, who once were alienated and enemies in your mind by wicked works, yet now He has reconciled in the body of His flesh through death, to present you holy, and blameless, and above reproach in His sight”)"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "Father, we come before You through Jesus Christ, who has disarmed the principalities and powers of this world at the cross. I reaffirm my salvation and my faith in You: nothing can separate me from Your love Lord Jesus, You are greater than he who is in the world. I submit to You fully. By Your Spirit, I put to death the deeds of this body and commit to resist the devil's schemes . I repent of every lie, every sin, every foothold I've given the enemy whether through unbelief, occult involvement, or unrepentant sin. Cleanse me by Your blood. Fill me with Your Holy Spirit, help me to equip Your full armor. Let Your Word dwell in me richly. I stand firm and confident in the victory You have already won."
+                },
+                {
+                  "type": "text",
+                  "text": " "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "In Jesus' name, amen."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "A. God alone is sovereign"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "God is the Creator and sustainer of all things, visible and invisible."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.72.1.16-72.1.17",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Colossians 1:16–17"
+                },
+                {
+                  "type": "text",
+                  "text": "; angels are created beings, not rivals to God. ​"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Colossians 1:16–17"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "For by Him all things were created that are in heaven and that are on earth, visible and invisible, whether thrones or dominions or principalities or powers. All things were created through Him and for Him. And He is before all things, and in Him all things consist."
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Lord rules over all angelic hosts."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.19.103.19-19.103.21",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Psalm 103:19–21"
+                },
+                {
+                  "type": "text",
+                  "text": "; angels “excel in strength” yet obey His word.​"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Psalm 103:19–21"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "The Lord has established His throne in heaven, And His kingdom rules over all. Bless the Lord, you His angels, Who excel in strength, who do His word, Heeding the voice of His word. Bless the Lord, all "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "you"
+                },
+                {
+                  "type": "text",
+                  "text": " His hosts, "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "You"
+                },
+                {
+                  "type": "text",
+                  "text": " ministers of His, who do His pleasure."
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Satan and demons are real but limited creatures under God’s ultimate authority."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ref.ly/logosref/bible.18.1.6-18.1.12",
+                        "target": "_blank",
+                        "rel": "noreferrer",
+                        "class": "editor-link"
+                      }
+                    }
+                  ],
+                  "text": "Job 1:6–12"
+                },
+                {
+                  "type": "text",
+                  "text": "; Satan cannot touch Job without God’s permission.​"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Job 1:6–12"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "NKJV"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Now there was a day when the sons of God came to present themselves before the Lord, and Satan also came among them. And the Lord said to Satan, “From where do you come?” So Satan answered the Lord and said, “From going to and fro on the earth, and from walking back and forth on it.” Then the Lord said to Satan, “Have you considered My servant Job, that "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "there is"
+                },
+                {
+                  "type": "text",
+                  "text": " none like him on the earth, a blameless and upright man, one who fears God and shuns evil?” So Satan answered the Lord and said, “Does Job fear God for nothing? Have You not made a hedge around him, around his household, and around all that he has on every side? You have blessed the work of his hands, and his possessions have increased in the land. But now, stretch out Your hand and touch all that he has, and he will surely curse You to Your face!” And the Lord said to Satan, “Behold, all that he has "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "is"
+                },
+                {
+                  "type": "text",
+                  "text": " in your power; only do not lay a hand on his "
+                },
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ],
+                  "text": "person"
+                },
+                {
+                  "type": "text",
+                  "text": ".” So Satan went out from the presence of the Lord."
+                }
+              ]
+            },
+            {
+              "type": "paragraph"
+            }
+          ]
+        },
+        "text": "A. Introduction\n\nI want to start this lesson with some caution and some reassurance. We are treading on ground that churches tend to avoid for a reason - there is a lot of power that we mostly ignore in scripture, a lot of spiritual things that we gloss over in my opinion to the detriment of our faith. However, when you aren't sure of the adherence of your congregation to the scriptures, when you can't be sure of their knowledge of scriptures, opening up to these types of discussions can cause more harm than good to those who are not a ways along in their walk.\n\n1 Corinthians 3:1–3\n\nNKJV\n\nAnd I, brethren, could not speak to you as to spiritual people but as to carnal, as to babes in Christ. I fed you with milk and not with solid food; for until now you were not able to receive it, and even now you are still not able; for you are still carnal. For where there are envy, strife, and divisions among you, are you not carnal and behaving like mere men?\n\nThis avoidance has consequences. Many congregations remain at the level of simple gospel teaching—important for salvation but not sufficient for equipping believers against temptation or spiritual attack. The book of Ephesians calls believers to put on the whole armor of God to stand against “the wiles of the devil” (Ephesians 6:10–13). Without that preparation, faith remains shallow and vulnerable.\n\nEphesians 6:10–13\n\nNKJV\n\nFinally, my brethren, be strong in the Lord and in the power of His might. Put on the whole armor of God, that you may be able to stand against the wiles of the devil. For we do not wrestle against flesh and blood, but against principalities, against powers, against the rulers of the darkness of this age, against spiritual hosts of wickedness in the heavenly places. Therefore take up the whole armor of God, that you may be able to withstand in the evil day, and having done all, to stand.\n\nLuke 4:1–13 records Jesus’ temptation after forty days of fasting. Being full of the Holy Spirit, He was led into direct confrontation with Satan.\n\nLuke 4:1–13\n\nNKJV\n\nThen Jesus, being filled with the Holy Spirit, returned from the Jordan and was led by the Spirit into the wilderness, being tempted for forty days by the devil. And in those days He ate nothing, and afterward, when they had ended, He was hungry. And the devil said to Him, “If You are the Son of God, command this stone to become bread.” But Jesus answered him, saying, “It is written, ‘Man shall not live by bread alone, but by every word of God.’ ” Then the devil, taking Him up on a high mountain, showed Him all the kingdoms of the world in a moment of time. And the devil said to Him, “All this authority I will give You, and their glory; for this has been delivered to me, and I give it to whomever I wish. Therefore, if You will worship before me, all will be Yours.” And Jesus answered and said to him, “Get behind Me, Satan! For it is written, ‘You shall worship the Lord your God, and Him only you shall serve.’ ” Then he brought Him to Jerusalem, set Him on the pinnacle of the temple, and said to Him, “If You are the Son of God, throw Yourself down from here. For it is written: ‘He shall give His angels charge over you, To keep you,’ and, ‘In their hands they shall bear you up, Lest you dash your foot against a stone.’ ” And Jesus answered and said to him, “It has been said, ‘You shall not tempt the Lord your God.’ ” Now when the devil had ended every temptation, he departed from Him until an opportune time.\n\nThis passage teaches several truths:\n\n1) Temptation is unavoidable. Even Jesus was tempted. Paul reminds believers that “no temptation has overtaken you except such as is common to man”\n\n1 Corinthians 10:13\n\nNKJV\n\nNo temptation has overtaken you except such as is common to man; but God is faithful, who will not allow you to be tempted beyond what you are able, but with the temptation will also make the way of escape, that you may be able to bear it.\n\n\n\n2) Victory depends on the Word of God. Each time Satan tempted Him, Jesus replied with Scripture. The spiritual battle is not fought with emotion or reason but with truth that is already written\n\nPsalm 119:11\n\nNKJV\n\nYour word I have hidden in my heart, That I might not sin against You.\n\n\n\n3) Temptation returns. Satan left “until an opportune time” (Luke 4:13). Spiritual vigilance must be continuous (1 Peter 5:8–9).\n\n1 Peter 5:8–9\n\nNKJV\n\nBe sober, be vigilant; because your adversary the devil walks about like a roaring lion, seeking whom he may devour. Resist him, steadfast in the faith, knowing that the same sufferings are experienced by your brotherhood in the world.\n\n\n\nWe are often only taught man's methods for dealing with temptation, but man is fallible - God is sufficient for taking care of whatever spiritual problems come our way and He has shown us how these methods work by modelling our physical bodies after the same. 1) There is no instant cure. You don't get to recite a verse, or say a specific prayer and suddenly be cured of your temptation, just like you don't get to have a surgery or take a drug and instantly be healthy. There is recovery, there is physical therapy for retraining, there is time needed for medication to do what it needs to do.\n\n2 Corinthians 4:16\n\nNKJV\n\nTherefore we do not lose heart. Even though our outward man is perishing, yet the inward man is being renewed day by day.\n\n2) You are going to get sick. You're human, your immune system isn't perfect to protect you against sickness and your spirit isn't perfect to not be tempted or not fall to temptation - it's going to happen. Repent, turn away and take that next step towards God. Shame, worry, depression, anger, guilt - none of that is going to fix what you've done, just taking your next step towards God as soon as you can, accept His forgiveness and move forward.\n\n1 John 1:9\n\nNKJV\n\nIf we confess our sins, He is faithful and just to forgive us our sins and to cleanse us from all unrighteousness.\n\n3) One size does not fit all of us. We are all created in the image of God, and we are all created unique. What works for one of us may not work for another - find what works for you and run towards it. Whatever version of the Bible that you read - read it, however you can calm your mind and hear the still small voice of God in prayer - do it, whatever denomination or church or group that helps you grow closer to Him (being careful of course of false doctrine) attend there. Our goal is to be more like Christ in everything that we do, and how we do that is going to be different for each of us.\n\nRomans 12:4–6\n\nNKJV\n\nFor as we have many members in one body, but all the members do not have the same function, so we, being many, are one body in Christ, and individually members of one another. Having then gifts differing according to the grace that is given to us, let us use them: if prophecy, let us prophesy in proportion to our faith;\n\n\n\nAnd the promised reassurance - we are sealed by the Holy Spirit to God by our profession of faith in Christ. We may suffer the fiery darts of Satan while we are here (although - we have spiritual protection there too) we can have joy through all of it because we know our future.\n\nEphesians 1:13\n\nNKJV\n\nIn Him you also trusted, after you heard the word of truth, the gospel of your salvation; in whom also, having believed, you were sealed with the Holy Spirit of promise,\n\nNo circumstance can remove us from the love of Christ\n\nRomans 8:38–39\n\nNKJV\n\nFor I am persuaded that neither death nor life, nor angels nor principalities nor powers, nor things present nor things to come, nor height nor depth, nor any other created thing, shall be able to separate us from the love of God which is in Christ Jesus our Lord.\n\n\n\nWith that said - I want to break with tradition a bit and do communion a bit differently. Now - this is purely symbolic, I want everyone to keep in mind that while there is a ritual around this, we are not changed by the ritual, we are not affected by the elements, this is not \"magic\".\n\nPaul instructed believers to examine themselves before partaking (1 Corinthians 11:27–29). The act of communion does not change the participant. It reminds us of Christ’s sacrifice and our unity in Him. “As often as you eat this bread and drink this cup, you proclaim the Lord’s death till He comes” (1 Corinthians 11:26). Communion is a time to shift attention from ritual to remembrance, to renew gratitude for redemption, and to reaffirm our hope as we await His return.\n\n1) The Body of Christ We take this bread and think back to when we first accepted the gift that Christ went through so much to offer to us. When we first came alive in the spirit, when we first felt His love for us that emboldened us to take that first step in our lifelong walk trying to be more like Him. When Jesus said, “This is My body which is given for you; do this in remembrance of Me” (Luke 22:19), He established communion as a memorial, not a mystical transformation. We remember His suffering, the incarnation, and the substitution that brought us from death to life (Isaiah 53:5; Romans 5:8; John 5:24).\n\nFather - help us to remember the decision we made, whether long ago or more recent, to follow after you. Remind us of the zeal that we felt for you at our first conversion, at our first baptism - how clean and new and alive you made us in one simple act of obedience. You have forgiven much, and have promised to continue to forgive us, not so we can do whatever we want, but so that we have assurance that while we are trying to follow after you that we aren't going to lose everything because we are imperfect.\n\n2) The Blood of Christ Christ’s blood represents cleansing, reconciliation, and authority. “This cup is the new covenant in My blood” (1 Corinthians 11:25). Through that blood, believers are: Redeemed (Ephesians 1:7 “In Him we have redemption through His blood, the forgiveness of sins, according to the riches of His grace” ) Reconciled (Colossians 1:20–22 “and by Him to reconcile all things to Himself, by Him, whether things on earth or things in heaven, having made peace through the blood of His cross. And you, who once were alienated and enemies in your mind by wicked works, yet now He has reconciled in the body of His flesh through death, to present you holy, and blameless, and above reproach in His sight”)\n\nFather, we come before You through Jesus Christ, who has disarmed the principalities and powers of this world at the cross. I reaffirm my salvation and my faith in You: nothing can separate me from Your love Lord Jesus, You are greater than he who is in the world. I submit to You fully. By Your Spirit, I put to death the deeds of this body and commit to resist the devil's schemes . I repent of every lie, every sin, every foothold I've given the enemy whether through unbelief, occult involvement, or unrepentant sin. Cleanse me by Your blood. Fill me with Your Holy Spirit, help me to equip Your full armor. Let Your Word dwell in me richly. I stand firm and confident in the victory You have already won. In Jesus' name, amen.\n\nA. God alone is sovereign\n\nGod is the Creator and sustainer of all things, visible and invisible.\n\nColossians 1:16–17; angels are created beings, not rivals to God. ​\n\nColossians 1:16–17\n\nNKJV\n\nFor by Him all things were created that are in heaven and that are on earth, visible and invisible, whether thrones or dominions or principalities or powers. All things were created through Him and for Him. And He is before all things, and in Him all things consist.\n\n\n\nThe Lord rules over all angelic hosts.\n\nPsalm 103:19–21; angels “excel in strength” yet obey His word.​\n\nPsalm 103:19–21\n\nNKJV\n\nThe Lord has established His throne in heaven, And His kingdom rules over all. Bless the Lord, you His angels, Who excel in strength, who do His word, Heeding the voice of His word. Bless the Lord, all you His hosts, You ministers of His, who do His pleasure.\n\n\n\nSatan and demons are real but limited creatures under God’s ultimate authority.\n\nJob 1:6–12; Satan cannot touch Job without God’s permission.​\n\nJob 1:6–12\n\nNKJV\n\nNow there was a day when the sons of God came to present themselves before the Lord, and Satan also came among them. And the Lord said to Satan, “From where do you come?” So Satan answered the Lord and said, “From going to and fro on the earth, and from walking back and forth on it.” Then the Lord said to Satan, “Have you considered My servant Job, that there is none like him on the earth, a blameless and upright man, one who fears God and shuns evil?” So Satan answered the Lord and said, “Does Job fear God for nothing? Have You not made a hedge around him, around his household, and around all that he has on every side? You have blessed the work of his hands, and his possessions have increased in the land. But now, stretch out Your hand and touch all that he has, and he will surely curse You to Your face!” And the Lord said to Satan, “Behold, all that he has is in your power; only do not lay a hand on his person.” So Satan went out from the presence of the Lord.\n\n"
+      }
     }
   ]
 }
