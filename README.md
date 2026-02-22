@@ -2,6 +2,15 @@
 
 An interactive Bible study presentation system with synchronized video playback and teacher controls.
 
+## Download Desktop App
+
+Download the standalone desktop application (no installation required):
+
+- **Windows**: [Download for Windows](../../releases/latest) - Portable `.exe`
+- **macOS**: [Download for Mac](../../releases/latest) - `.dmg` installer
+
+Or run directly in your browser using the web version (see [Quick Start](#quick-start) below).
+
 ## Project Structure
 
 ```
