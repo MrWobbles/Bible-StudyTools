@@ -256,6 +256,7 @@ function setupEventListeners() {
 
   // Verse insertion
   document.getElementById('btn-insert-verse').addEventListener('click', insertVerseReference);
+  document.getElementById('bible-translation-select')?.addEventListener('change', saveBibleTranslationSetting);
 
   // Image insertion
   document.getElementById('btn-insert-image').addEventListener('click', insertImage);
@@ -441,7 +442,74 @@ function openModal(modalId) {
     if (modalId === 'qa-pause-modal') {
       populateQASectionDropdown();
     }
+    // Load current Bible translation setting for verse modal
+    if (modalId === 'verse-modal') {
+      loadBibleTranslationSetting();
+    }
     modal.style.display = 'flex';
+  }
+}
+
+// Load Bible translation setting from class config
+function loadBibleTranslationSetting() {
+  const select = document.getElementById('bible-translation-select');
+  if (!select) return;
+  
+  // Try to get from class config first, then fallback to localStorage or default
+  let translation = 'nkjv'; // default
+  
+  if (currentClassId && allClasses.length > 0) {
+    const currentClass = allClasses.find(c => c.id === currentClassId || c.classNumber == currentClassId);
+    if (currentClass?.bibleTranslation) {
+      translation = currentClass.bibleTranslation;
+    }
+  } else {
+    // Fallback to localStorage
+    translation = localStorage.getItem('bible-translation-preference') || 'nkjv';
+  }
+  
+  select.value = translation;
+}
+
+// Save Bible translation setting
+async function saveBibleTranslationSetting() {
+  const select = document.getElementById('bible-translation-select');
+  if (!select) return;
+  
+  const translation = select.value;
+  
+  try {
+    if (currentClassId) {
+      // Load current classes
+      const response = await fetch('assets/data/classes.json');
+      const data = await response.json();
+      allClasses = data.classes || [];
+      
+      // Find and update the class
+      const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
+      if (classIndex !== -1) {
+        allClasses[classIndex].bibleTranslation = translation;
+        
+        // Save back to server
+        const saveResponse = await fetch('/api/save/classes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ classes: allClasses })
+        });
+        
+        if (saveResponse.ok) {
+          console.log('Bible translation preference saved:', translation);
+          updateSaveStatus('Translation saved');
+          setTimeout(() => updateSaveStatus('Saved'), 2000);
+        }
+      }
+    } else {
+      // Fallback to localStorage
+      localStorage.setItem('bible-translation-preference', translation);
+      console.log('Bible translation preference saved to localStorage:', translation);
+    }
+  } catch (error) {
+    console.error('Failed to save translation preference:', error);
   }
 }
 

@@ -641,7 +641,9 @@ function renderGeneratedOutline() {
     ref.addEventListener('click', () => {
       const verse = ref.dataset.verse;
       if (verse) {
-        sendVerseToStudent(verse);
+        // Use configured Bible translation from config
+        const translation = classConfig?.bibleTranslation || window.BIBLE_STUDY_CONFIG?.bibleTranslation || 'nkjv';
+        sendVerseToStudent(verse, translation);
         // Visual feedback
         ref.style.background = 'rgba(240, 180, 41, 0.3)';
         setTimeout(() => {

@@ -182,6 +182,20 @@
                 <label for="verse-input">Enter verse reference (e.g., John 3:16 or Romans 5:1-8):</label>
                 <input type="text" id="verse-input" placeholder="John 3:16">
                 <div id="verse-suggestions" class="suggestions"></div>
+                
+                <label for="bible-translation-select" style="margin-top: 16px;">Default Bible Translation:</label>
+                <select id="bible-translation-select" class="toolbar-select">
+                    <option value="nkjv">NKJV (New King James Version)</option>
+                    <option value="kjv">KJV (King James Version)</option>
+                    <option value="esv">ESV (English Standard Version)</option>
+                    <option value="niv">NIV (New International Version)</option>
+                    <option value="nasb">NASB (New American Standard)</option>
+                    <option value="nlt">NLT (New Living Translation)</option>
+                    <option value="amp">AMP (Amplified Bible)</option>
+                </select>
+                <small style="color: #6c757d; display: block; margin-top: 4px;">
+                    This translation will be used when clicking verse links in teacher view
+                </small>
             </div>
             <div class="modal-footer">
                 <button id="btn-insert-verse" class="btn btn-primary">Insert</button>
