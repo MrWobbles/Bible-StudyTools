@@ -13,7 +13,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware - JSON parsing first
-app.use(express.json());
+// classes.json can exceed the default 100kb when outlines/content are expanded
+app.use(express.json({ limit: '10mb' }));
 
 // Data directory
 const DATA_DIR = path.join(__dirname, 'assets', 'data');
@@ -460,7 +461,19 @@ app.use(express.static('.'));
 
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+
+  // Body parser limits/format errors
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request body too large. Try reducing content size or increase server limit.' });
+  }
+
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON payload' });
+  }
+
+  const status = err?.status && Number.isInteger(err.status) ? err.status : 500;
+  const message = err?.message || 'Internal server error';
+  res.status(status).json({ error: message });
 });
 
 // ===== START SERVER =====

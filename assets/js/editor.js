@@ -895,6 +895,9 @@ async function saveDocument() {
     if (currentClassId) {
       // Load current classes
       const response = await fetch('assets/data/classes.json');
+      if (!response.ok) {
+        throw new Error(`Failed to load classes.json: ${response.status}`);
+      }
       const data = await response.json();
       allClasses = data.classes || [];
 
@@ -909,6 +912,7 @@ async function saveDocument() {
         }
 
         // Save back to server
+        console.log('Saving document to server...');
         const saveResponse = await fetch('/api/save/classes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -916,7 +920,8 @@ async function saveDocument() {
         });
 
         if (!saveResponse.ok) {
-          throw new Error('Failed to save');
+          const errorData = await saveResponse.json().catch(() => ({}));
+          throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
         }
 
         isDirty = false;
@@ -1411,28 +1416,43 @@ async function applyOutlineToClass() {
   try {
     // Load current classes
     const response = await fetch('assets/data/classes.json');
+    if (!response.ok) {
+      throw new Error(`Failed to load classes.json: ${response.status}`);
+    }
     const data = await response.json();
     allClasses = data.classes || [];
+    console.log(`Loaded ${allClasses.length} classes from classes.json`);
 
     // Find and update the class (support both id and classNumber)
     const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
+    console.log(`Looking for class with id/classNumber: ${currentClassId}, found at index: ${classIndex}`);
+    
     if (classIndex !== -1) {
       // Save to generatedOutline field (for viewing in teacher tab)
       allClasses[classIndex].generatedOutline = generatedOutline;
 
       // Also save to outline field (this replaces the guide with the generated outline)
       allClasses[classIndex].outline = generatedOutline;
+      console.log(`Updated class at index ${classIndex} with outline`);
+      console.log('Outline structure:', generatedOutline);
 
       // Save back to server
+      const savePayload = { classes: allClasses };
+      console.log('Sending to server:', JSON.stringify(savePayload).substring(0, 200) + '...');
+      
       const saveResponse = await fetch('/api/save/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classes: allClasses })
+        body: JSON.stringify(savePayload)
       });
 
       if (!saveResponse.ok) {
-        throw new Error('Failed to save');
+        const errorData = await saveResponse.json().catch(() => ({}));
+        throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
       }
+
+      const responseData = await saveResponse.json();
+      console.log('Server response:', responseData);
 
       // Update the outline navigator to reflect new structure
       updateOutlineNavigatorFromGenerated(generatedOutline);
