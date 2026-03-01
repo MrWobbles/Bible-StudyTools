@@ -496,7 +496,36 @@ function handlePendingMedia() {
     const media = pendingMedia;
     pendingMedia = null;
     renderVerseMedia(media);
+  } else if (pendingMedia.type === 'question') {
+    const media = pendingMedia;
+    pendingMedia = null;
+    renderQuestionMedia(media);
   }
+}
+
+// Render a question/discussion prompt on the student screen
+function renderQuestionMedia(media) {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
+  const prompt = media.prompt || media.title || '';
+  if (!prompt) return;
+
+  if (player) {
+    player.destroy();
+    player = null;
+  }
+
+  playerDiv.innerHTML = `
+    <div class="question-frame" style="padding:60px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"none\" stroke=\"rgba(240,180,41,0.1)\" stroke-width=\"0.5\"/></svg>') repeat;opacity:0.3;"></div>
+      <div style="text-align:center;max-width:85%;position:relative;z-index:1;">
+        <div style="font-size:48px;margin-bottom:24px;">❓</div>
+        <h1 class="question-prompt" style="color:#fff;font-size:52px;line-height:1.4;font-weight:600;margin:0;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">${escapeHtml(prompt)}</h1>
+        ${media.title && media.title !== prompt ? `<div style="color:rgba(255,255,255,0.7);font-size:24px;margin-top:24px;">${escapeHtml(media.title)}</div>` : ''}
+      </div>
+    </div>
+  `;
 }
 
 async function renderVerseMedia(media) {
