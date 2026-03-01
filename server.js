@@ -12,8 +12,8 @@ const ytdl = require('ytdl-core');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware - JSON parsing first
-app.use(express.json());
+// Middleware - JSON parsing first with increased size limit
+app.use(express.json({ limit: '10mb' }));
 
 // Data directory
 const DATA_DIR = path.join(__dirname, 'assets', 'data');
