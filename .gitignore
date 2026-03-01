@@ -20,8 +20,7 @@ class1-notes.html
 # Node modules
 node_modules/
 
-# Backups (auto-generated, keep local only)
-backups/
+# Backups are tracked
 
 # Large media files (download manually, not tracked)
 assets/video/*
