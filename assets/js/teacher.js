@@ -209,10 +209,57 @@ function renderOutlineWithQuestions() {
           pointDiv.innerHTML = `<span class="point-icon">${icon}</span><span class="point-text">${pointText}</span>`;
         }
 
+        // Check if the point text looks like a Bible verse reference and make it clickable
+        const versePattern = /^([1-3]?\s?[A-Za-z]+)\s+(\d+)(:\d+(-\d+)?)?$/;
+        const verseMatch = pointText.match(versePattern);
+        if (verseMatch || pointType === 'verse') {
+          pointDiv.classList.add('clickable-mark');
+          pointDiv.title = 'Click to display on student screen';
+          pointDiv.onclick = () => {
+            sendVerseToStudent(pointText, 'nkjv');
+            pointDiv.classList.add('mark-active');
+            setTimeout(() => pointDiv.classList.remove('mark-active'), 500);
+          };
+        }
+
         pointsContainer.appendChild(pointDiv);
       });
 
       detailsEl.appendChild(pointsContainer);
+    }
+
+    // Section media marks - clickable items to display on student screen
+    if (Array.isArray(section.media) && section.media.length > 0) {
+      const mediaMarksContainer = document.createElement('div');
+      mediaMarksContainer.className = 'media-marks-container';
+
+      const mediaMarksLabel = document.createElement('div');
+      mediaMarksLabel.className = 'media-marks-label';
+      mediaMarksLabel.innerHTML = '<small>📌 Media marks (click to display)</small>';
+      mediaMarksContainer.appendChild(mediaMarksLabel);
+
+      const mediaMarksList = document.createElement('div');
+      mediaMarksList.className = 'media-marks-list';
+
+      section.media.forEach((media, mediaIdx) => {
+        const markItem = document.createElement('button');
+        markItem.className = `media-mark media-mark-${media.type}`;
+        markItem.title = `Display ${media.title || media.type} on student screen`;
+
+        const markIcon = getMediaMarkIcon(media.type);
+        markItem.innerHTML = `<span class="mark-icon">${markIcon}</span><span class="mark-title">${media.title || media.reference || media.type}</span>`;
+
+        markItem.onclick = () => {
+          sendSectionMediaToStudent(media);
+          markItem.classList.add('mark-active');
+          setTimeout(() => markItem.classList.remove('mark-active'), 500);
+        };
+
+        mediaMarksList.appendChild(markItem);
+      });
+
+      mediaMarksContainer.appendChild(mediaMarksList);
+      detailsEl.appendChild(mediaMarksContainer);
     }
 
     // Questions with answer fields + notes
@@ -221,9 +268,32 @@ function renderOutlineWithQuestions() {
         const questionDiv = document.createElement('div');
         questionDiv.className = 'question';
 
+        // Question header with prompt and display button
+        const questionHeader = document.createElement('div');
+        questionHeader.className = 'question-header';
+
         const promptP = document.createElement('p');
         promptP.textContent = q.prompt;
-        questionDiv.appendChild(promptP);
+        questionHeader.appendChild(promptP);
+
+        // Add "Display on screen" button
+        const displayBtn = document.createElement('button');
+        displayBtn.className = 'question-display-btn';
+        displayBtn.innerHTML = '📺 Show';
+        displayBtn.title = 'Display this question on the student screen';
+        displayBtn.onclick = (e) => {
+          e.stopPropagation();
+          sendSectionMediaToStudent({
+            type: 'question',
+            prompt: q.prompt,
+            title: q.prompt
+          });
+          displayBtn.classList.add('mark-active');
+          setTimeout(() => displayBtn.classList.remove('mark-active'), 500);
+        };
+        questionHeader.appendChild(displayBtn);
+
+        questionDiv.appendChild(questionHeader);
 
         // Teacher notes / suggested answer
         if (q.answer) {
@@ -816,6 +886,108 @@ function sendVerseToStudent(reference, translation = 'nkjv') {
       title: reference.trim()
     }
   });
+}
+
+// Get icon for media mark type
+function getMediaMarkIcon(type) {
+  const icons = {
+    verse: '📖',
+    video: '🎬',
+    image: '🖼️',
+    images: '🖼️',
+    link: '🔗',
+    pdf: '📄',
+    document: '📋',
+    audio: '🎵',
+    question: '❓',
+    presentation: '📊'
+  };
+  return icons[type] || '📎';
+}
+
+// Send section media directly to student
+function sendSectionMediaToStudent(media) {
+  if (!media) return;
+
+  console.log('[Teacher] Sending section media to student:', media);
+
+  // Handle verse type specially
+  if (media.type === 'verse') {
+    const reference = media.reference || media.title || '';
+    const translation = media.translation || 'nkjv';
+    sendVerseToStudent(reference, translation);
+    return;
+  }
+
+  // Handle video type - check for YouTube
+  if (media.type === 'video') {
+    currentMediaType = 'video';
+    updateControlVisibility();
+
+    // Build video media object
+    const videoMedia = {
+      type: 'video',
+      title: media.title || 'Video'
+    };
+
+    if (media.sources) {
+      videoMedia.sources = media.sources;
+    } else if (media.url) {
+      videoMedia.url = media.url;
+    }
+
+    sendCommand('displayMedia', { media: videoMedia });
+    return;
+  }
+
+  // Handle image type
+  if (media.type === 'image' || media.type === 'images') {
+    currentMediaType = 'image';
+    updateControlVisibility();
+
+    const imageMedia = {
+      type: 'image',
+      title: media.title || 'Image'
+    };
+
+    if (media.sources) {
+      imageMedia.sources = media.sources;
+    } else if (media.url) {
+      imageMedia.url = media.url;
+    }
+
+    sendCommand('displayMedia', { media: imageMedia });
+    return;
+  }
+
+  // Handle question type - display question on student screen
+  if (media.type === 'question') {
+    currentMediaType = 'question';
+    updateControlVisibility();
+    sendCommand('displayMedia', {
+      media: {
+        type: 'question',
+        prompt: media.prompt || media.title || '',
+        answer: media.answer || '',
+        title: media.title || 'Discussion Question'
+      }
+    });
+    return;
+  }
+
+  // Handle link type - open in new tab (don't display on student)
+  if (media.type === 'link') {
+    const url = media.url || (media.sources && media.sources[0]?.url) || '';
+    if (url) {
+      window.open(url, '_blank', 'noopener');
+    }
+    return;
+  }
+
+  // Generic media handling for other types (pdf, audio, etc.)
+  currentMediaType = media.type || 'unknown';
+  updateControlVisibility();
+  sendCommand('displayMedia', { media });
 }
 
 function sendCommand(type, payload = {}) {

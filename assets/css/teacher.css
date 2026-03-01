@@ -469,6 +469,151 @@ details.accordion > *:not(summary) {
   display: none;
 }
 
+/* Clickable marks for displaying on student screen */
+.clickable-mark {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-mark:hover {
+  background: rgba(240, 180, 41, 0.2) !important;
+  border-left-color: var(--accent) !important;
+  transform: translateX(4px);
+}
+
+.clickable-mark::after {
+  content: "→";
+  margin-left: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: var(--accent);
+}
+
+.clickable-mark:hover::after {
+  opacity: 1;
+}
+
+.mark-active {
+  animation: mark-flash 0.5s ease;
+}
+
+@keyframes mark-flash {
+  0%,
+  100% {
+    background: inherit;
+  }
+  50% {
+    background: rgba(240, 180, 41, 0.4) !important;
+  }
+}
+
+/* Media marks container */
+.media-marks-container {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.media-marks-label {
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.media-marks-label small {
+  font-size: 13px;
+}
+
+.media-marks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.media-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-mark:hover {
+  background: rgba(240, 180, 41, 0.2);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.media-mark .mark-icon {
+  font-size: 14px;
+}
+
+.media-mark .mark-title {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Media mark type colors */
+.media-mark-verse {
+  background: rgba(147, 112, 219, 0.15);
+  border-color: rgba(147, 112, 219, 0.4);
+}
+
+.media-mark-verse:hover {
+  background: rgba(147, 112, 219, 0.3);
+  border-color: rgba(147, 112, 219, 0.7);
+}
+
+.media-mark-video {
+  background: rgba(255, 87, 87, 0.15);
+  border-color: rgba(255, 87, 87, 0.4);
+}
+
+.media-mark-video:hover {
+  background: rgba(255, 87, 87, 0.3);
+  border-color: rgba(255, 87, 87, 0.7);
+}
+
+.media-mark-image,
+.media-mark-images {
+  background: rgba(76, 175, 80, 0.15);
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
+.media-mark-image:hover,
+.media-mark-images:hover {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: rgba(76, 175, 80, 0.7);
+}
+
+.media-mark-link {
+  background: rgba(73, 161, 255, 0.15);
+  border-color: rgba(73, 161, 255, 0.4);
+}
+
+.media-mark-link:hover {
+  background: rgba(73, 161, 255, 0.3);
+  border-color: rgba(73, 161, 255, 0.7);
+}
+
+.media-mark-question {
+  background: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.4);
+}
+
+.media-mark-question:hover {
+  background: rgba(255, 193, 7, 0.3);
+  border-color: rgba(255, 193, 7, 0.7);
+}
+
 .question {
   margin-top: 20px;
   padding: 16px;
@@ -483,6 +628,41 @@ details.accordion > *:not(summary) {
   font-weight: 600;
   color: var(--accent);
   line-height: 1.6;
+  flex: 1;
+}
+
+.question-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.question-header p {
+  margin: 0;
+}
+
+.question-display-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(240, 180, 41, 0.15);
+  border: 1px solid rgba(240, 180, 41, 0.4);
+  color: var(--accent);
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.question-display-btn:hover {
+  background: rgba(240, 180, 41, 0.3);
+  border-color: var(--accent);
+  transform: scale(1.05);
 }
 
 .question textarea {
@@ -689,7 +869,7 @@ details.accordion a {
 }
 
 .editor-content-display:empty::before {
-  content: 'No editor content available. Create content in the editor and save it to the class.';
+  content: "No editor content available. Create content in the editor and save it to the class.";
   color: var(--muted);
   font-size: 14px;
   font-style: italic;
@@ -706,10 +886,18 @@ details.accordion a {
   margin: 16px 0 8px;
 }
 
-.editor-content-display h1 { font-size: 24px; }
-.editor-content-display h2 { font-size: 20px; }
-.editor-content-display h3 { font-size: 18px; }
-.editor-content-display h4 { font-size: 16px; }
+.editor-content-display h1 {
+  font-size: 24px;
+}
+.editor-content-display h2 {
+  font-size: 20px;
+}
+.editor-content-display h3 {
+  font-size: 18px;
+}
+.editor-content-display h4 {
+  font-size: 16px;
+}
 
 .editor-content-display p {
   margin: 8px 0;
@@ -753,7 +941,7 @@ details.accordion a {
   background: rgba(255, 255, 255, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 13px;
 }
 
@@ -808,7 +996,7 @@ details.accordion a {
 }
 
 .generated-outline-display:empty::before {
-  content: 'No generated outline available. Create one in the editor and save it to the class.';
+  content: "No generated outline available. Create one in the editor and save it to the class.";
   color: var(--muted);
   font-size: 14px;
   font-style: italic;
@@ -892,7 +1080,8 @@ details.accordion a {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 rgba(240, 180, 41, 0.4);
   }
   50% {
@@ -981,7 +1170,7 @@ details.accordion a {
 }
 
 .qa-pause-marker::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 50%;
@@ -993,7 +1182,7 @@ details.accordion a {
 }
 
 .qa-pause-marker::after {
-  content: '→';
+  content: "→";
   position: absolute;
   right: 20px;
   font-size: 24px;

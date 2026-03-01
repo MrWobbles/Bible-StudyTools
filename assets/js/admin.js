@@ -1373,3 +1373,166 @@ Copy the URL and use an external downloader.
     alert('Download error: ' + err.message);
   }
 }
+
+// ===== BACKUP MANAGEMENT =====
+
+let currentBackupTab = 'classes';
+
+// Open backup modal
+function openBackupModal() {
+  document.getElementById('backup-modal').style.display = 'flex';
+  showBackupList('classes');
+}
+
+// Show backups for a specific file type
+async function showBackupList(fileType) {
+  currentBackupTab = fileType;
+
+  // Update tab styling
+  document.getElementById('tab-classes').classList.toggle('active', fileType === 'classes');
+  document.getElementById('tab-lessonPlans').classList.toggle('active', fileType === 'lessonPlans');
+
+  const container = document.getElementById('backup-list');
+  container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Loading backups...</p>';
+
+  try {
+    const response = await fetch(`/api/backups/${fileType}`);
+    if (!response.ok) throw new Error('Failed to fetch backups');
+
+    const data = await response.json();
+    const backups = data.backups || [];
+
+    if (backups.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 40px; color: var(--muted);">
+          <p>No backups found for ${fileType === 'classes' ? 'Classes' : 'Lesson Plans'}.</p>
+          <p style="font-size: 13px; margin-top: 8px;">Backups are created automatically when you save changes.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = backups.map(backup => {
+      // Parse the timestamp for display
+      const dateMatch = backup.fileName.match(/_(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
+      let displayDate = backup.timestamp;
+      if (dateMatch) {
+        const [, year, month, day, hour, min, sec] = dateMatch;
+        displayDate = `${month}/${day}/${year} ${hour}:${min}:${sec}`;
+      }
+
+      return `
+        <div class="backup-item">
+          <div class="backup-info">
+            <div class="backup-date"><span class="material-icons" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">event</span> ${displayDate}</div>
+            <div class="backup-filename">${backup.fileName}</div>
+          </div>
+          <div class="backup-actions">
+            <button onclick="restoreBackup('${backup.fileName}')" class="btn-small btn-restore" title="Restore this backup">
+              <span class="material-icons" style="font-size: 14px; vertical-align: middle;">restore</span> Restore
+            </button>
+            <button onclick="deleteBackup('${backup.fileName}')" class="btn-small btn-delete" title="Delete this backup">
+              <span class="material-icons" style="font-size: 14px; vertical-align: middle;">delete</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('Error loading backups:', err);
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #ff6b6b;">
+        <p>Error loading backups: ${err.message}</p>
+        <p style="font-size: 13px; margin-top: 8px;">Make sure the server is running.</p>
+      </div>
+    `;
+  }
+}
+
+// Create a manual backup
+async function createManualBackup(fileType) {
+  try {
+    const response = await fetch('/api/backups/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: fileType })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create backup');
+    }
+
+    const result = await response.json();
+    alert(`✓ Backup created: ${result.backupFileName}`);
+    showBackupList(currentBackupTab);
+
+  } catch (err) {
+    console.error('Error creating backup:', err);
+    alert('Error creating backup: ' + err.message);
+  }
+}
+
+// Restore from a backup
+async function restoreBackup(backupFileName) {
+  const confirmRestore = confirm(
+    `Are you sure you want to restore from this backup?\n\n` +
+    `File: ${backupFileName}\n\n` +
+    `This will replace the current data. A backup of the current data will be created automatically.`
+  );
+
+  if (!confirmRestore) return;
+
+  try {
+    const response = await fetch('/api/backups/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backupFileName })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to restore backup');
+    }
+
+    const result = await response.json();
+    alert(`✓ ${result.message}\n\nPlease refresh the page to see the restored data.`);
+
+    // Refresh the page to load restored data
+    if (confirm('Refresh the page now to load the restored data?')) {
+      window.location.reload();
+    }
+
+  } catch (err) {
+    console.error('Error restoring backup:', err);
+    alert('Error restoring backup: ' + err.message);
+  }
+}
+
+// Delete a backup
+async function deleteBackup(backupFileName) {
+  const confirmDelete = confirm(`Delete this backup?\n\n${backupFileName}\n\nThis cannot be undone.`);
+
+  if (!confirmDelete) return;
+
+  try {
+    const response = await fetch(`/api/backups/${encodeURIComponent(backupFileName)}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete backup');
+    }
+
+    showBackupList(currentBackupTab);
+
+  } catch (err) {
+    console.error('Error deleting backup:', err);
+    alert('Error deleting backup: ' + err.message);
+  }
+}
+
+// Set up backup button listener
+document.getElementById('backup-btn')?.addEventListener('click', openBackupModal);

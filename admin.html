@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/admin.css" />
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="apple-touch-icon" href="assets/images/icon.png" />
@@ -22,6 +23,10 @@
         <p class="subtitle" id="header-subtitle">Create and manage Bible study lesson plans</p>
       </div>
       <div style="display: flex; gap: 10px;">
+        <button id="backup-btn" class="pill-link"
+          style="background: rgba(76, 175, 80, 0.15); border-color: rgba(76, 175, 80, 0.4);"><span
+            class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">save</span>
+          Backups</button>
         <button id="back-btn" class="pill-link"
           style="display: none; background: var(--accent); border: none; cursor: pointer;">← Back</button>
         <a id="view-student-link" href="student.html" class="pill-link" target="_blank" rel="noopener"
@@ -227,6 +232,52 @@
       <div class="modal-body" id="class-add-modal-content"></div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeModal('class-add-modal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup Management Modal -->
+  <div id="backup-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3><span class="material-icons" style="font-size: 20px; vertical-align: middle; margin-right: 6px;">save</span>
+          Backup Management</h3>
+        <button class="modal-close" onclick="closeModal('backup-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+          <button onclick="createManualBackup('classes')" class="btn-secondary" style="flex: 1;">
+            <span class="material-icons"
+              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">assignment</span> Backup Classes Now
+          </button>
+          <button onclick="createManualBackup('lessonPlans')" class="btn-secondary" style="flex: 1;">
+            <span class="material-icons"
+              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">library_books</span> Backup Lesson
+            Plans Now
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+          <button onclick="showBackupList('classes')" class="backup-tab active" id="tab-classes">
+            Classes Backups
+          </button>
+          <button onclick="showBackupList('lessonPlans')" class="backup-tab" id="tab-lessonPlans">
+            Lesson Plans Backups
+          </button>
+        </div>
+
+        <div id="backup-list" style="max-height: 400px; overflow-y: auto;">
+          <p style="color: var(--muted); text-align: center; padding: 20px;">Loading backups...</p>
+        </div>
+
+        <div
+          style="margin-top: 16px; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; font-size: 13px; color: var(--muted);">
+          <strong>Auto-backup:</strong> Backups are automatically created when you save changes (max once per minute).
+          Up to 50 backups are kept per file. Backups are stored in the <code>backups/</code> folder.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('backup-modal')">Close</button>
       </div>
     </div>
   </div>
