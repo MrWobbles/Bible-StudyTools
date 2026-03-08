@@ -386,6 +386,138 @@ details.accordion[open] summary {
   margin-bottom: 0;
 }
 
+/* Stopped Here Marker Styles */
+details.accordion.stopped-here {
+  position: relative;
+}
+
+details.accordion.stopped-here::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #10b981, #059669);
+  border-radius: 4px;
+}
+
+details.accordion.stopped-here summary {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+details.accordion.stopped-here[open] summary {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+details.accordion summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+details.accordion summary .summary-text {
+  flex: 1;
+}
+
+.stopped-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.stopped-indicator .material-icons {
+  font-size: 14px;
+}
+
+.stop-marker-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  padding: 6px 10px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.stop-marker-btn .material-icons {
+  font-size: 16px;
+}
+
+details.accordion:hover .stop-marker-btn,
+.stop-marker-btn.active {
+  opacity: 1;
+}
+
+.stop-marker-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.stop-marker-btn.active {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #10b981;
+}
+
+/* Editor Content Stopped Here Markers */
+.editor-heading-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.editor-heading-wrapper h1,
+.editor-heading-wrapper h2,
+.editor-heading-wrapper h3,
+.editor-heading-wrapper h4,
+.editor-heading-wrapper h5,
+.editor-heading-wrapper h6 {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.editor-heading-wrapper.stopped-here {
+  padding-left: 12px;
+  border-left: 4px solid #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 0 8px 8px 0;
+  margin-left: -12px;
+  padding-right: 8px;
+}
+
+.editor-heading-wrapper .stop-marker-btn.editor-marker {
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.editor-heading-wrapper:hover .stop-marker-btn.editor-marker,
+.editor-heading-wrapper .stop-marker-btn.editor-marker.active {
+  opacity: 1;
+}
+
+.stopped-indicator.editor-stopped {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 details.accordion > *:not(summary) {
   padding: 16px;
   background: rgba(255, 255, 255, 0.03);

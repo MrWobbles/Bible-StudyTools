@@ -116,7 +116,15 @@ function setupControlChannel() {
   console.log('[Student] Setting up control channel:', CHANNEL_KEY, 'STORAGE_FALLBACK_KEY:', STORAGE_FALLBACK_KEY);
   console.log('[Student] Is in iframe:', window.self !== window.top);
 
-  if ('BroadcastChannel' in window) {
+  // Use Electron IPC-based channel if available, otherwise native BroadcastChannel
+  if (window.bst?.createBroadcastChannel) {
+    channel = window.bst.createBroadcastChannel(CHANNEL_KEY);
+    channel.addMessageHandler((event) => {
+      console.log('[Student] Electron IPC message received:', event);
+      handleRemoteCommand(event);
+    });
+    console.log('[Student] Electron IPC BroadcastChannel set up');
+  } else if ('BroadcastChannel' in window) {
     channel = new BroadcastChannel(CHANNEL_KEY);
     channel.onmessage = (event) => {
       console.log('[Student] BroadcastChannel message received');
@@ -431,11 +439,38 @@ function handlePendingMedia() {
     if (pendingMedia.sources && pendingMedia.sources[0]) {
       const source = pendingMedia.sources[0];
       videoId = source.videoId || '';
-      videoUrl = source.url || '';
+      videoUrl = source.url || source.path || '';
     } else if (pendingMedia.url) {
       videoUrl = pendingMedia.url;
     } else if (pendingMedia.videoId) {
       videoId = pendingMedia.videoId;
+    }
+
+    // Check if it's a local video file (not YouTube)
+    const isLocalVideo = videoUrl && (
+      videoUrl.endsWith('.mp4') || 
+      videoUrl.endsWith('.webm') || 
+      videoUrl.endsWith('.ogg') ||
+      videoUrl.startsWith('assets/') ||
+      videoUrl.startsWith('./assets/')
+    );
+
+    if (isLocalVideo) {
+      console.log('[Student] Playing local video:', videoUrl);
+      // Destroy YouTube player if any
+      if (player) {
+        player.destroy();
+        player = null;
+      }
+      // Use HTML5 video element for local files
+      playerDiv.innerHTML = `
+        <video id="local-video" style="width:100%;height:100%;background:#000;" controls autoplay>
+          <source src="${videoUrl}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      `;
+      pendingMedia = null;
+      return;
     }
 
     const newVideoId = videoId || extractVideoId(videoUrl);

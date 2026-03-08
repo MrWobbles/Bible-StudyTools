@@ -7,6 +7,7 @@ let STORAGE_FALLBACK_KEY = 'class-control-storage';
 let NOTES_KEY = 'class-teacher-notes';
 let QUESTION_PREFIX = 'class-question-';
 let currentMediaType = null;
+let allClassesData = null; // Store full classes data for saving
 
 let channel = null;
 let statusEl = null;
@@ -23,6 +24,9 @@ async function loadClassConfig() {
   try {
     const response = await fetch('assets/data/classes.json');
     const raw = await response.json();
+
+    // Store full data for saving
+    allClassesData = raw;
 
     // Normalize to array: supports {classes:[...]}, [ ... ], or single object
     const classesArr = Array.isArray(raw)
@@ -114,7 +118,14 @@ function initializePage() {
   // Render generated outline
   renderGeneratedOutline();
 
-  channel = 'BroadcastChannel' in window ? new BroadcastChannel(CHANNEL_KEY) : null;
+  // Use Electron IPC-based channel if available, otherwise native BroadcastChannel
+  if (window.bst?.createBroadcastChannel) {
+    channel = window.bst.createBroadcastChannel(CHANNEL_KEY);
+  } else if ('BroadcastChannel' in window) {
+    channel = new BroadcastChannel(CHANNEL_KEY);
+  } else {
+    channel = null;
+  }
 
   bindControls();
   hydrateNotes();
@@ -144,12 +155,43 @@ function renderOutlineWithQuestions() {
 
   classConfig.outline.forEach((section) => {
     const isOpen = section.defaultOpen ? ' open' : '';
+    const isStoppedHere = classConfig.stoppedAtSection === section.id;
     const detailsEl = document.createElement('details');
-    detailsEl.className = `accordion${isOpen}`;
+    detailsEl.className = `accordion${isOpen}${isStoppedHere ? ' stopped-here' : ''}`;
     detailsEl.setAttribute('data-section-id', section.id || '');
 
     const summaryEl = document.createElement('summary');
-    summaryEl.textContent = section.summary;
+
+    // Create summary content wrapper
+    const summaryContent = document.createElement('span');
+    summaryContent.className = 'summary-text';
+    summaryContent.textContent = section.summary;
+    summaryEl.appendChild(summaryContent);
+
+    // Add stopped-here indicator
+    if (isStoppedHere) {
+      const stoppedIndicator = document.createElement('span');
+      stoppedIndicator.className = 'stopped-indicator';
+      stoppedIndicator.innerHTML = '<span class="material-icons">location_on</span> Stopped here';
+      summaryEl.appendChild(stoppedIndicator);
+    }
+
+    // Add "Mark stopped here" button
+    const stopMarkerBtn = document.createElement('button');
+    stopMarkerBtn.className = 'stop-marker-btn' + (isStoppedHere ? ' active' : '');
+    stopMarkerBtn.innerHTML = isStoppedHere ? '<span class="material-icons">check</span> Marked' : '<span class="material-icons">location_on</span>';
+    stopMarkerBtn.title = isStoppedHere ? 'Click to remove marker' : 'Mark where you stopped';
+    stopMarkerBtn.onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (isStoppedHere) {
+        setStoppedMarker(null);
+      } else {
+        setStoppedMarker(section.id);
+      }
+    };
+    summaryEl.appendChild(stopMarkerBtn);
+
     detailsEl.appendChild(summaryEl);
 
     // Actions row (e.g., Jump button)
@@ -392,28 +434,31 @@ function parseTimeFromSummary(summary) {
 }
 
 function renderMediaGallery() {
-  if (!classConfig.media || classConfig.media.length === 0) return;
+  const hasMedia = classConfig.media && classConfig.media.length > 0;
 
   const orderedMedia = [];
-  const primaryMedia = classConfig.media.filter(m => m.primary);
-  const otherClassMedia = classConfig.media.filter(m => !m.primary);
 
-  orderedMedia.push(...primaryMedia);
+  if (hasMedia) {
+    const primaryMedia = classConfig.media.filter(m => m.primary);
+    const otherClassMedia = classConfig.media.filter(m => !m.primary);
 
-  if (classConfig.outline) {
-    classConfig.outline.forEach(section => {
-      if (section.media && section.media.length > 0) {
-        section.media.forEach(media => {
-          orderedMedia.push({
-            ...media,
-            sectionTitle: section.summary
+    orderedMedia.push(...primaryMedia);
+
+    if (classConfig.outline) {
+      classConfig.outline.forEach(section => {
+        if (section.media && section.media.length > 0) {
+          section.media.forEach(media => {
+            orderedMedia.push({
+              ...media,
+              sectionTitle: section.summary
+            });
           });
-        });
-      }
-    });
-  }
+        }
+      });
+    }
 
-  orderedMedia.push(...otherClassMedia);
+    orderedMedia.push(...otherClassMedia);
+  }
 
   let mediaDrawer = document.getElementById('media-drawer');
   if (!mediaDrawer) {
@@ -452,32 +497,54 @@ function renderMediaGallery() {
   }
 
   const mediaPanel = document.getElementById('media-panel');
-  if (!mediaPanel) return;
+  if (mediaPanel) {
+    // Render a compact vertical list of class materials
+    if (orderedMedia.length > 0) {
+      const mediaHTML = `
+        <div class="media-list">
+          ${orderedMedia.map((media, idx) => {
+        const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
+        const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
 
-  // Render a compact vertical list of class materials
-  const mediaHTML = `
-    <div class="media-list">
-      ${orderedMedia.map((media, idx) => {
-    const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
-    const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
-
-    return `
-        <div class="media-item" data-media-index="${idx}" data-media-type="${media.type}" data-media-url="${url}" title="${media.title || media.type}">
-          <div style="display:flex; gap:10px; align-items:center; min-width:0;">
-            <span class="material-symbols-outlined" style="font-size:20px;">${getMediaIcon(media.type)}</span>
-            <div style="min-width:0;">
-              <div class="media-item-title">${media.title || media.type}</div>
-              <div class="media-item-meta">${media.type}${media.primary ? ' (primary)' : ''}</div>
-              ${sectionLabel}
+        return `
+            <div class="media-item" data-media-index="${idx}" data-media-type="${media.type}" data-media-url="${url}" title="${media.title || media.type}">
+              <div style="display:flex; gap:10px; align-items:center; min-width:0;">
+                <span class="material-symbols-outlined" style="font-size:20px;">${getMediaIcon(media.type)}</span>
+                <div style="min-width:0;">
+                  <div class="media-item-title">${media.title || media.type}</div>
+                  <div class="media-item-meta">${media.type}${media.primary ? ' (primary)' : ''}</div>
+                  ${sectionLabel}
+                </div>
+              </div>
             </div>
-          </div>
+            `;
+      }).join('')}
         </div>
-        `;
-  }).join('')}
-    </div>
-  `;
+      `;
+      mediaPanel.innerHTML = mediaHTML;
 
-  mediaPanel.innerHTML = mediaHTML;
+      mediaPanel.querySelectorAll('.media-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const idx = Number(item.dataset.mediaIndex);
+          const type = item.dataset.mediaType || '';
+          const url = item.dataset.mediaUrl || '';
+          if (type === 'link' && url && url !== '#') {
+            window.open(url, '_blank', 'noopener');
+          } else if (Number.isInteger(idx)) {
+            sendMediaToStudent(idx);
+          }
+        });
+      });
+    } else {
+      mediaPanel.innerHTML = `
+        <div style="color: var(--muted); font-size: 14px; padding: 20px; text-align: center;">
+          <span class="material-icons" style="font-size: 32px; opacity: 0.5; display: block; margin-bottom: 8px;">folder_off</span>
+          No media resources for this class.<br>
+          Add media in the Admin panel.
+        </div>
+      `;
+    }
+  }
 
   const versePanel = document.getElementById('verse-panel');
   if (!versePanel) return;
@@ -505,19 +572,6 @@ function renderMediaGallery() {
     verseSendBtn.onclick = () =>
       sendVerseToStudent(verseRefInput.value, verseTranslationInput?.value || 'web');
   }
-
-  mediaPanel.querySelectorAll('.media-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const idx = Number(item.dataset.mediaIndex);
-      const type = item.dataset.mediaType || '';
-      const url = item.dataset.mediaUrl || '';
-      if (type === 'link' && url && url !== '#') {
-        window.open(url, '_blank', 'noopener');
-      } else if (Number.isInteger(idx)) {
-        sendMediaToStudent(idx);
-      }
-    });
-  });
 
   const toggleBtn = document.getElementById('toggle-media-btn');
   const closeBtn = document.getElementById('media-close-btn');
@@ -722,6 +776,9 @@ function renderGeneratedOutline() {
       }
     });
   });
+
+  // Add stopped-here markers to headings
+  addStoppedMarkersToEditorContent(displayContainer);
 
   // Add Q&A break markers if generatedOutline exists
   if (classConfig.generatedOutline && classConfig.generatedOutline.length > 0) {
@@ -1213,6 +1270,146 @@ function updateControlVisibility() {
       control.style.display = 'none';
     }
   });
+}
+
+// ===== STOPPED HERE MARKER =====
+
+/**
+ * Add stopped-here markers to headings in editor content
+ */
+function addStoppedMarkersToEditorContent(container) {
+  const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+
+  headings.forEach((heading, index) => {
+    const headingId = `editor-heading-${index}`;
+    const isStoppedHere = classConfig.stoppedAtEditorHeading === headingId;
+
+    // Wrap heading content
+    const wrapper = document.createElement('div');
+    wrapper.className = `editor-heading-wrapper${isStoppedHere ? ' stopped-here' : ''}`;
+    wrapper.setAttribute('data-heading-id', headingId);
+
+    // Move heading into wrapper
+    heading.parentNode.insertBefore(wrapper, heading);
+    wrapper.appendChild(heading);
+
+    // Add stopped indicator if marked
+    if (isStoppedHere) {
+      const indicator = document.createElement('span');
+      indicator.className = 'stopped-indicator editor-stopped';
+      indicator.innerHTML = '<span class="material-icons">location_on</span> Stopped here';
+      heading.appendChild(indicator);
+    }
+
+    // Add marker button
+    const markerBtn = document.createElement('button');
+    markerBtn.className = `stop-marker-btn editor-marker${isStoppedHere ? ' active' : ''}`;
+    markerBtn.innerHTML = isStoppedHere
+      ? '<span class="material-icons">check</span>'
+      : '<span class="material-icons">location_on</span>';
+    markerBtn.title = isStoppedHere ? 'Click to remove marker' : 'Mark where you stopped';
+    markerBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (isStoppedHere) {
+        setStoppedMarkerEditor(null);
+      } else {
+        setStoppedMarkerEditor(headingId);
+      }
+    };
+    wrapper.appendChild(markerBtn);
+  });
+}
+
+/**
+ * Set the "stopped here" marker on an editor heading
+ * @param {string|null} headingId - Heading ID to mark, or null to clear
+ */
+async function setStoppedMarkerEditor(headingId) {
+  // Clear any outline section marker (only one marker per class)
+  classConfig.stoppedAtSection = null;
+  classConfig.stoppedAtEditorHeading = headingId;
+
+  // Update the allClassesData
+  if (allClassesData && allClassesData.classes) {
+    const classIndex = allClassesData.classes.findIndex(c =>
+      c.id === classConfig.id || c.classNumber === classConfig.classNumber
+    );
+    if (classIndex !== -1) {
+      allClassesData.classes[classIndex].stoppedAtSection = null;
+      allClassesData.classes[classIndex].stoppedAtEditorHeading = headingId;
+    }
+  }
+
+  // Save to server
+  await saveStoppedMarker();
+
+  // Re-render both views to update UI
+  renderOutlineWithQuestions();
+  renderGeneratedOutline();
+
+  // Show feedback
+  if (headingId) {
+    flashStatus('Marked where you stopped');
+  } else {
+    flashStatus('Marker removed');
+  }
+}
+
+/**
+ * Set the "stopped here" marker on a section
+ * @param {string|null} sectionId - Section ID to mark, or null to clear
+ */
+async function setStoppedMarker(sectionId) {
+  // Clear any editor heading marker (only one marker per class)
+  classConfig.stoppedAtEditorHeading = null;
+  classConfig.stoppedAtSection = sectionId;
+
+  // Update the allClassesData with the new marker
+  if (allClassesData && allClassesData.classes) {
+    const classIndex = allClassesData.classes.findIndex(c =>
+      c.id === classConfig.id || c.classNumber === classConfig.classNumber
+    );
+    if (classIndex !== -1) {
+      allClassesData.classes[classIndex].stoppedAtEditorHeading = null;
+      allClassesData.classes[classIndex].stoppedAtSection = sectionId;
+    }
+  }
+
+  // Save to server
+  await saveStoppedMarker();
+
+  // Re-render both views to update UI
+  renderOutlineWithQuestions();
+  renderGeneratedOutline();
+
+  // Show feedback
+  if (sectionId) {
+    flashStatus('Marked where you stopped');
+  } else {
+    flashStatus('Marker removed');
+  }
+}
+
+/**
+ * Save the stopped marker to server
+ */
+async function saveStoppedMarker() {
+  try {
+    const response = await fetch('/api/save/classes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(allClassesData)
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save');
+    }
+
+    console.log('[✓] Saved stopped marker');
+  } catch (err) {
+    console.error('Failed to save stopped marker:', err);
+    flashStatus('⚠️ Could not save marker - check server');
+  }
 }
 
 if (document.readyState === 'loading') {

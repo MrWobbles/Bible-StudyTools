@@ -576,6 +576,19 @@
               "url": "/assets/images/Angels-and-Demons/merandadevan-end-times.jpg"
             }
           ]
+        },
+        {
+          "id": "gods-not-dead",
+          "type": "video",
+          "title": "God's Not Dead",
+          "primary": false,
+          "sources": [
+            {
+              "type": "local",
+              "url": "assets/video/Comfortable-Prison-Cell.mp4"
+            }
+          ],
+          "pausePoints": []
         }
       ],
       "outline": [

@@ -132,7 +132,8 @@ ipcMain.on('broadcast-channel-message', (event, message) => {
   let relayed = 0;
   allWindows.forEach(win => {
     if (win && !win.isDestroyed() && win.webContents !== event.sender) {
-      console.log('[IPC Relay] Relaying to window');
+      const url = win.webContents.getURL();
+      console.log('[IPC Relay] Relaying to window:', url);
       win.webContents.send('broadcast-channel-relay', message);
       relayed++;
     }

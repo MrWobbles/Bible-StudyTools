@@ -1,56 +1,59 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Create a shim for BroadcastChannel that uses Electron IPC
-class ElectronBroadcastChannel {
-  constructor(name) {
-    this.name = name;
-    this._listeners = [];
-    console.log('[BroadcastChannel] Created channel:', name);
+// Registry of all channels created in this window
+const channelRegistry = new Map();
 
-    // Listen for relayed messages from main process
-    ipcRenderer.on('broadcast-channel-relay', (event, message) => {
-      console.log('[BroadcastChannel] Received relay:', message);
-      if (message.channel === name) {
-        console.log('[BroadcastChannel] Dispatching to', this._listeners.length, 'listeners');
-        this._listeners.forEach(listener => {
-          listener({ data: message.data });
-        });
+// Set up ONE listener for all relayed messages
+ipcRenderer.on('broadcast-channel-relay', (event, message) => {
+  console.log('[Preload] Received relay for channel:', message.channel);
+  const handlers = channelRegistry.get(message.channel);
+  if (handlers && handlers.length > 0) {
+    console.log('[Preload] Dispatching to', handlers.length, 'handlers');
+    handlers.forEach(handler => {
+      try {
+        handler({ data: message.data });
+      } catch (err) {
+        console.error('[Preload] Error in message handler:', err);
       }
     });
+  } else {
+    console.log('[Preload] No handlers registered for channel:', message.channel);
   }
+});
 
-  postMessage(message) {
-    console.log('[BroadcastChannel] Posting message on', this.name, ':', message);
-    // Send to main process to relay to other windows
-    ipcRenderer.send('broadcast-channel-message', {
-      channel: this.name,
-      data: message
-    });
-  }
-
-  set onmessage(handler) {
-    this._listeners = [handler];
-  }
-
-  addEventListener(type, handler) {
-    if (type === 'message') {
-      this._listeners.push(handler);
-    }
-  }
-
-  close() {
-    this._listeners = [];
-  }
-}
-
-// Override BroadcastChannel with our Electron-compatible version
-window.BroadcastChannel = ElectronBroadcastChannel;
-
-// Expose API for file system operations
+// Expose API for file system operations and BroadcastChannel
 contextBridge.exposeInMainWorld('bst', {
   version: '0.1.0',
   saveFile: (filename, data) => ipcRenderer.invoke('save-file', filename, data),
   uploadMedia: (mediaType, filename, arrayBuffer) => ipcRenderer.invoke('upload-media', mediaType, filename, arrayBuffer),
   downloadMedia: (mediaType, url) => ipcRenderer.invoke('download-media', mediaType, url),
-  toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen')
+  toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),
+
+  // BroadcastChannel-like API for cross-window communication
+  createBroadcastChannel: (name) => {
+    console.log('[Preload] Creating channel:', name);
+
+    // Initialize handler array for this channel if not exists
+    if (!channelRegistry.has(name)) {
+      channelRegistry.set(name, []);
+    }
+
+    return {
+      postMessage: (message) => {
+        console.log('[Preload] Posting message on', name);
+        ipcRenderer.send('broadcast-channel-message', { channel: name, data: message });
+      },
+
+      addMessageHandler: (handler) => {
+        console.log('[Preload] Adding handler for channel:', name);
+        const handlers = channelRegistry.get(name);
+        handlers.push(handler);
+        console.log('[Preload] Total handlers for', name, ':', handlers.length);
+      },
+
+      close: () => {
+        channelRegistry.set(name, []);
+      }
+    };
+  }
 });
