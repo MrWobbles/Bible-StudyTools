@@ -353,8 +353,8 @@ async function saveLessonPlansToFile(options = {}) {
   try {
     const partialSyncWarning = await syncLessonPlanDeltaToMongo({ changedPlanId, deletedPlanId });
 
-    console.log('Attempting API save to /api/save/lessonplans...');
-    const response = await window.BSTApi.fetch('/api/save/lessonplans', {
+    console.log('Attempting API save to /api/save/lessonPlans...');
+    const response = await window.BSTApi.fetch('/api/save/lessonPlans', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

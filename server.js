@@ -9,7 +9,9 @@ require('dotenv').config();
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
+const crypto = require('crypto');
 const ytdl = require('ytdl-core');
+const { z } = require('zod');
 const {
   connectDB,
   isConnected,
@@ -30,9 +32,69 @@ const SHOULD_AUTO_OPEN_BROWSER = process.env.BST_DISABLE_BROWSER_OPEN !== '1';
 
 app.disable('x-powered-by');
 
+const LESSON_PLANS_SEGMENT = 'lessonPlans';
+const LEGACY_LESSON_PLANS_SEGMENT = 'lessonplans';
+const API_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const REQUIRE_ADMIN_ON_LOOPBACK = parseBooleanLike(process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK);
+const ENFORCE_REMOTE_CSRF = parseBooleanLike(process.env.BST_ENFORCE_REMOTE_CSRF);
+const REMOTE_CSRF_TOKEN = String(process.env.BST_CSRF_TOKEN || '').trim();
+const TRUSTED_REMOTE_ORIGINS = new Set(
+  String(process.env.BST_TRUSTED_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+const ENABLE_REMOTE_RATE_LIMIT = parseBooleanLike(process.env.BST_ENABLE_REMOTE_RATE_LIMIT || '1');
+const RATE_LIMIT_WINDOW_MS = getBoundedPositiveInt(process.env.BST_RATE_LIMIT_WINDOW_MS, 60000, 3600000);
+const RATE_LIMIT_MAX_REQUESTS = getBoundedPositiveInt(process.env.BST_RATE_LIMIT_MAX_REQUESTS, 120, 5000);
+const ENABLE_REQUEST_AUDIT = parseBooleanLike(process.env.BST_ENABLE_REQUEST_AUDIT || '1');
+const AUDIT_LOG_FILE = process.env.BST_AUDIT_LOG_FILE
+  ? path.resolve(process.env.BST_AUDIT_LOG_FILE)
+  : path.join(__dirname, 'logs', 'api-audit.log');
+const MAX_CLASSES_PER_PAYLOAD = getBoundedPositiveInt(process.env.BST_MAX_CLASSES_PER_PAYLOAD, 500, 5000);
+const MAX_LESSON_PLANS_PER_PAYLOAD = getBoundedPositiveInt(process.env.BST_MAX_LESSON_PLANS_PER_PAYLOAD, 500, 5000);
+const MAX_ITEMS_PER_CLASS_OUTLINE = getBoundedPositiveInt(process.env.BST_MAX_CLASS_OUTLINE_ITEMS, 2000, 10000);
+const MAX_ITEMS_PER_CLASS_MEDIA = getBoundedPositiveInt(process.env.BST_MAX_CLASS_MEDIA_ITEMS, 1000, 10000);
+const MAX_CLASSES_PER_LESSON_PLAN = getBoundedPositiveInt(process.env.BST_MAX_CLASSES_PER_LESSON_PLAN, 300, 2000);
+const REMOTE_RATE_LIMIT_BUCKETS = new Map();
+
+const baseStringSchema = z.string().trim();
+const boundedIdSchema = baseStringSchema.min(1).max(120);
+const boundedTitleSchema = baseStringSchema.min(1).max(240);
+
+const classRecordSchema = z.object({
+  id: boundedIdSchema.optional(),
+  classId: boundedIdSchema.optional(),
+  classNumber: z.union([
+    baseStringSchema.min(1).max(40),
+    z.number().int().min(0).max(100000)
+  ]).optional(),
+  title: boundedTitleSchema.optional(),
+  outline: z.array(z.any()).max(MAX_ITEMS_PER_CLASS_OUTLINE).optional(),
+  media: z.array(z.any()).max(MAX_ITEMS_PER_CLASS_MEDIA).optional()
+}).passthrough();
+
+const lessonPlanRecordSchema = z.object({
+  id: boundedIdSchema.optional(),
+  planId: boundedIdSchema.optional(),
+  title: boundedTitleSchema.optional(),
+  classes: z.array(boundedIdSchema).max(MAX_CLASSES_PER_LESSON_PLAN).optional()
+}).passthrough();
+
+const classesSaveSchema = z.object({
+  classes: z.array(classRecordSchema).max(MAX_CLASSES_PER_PAYLOAD)
+}).passthrough();
+
+const lessonPlansSaveSchema = z.object({
+  lessonPlans: z.array(lessonPlanRecordSchema).max(MAX_LESSON_PLANS_PER_PAYLOAD)
+}).passthrough();
+
 // Middleware - JSON parsing first
 // classes.json can exceed the default 100kb when outlines/content are expanded
 app.use(express.json({ limit: '10mb' }));
+app.use(requestAuditMiddleware);
+app.use(remoteWriteRateLimit);
+app.use(enforceRemoteCsrf);
 
 // Data directory
 const DATA_DIR = process.env.BST_DATA_DIR
@@ -139,11 +201,12 @@ function hasValidAdminToken(req) {
     : '';
   const headerToken = String(req.get('x-bst-admin-token') || '').trim();
 
-  return headerToken === ADMIN_TOKEN || bearerToken === ADMIN_TOKEN;
+  return areTokensEqual(headerToken, ADMIN_TOKEN) || areTokensEqual(bearerToken, ADMIN_TOKEN);
 }
 
 function requireAdminAccess(req, res, next) {
-  if (isLoopbackRequest(req)) {
+  const isLoopback = isLoopbackRequest(req);
+  if (isLoopback && !REQUIRE_ADMIN_ON_LOOPBACK) {
     return next();
   }
 
@@ -156,6 +219,180 @@ function requireAdminAccess(req, res, next) {
   if (!hasValidAdminToken(req)) {
     return res.status(401).json({ error: 'Admin token required' });
   }
+
+  return next();
+}
+
+function isApiWriteRequest(req) {
+  return req.path.startsWith('/api/') && API_WRITE_METHODS.has(req.method);
+}
+
+function areTokensEqual(inputToken, expectedToken) {
+  const left = Buffer.from(String(inputToken || ''), 'utf8');
+  const right = Buffer.from(String(expectedToken || ''), 'utf8');
+
+  if (left.length === 0 || right.length === 0 || left.length !== right.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(left, right);
+}
+
+function getBoundedPositiveInt(value, fallback, maxValue) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.min(parsed, maxValue);
+}
+
+function issuePathToString(issuePath) {
+  if (!Array.isArray(issuePath) || issuePath.length === 0) {
+    return 'root';
+  }
+
+  return issuePath
+    .map((part) => (typeof part === 'number' ? `[${part}]` : String(part)))
+    .join('.');
+}
+
+function formatZodIssues(error, maxIssues = 8) {
+  if (!error?.issues || !Array.isArray(error.issues)) {
+    return [];
+  }
+
+  return error.issues.slice(0, maxIssues).map((issue) => ({
+    path: issuePathToString(issue.path),
+    message: issue.message
+  }));
+}
+
+function parseBodyWithSchema(schema, payload, errorMessage) {
+  const result = schema.safeParse(payload);
+  if (result.success) {
+    return { ok: true, data: result.data };
+  }
+
+  return {
+    ok: false,
+    status: 400,
+    error: errorMessage,
+    details: formatZodIssues(result.error)
+  };
+}
+
+function isLegacyLessonPlansPath(reqPath) {
+  return String(reqPath || '').toLowerCase().includes(`/${LEGACY_LESSON_PLANS_SEGMENT}`);
+}
+
+function markLegacyLessonPlansRoute(req, res, next) {
+  if (isLegacyLessonPlansPath(req.path)) {
+    const successorPath = req.path.replace(`/${LEGACY_LESSON_PLANS_SEGMENT}`, `/${LESSON_PLANS_SEGMENT}`);
+    res.set('Deprecation', 'true');
+    res.set('Link', `<${successorPath}>; rel="successor-version"`);
+  }
+  next();
+}
+
+function getRemoteRateLimitKey(req) {
+  const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
+  return `${ip}|${req.method}|${req.path}`;
+}
+
+function remoteWriteRateLimit(req, res, next) {
+  if (!ENABLE_REMOTE_RATE_LIMIT || !isApiWriteRequest(req) || isLoopbackRequest(req)) {
+    return next();
+  }
+
+  const now = Date.now();
+  const key = getRemoteRateLimitKey(req);
+  const entry = REMOTE_RATE_LIMIT_BUCKETS.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    REMOTE_RATE_LIMIT_BUCKETS.set(key, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW_MS
+    });
+    return next();
+  }
+
+  entry.count += 1;
+
+  if (entry.count > RATE_LIMIT_MAX_REQUESTS) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
+    res.set('Retry-After', String(retryAfterSeconds));
+    return res.status(429).json({
+      error: 'Rate limit exceeded for remote write requests. Try again later.',
+      retryAfterSeconds
+    });
+  }
+
+  return next();
+}
+
+function enforceRemoteCsrf(req, res, next) {
+  if (!isApiWriteRequest(req) || isLoopbackRequest(req) || !ENFORCE_REMOTE_CSRF) {
+    return next();
+  }
+
+  if (!REMOTE_CSRF_TOKEN) {
+    return res.status(500).json({
+      error: 'Remote CSRF protection is enabled but BST_CSRF_TOKEN is not configured.'
+    });
+  }
+
+  const providedToken = String(req.get('x-bst-csrf-token') || req.get('x-csrf-token') || '').trim();
+  if (!areTokensEqual(providedToken, REMOTE_CSRF_TOKEN)) {
+    return res.status(403).json({ error: 'CSRF token required for remote write requests' });
+  }
+
+  const origin = String(req.get('origin') || '').trim();
+  if (TRUSTED_REMOTE_ORIGINS.size > 0 && origin && !TRUSTED_REMOTE_ORIGINS.has(origin)) {
+    return res.status(403).json({ error: 'Request origin is not trusted' });
+  }
+
+  return next();
+}
+
+async function appendAuditLog(entry) {
+  if (!ENABLE_REQUEST_AUDIT) {
+    return;
+  }
+
+  try {
+    await fs.mkdir(path.dirname(AUDIT_LOG_FILE), { recursive: true });
+    await fs.appendFile(AUDIT_LOG_FILE, `${JSON.stringify(entry)}\n`, 'utf8');
+  } catch (err) {
+    console.warn('[Audit] Failed to append request audit log:', err.message);
+  }
+}
+
+function requestAuditMiddleware(req, res, next) {
+  if (!isApiWriteRequest(req)) {
+    return next();
+  }
+
+  const requestId = crypto.randomUUID();
+  const startedAt = Date.now();
+  res.set('x-request-id', requestId);
+
+  res.on('finish', () => {
+    const authMode = isLoopbackRequest(req)
+      ? 'loopback'
+      : (hasValidAdminToken(req) ? 'token' : 'none');
+
+    void appendAuditLog({
+      requestId,
+      at: new Date().toISOString(),
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+      ip: String(req.ip || req.socket?.remoteAddress || ''),
+      userAgent: String(req.get('user-agent') || ''),
+      authMode
+    });
+  });
 
   return next();
 }
@@ -391,13 +628,20 @@ app.get('/api/data/:fileName', async (req, res) => {
 app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
   try {
     const filePath = path.join(DATA_DIR, 'classes.json');
-    const data = req.body;
-    const skipCloudSync = shouldSkipCloudSync(req);
-
-    // Validate that it has the expected structure
-    if (!data.classes || !Array.isArray(data.classes)) {
-      return res.status(400).json({ error: 'Invalid classes data structure' });
+    const parsed = parseBodyWithSchema(
+      classesSaveSchema,
+      req.body,
+      'Invalid classes payload'
+    );
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({
+        error: parsed.error,
+        details: parsed.details
+      });
     }
+
+    const data = parsed.data;
+    const skipCloudSync = shouldSkipCloudSync(req);
 
     const { backupFile, cloudSync } = await withFileLock('classes.json', async () => {
       let backupFileName = null;
@@ -446,19 +690,29 @@ app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
 });
 
 /**
- * POST /api/save/lessonplans
+ * POST /api/save/lessonPlans
  * Save lessonPlans.json with automatic backup
  */
-app.post('/api/save/lessonplans', requireAdminAccess, async (req, res) => {
+app.post([
+  `/api/save/${LESSON_PLANS_SEGMENT}`,
+  `/api/save/${LEGACY_LESSON_PLANS_SEGMENT}`
+], markLegacyLessonPlansRoute, requireAdminAccess, async (req, res) => {
   try {
     const filePath = path.join(DATA_DIR, 'lessonPlans.json');
-    const data = req.body;
-    const skipCloudSync = shouldSkipCloudSync(req);
-
-    // Validate that it has the expected structure
-    if (!data.lessonPlans || !Array.isArray(data.lessonPlans)) {
-      return res.status(400).json({ error: 'Invalid lesson plans data structure' });
+    const parsed = parseBodyWithSchema(
+      lessonPlansSaveSchema,
+      req.body,
+      'Invalid lesson plans payload'
+    );
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({
+        error: parsed.error,
+        details: parsed.details
+      });
     }
+
+    const data = parsed.data;
+    const skipCloudSync = shouldSkipCloudSync(req);
 
     const { backupFile, cloudSync } = await withFileLock('lessonPlans.json', async () => {
       let backupFileName = null;
@@ -714,10 +968,13 @@ app.delete('/api/mongo/classes/:classId', requireAdminAccess, async (req, res) =
 });
 
 /**
- * PUT /api/mongo/lessonplans/:planId
+ * PUT /api/mongo/lessonPlans/:planId
  * Upsert a single lesson plan record directly in MongoDB normalized storage
  */
-app.put('/api/mongo/lessonplans/:planId', requireAdminAccess, async (req, res) => {
+app.put([
+  `/api/mongo/${LESSON_PLANS_SEGMENT}/:planId`,
+  `/api/mongo/${LEGACY_LESSON_PLANS_SEGMENT}/:planId`
+], markLegacyLessonPlansRoute, requireAdminAccess, async (req, res) => {
   try {
     if (!requireMongoConnection(res)) {
       return;
@@ -751,10 +1008,13 @@ app.put('/api/mongo/lessonplans/:planId', requireAdminAccess, async (req, res) =
 });
 
 /**
- * DELETE /api/mongo/lessonplans/:planId
+ * DELETE /api/mongo/lessonPlans/:planId
  * Delete a single lesson plan record directly in MongoDB normalized storage
  */
-app.delete('/api/mongo/lessonplans/:planId', requireAdminAccess, async (req, res) => {
+app.delete([
+  `/api/mongo/${LESSON_PLANS_SEGMENT}/:planId`,
+  `/api/mongo/${LEGACY_LESSON_PLANS_SEGMENT}/:planId`
+], markLegacyLessonPlansRoute, requireAdminAccess, async (req, res) => {
   try {
     if (!requireMongoConnection(res)) {
       return;
@@ -1013,7 +1273,7 @@ Open in browser:
 
 API Endpoints:
   - POST /api/save/classes       - Save classes.json (auto-backup)
-  - POST /api/save/lessonplans   - Save lessonPlans.json (auto-backup)
+  - POST /api/save/lessonPlans   - Save lessonPlans.json (auto-backup)
   - GET  /api/backups/:fileName  - List backups (classes/lessonPlans)
   - POST /api/backups/restore    - Restore from backup
   - POST /api/backups/create     - Create manual backup
@@ -1021,8 +1281,8 @@ API Endpoints:
   - GET  /api/status             - Health check
   - PUT  /api/mongo/classes/:id  - Upsert one class in MongoDB
   - DELETE /api/mongo/classes/:id - Delete one class in MongoDB
-  - PUT  /api/mongo/lessonplans/:id - Upsert one lesson plan in MongoDB
-  - DELETE /api/mongo/lessonplans/:id - Delete one lesson plan in MongoDB
+  - PUT  /api/mongo/lessonPlans/:id - Upsert one lesson plan in MongoDB
+  - DELETE /api/mongo/lessonPlans/:id - Delete one lesson plan in MongoDB
 
 Press Ctrl+C to stop
   `);

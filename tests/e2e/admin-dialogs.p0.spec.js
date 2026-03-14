@@ -6,7 +6,7 @@ function setupApiMocks(page) {
   };
 
   return Promise.all([
-    page.route('**/api/data/lessonplans', async (route) => {
+    page.route('**/api/data/lessonPlans', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -20,7 +20,7 @@ function setupApiMocks(page) {
         body: JSON.stringify({ classes: [] })
       });
     }),
-    page.route('**/api/save/lessonplans', async (route) => {
+    page.route('**/api/save/lessonPlans', async (route) => {
       const payload = route.request().postDataJSON() || {};
       lessonPlansState = {
         lessonPlans: Array.isArray(payload.lessonPlans) ? payload.lessonPlans : []

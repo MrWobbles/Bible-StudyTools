@@ -95,7 +95,7 @@
   }
 
   async function getLessonPlans() {
-    return fetchJson('/api/data/lessonplans');
+    return fetchJson('/api/data/lessonPlans');
   }
 
   async function upsertMongoClass(classId, classPayload) {
@@ -119,7 +119,7 @@
   }
 
   async function upsertMongoLessonPlan(planId, lessonPlanPayload) {
-    return fetchJson(`/api/mongo/lessonplans/${encodeURIComponent(planId)}`, {
+    return fetchJson(`/api/mongo/lessonPlans/${encodeURIComponent(planId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -131,7 +131,7 @@
   }
 
   async function deleteMongoLessonPlan(planId) {
-    return fetchJson(`/api/mongo/lessonplans/${encodeURIComponent(planId)}`, {
+    return fetchJson(`/api/mongo/lessonPlans/${encodeURIComponent(planId)}`, {
       method: 'DELETE'
     }, {
       requireAdmin: true

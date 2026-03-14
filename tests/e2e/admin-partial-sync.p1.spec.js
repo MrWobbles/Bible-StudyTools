@@ -12,7 +12,7 @@ test.describe('admin partial-sync save flow P1', () => {
       lessonPlans: ''
     };
 
-    await page.route('**/api/data/lessonplans', async (route) => {
+    await page.route('**/api/data/lessonPlans', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -28,7 +28,7 @@ test.describe('admin partial-sync save flow P1', () => {
       });
     });
 
-    await page.route('**/api/mongo/lessonplans/*', async (route) => {
+    await page.route('**/api/mongo/lessonPlans/*', async (route) => {
       callOrder.push('mongo-lessonplans');
       await route.fulfill({
         status: 200,
@@ -46,7 +46,7 @@ test.describe('admin partial-sync save flow P1', () => {
       });
     });
 
-    await page.route('**/api/save/lessonplans', async (route) => {
+    await page.route('**/api/save/lessonPlans', async (route) => {
       callOrder.push('save-lessonplans');
       skipHeaders.lessonPlans = route.request().headers()['x-bst-skip-cloud-sync'] || '';
 
@@ -118,7 +118,7 @@ test.describe('admin partial-sync save flow P1', () => {
     let classesState = { classes: [] };
     let saveClassesCalled = false;
 
-    await page.route('**/api/data/lessonplans', async (route) => {
+    await page.route('**/api/data/lessonPlans', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -134,7 +134,7 @@ test.describe('admin partial-sync save flow P1', () => {
       });
     });
 
-    await page.route('**/api/mongo/lessonplans/*', async (route) => {
+    await page.route('**/api/mongo/lessonPlans/*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -150,7 +150,7 @@ test.describe('admin partial-sync save flow P1', () => {
       });
     });
 
-    await page.route('**/api/save/lessonplans', async (route) => {
+    await page.route('**/api/save/lessonPlans', async (route) => {
       const payload = route.request().postDataJSON() || {};
       lessonPlansState = {
         lessonPlans: Array.isArray(payload.lessonPlans) ? payload.lessonPlans : []

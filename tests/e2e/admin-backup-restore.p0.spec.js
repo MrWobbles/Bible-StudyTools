@@ -27,7 +27,7 @@ test.describe('admin backup restore guard rails P0', () => {
       await dialog.accept();
     });
 
-    await page.route('**/api/data/lessonplans', async (route) => {
+    await page.route('**/api/data/lessonPlans', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

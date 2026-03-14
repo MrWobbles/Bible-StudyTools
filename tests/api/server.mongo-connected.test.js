@@ -126,12 +126,12 @@ describe('server API with connected Mongo (mocked)', () => {
 
   it('upserts and deletes lesson plans via partial Mongo endpoints when connected', async () => {
     await request(app)
-      .put('/api/mongo/lessonplans/plan-22')
+      .put('/api/mongo/lessonPlans/plan-22')
       .send({ id: 'plan-22', title: 'Connected Plan', classes: ['class-1'] })
       .expect(200);
 
     await request(app)
-      .delete('/api/mongo/lessonplans/plan-22')
+      .delete('/api/mongo/lessonPlans/plan-22')
       .expect(200);
 
     expect(dbMock.upsertLessonPlanRecord).toHaveBeenCalledWith(
@@ -140,6 +140,22 @@ describe('server API with connected Mongo (mocked)', () => {
       'api-partial-upsert'
     );
     expect(dbMock.deleteLessonPlanRecord).toHaveBeenCalledWith('plan-22', 'api-partial-delete');
+  });
+
+  it('supports legacy lessonplans Mongo routes and marks them deprecated', async () => {
+    const upsertResponse = await request(app)
+      .put('/api/mongo/lessonplans/plan-legacy')
+      .send({ id: 'plan-legacy', title: 'Legacy Plan', classes: ['class-1'] })
+      .expect(200);
+
+    const deleteResponse = await request(app)
+      .delete('/api/mongo/lessonplans/plan-legacy')
+      .expect(200);
+
+    expect(upsertResponse.headers.deprecation).toBe('true');
+    expect(String(upsertResponse.headers.link || '')).toContain('/api/mongo/lessonPlans/plan-legacy');
+    expect(deleteResponse.headers.deprecation).toBe('true');
+    expect(String(deleteResponse.headers.link || '')).toContain('/api/mongo/lessonPlans/plan-legacy');
   });
 
   it('skips full Mongo sync on save endpoint when skip header is set', async () => {

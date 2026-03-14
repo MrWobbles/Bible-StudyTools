@@ -153,8 +153,8 @@ async function runLightChecks() {
   assert(classes.response.ok, 'GET /api/data/classes failed');
   assert(Array.isArray(classes.data?.classes), 'Classes payload missing classes[]');
 
-  const plans = await fetchJson(`${baseUrl}/api/data/lessonplans`);
-  assert(plans.response.ok, 'GET /api/data/lessonplans failed');
+  const plans = await fetchJson(`${baseUrl}/api/data/lessonPlans`);
+  assert(plans.response.ok, 'GET /api/data/lessonPlans failed');
   assert(Array.isArray(plans.data?.lessonPlans), 'Lesson plans payload missing lessonPlans[]');
 
   const invalidSave = await fetchJson(`${baseUrl}/api/save/classes`, {
@@ -171,8 +171,8 @@ async function runHeavyChecks() {
   assert(classesTextResponse.ok, 'GET /api/data/classes failed before heavy checks');
   const classesRaw = await classesTextResponse.text();
 
-  const plansTextResponse = await fetch(`${baseUrl}/api/data/lessonplans`);
-  assert(plansTextResponse.ok, 'GET /api/data/lessonplans failed before heavy checks');
+  const plansTextResponse = await fetch(`${baseUrl}/api/data/lessonPlans`);
+  assert(plansTextResponse.ok, 'GET /api/data/lessonPlans failed before heavy checks');
   const plansRaw = await plansTextResponse.text();
 
   const saveClasses = await fetchJson(`${baseUrl}/api/save/classes`, {
@@ -183,12 +183,12 @@ async function runHeavyChecks() {
   assert(saveClasses.response.ok, 'POST /api/save/classes failed in heavy checks');
   assert(saveClasses.data?.success === true, 'Save classes did not return success=true');
 
-  const savePlans = await fetchJson(`${baseUrl}/api/save/lessonplans`, {
+  const savePlans = await fetchJson(`${baseUrl}/api/save/lessonPlans`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
     body: plansRaw
   });
-  assert(savePlans.response.ok, 'POST /api/save/lessonplans failed in heavy checks');
+  assert(savePlans.response.ok, 'POST /api/save/lessonPlans failed in heavy checks');
   assert(savePlans.data?.success === true, 'Save lesson plans did not return success=true');
 
   const backupCreate = await fetchJson(`${baseUrl}/api/backups/create`, {

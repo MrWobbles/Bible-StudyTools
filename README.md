@@ -75,10 +75,21 @@ For partial cloud updates (without writing full aggregate documents), use:
 
 - `PUT /api/mongo/classes/:classId`
 - `DELETE /api/mongo/classes/:classId`
-- `PUT /api/mongo/lessonplans/:planId`
-- `DELETE /api/mongo/lessonplans/:planId`
+- `PUT /api/mongo/lessonPlans/:planId`
+- `DELETE /api/mongo/lessonPlans/:planId`
 
 These routes require admin access and return `503` when MongoDB is disconnected.
+
+## API Hardening (Remote Deployments)
+
+For non-localhost deployments, the server now includes security controls for write endpoints:
+
+- **Auth**: set `BST_ADMIN_TOKEN` (or `ADMIN_TOKEN`) and send it as `x-bst-admin-token` or `Authorization: Bearer ...`
+- **Optional local auth enforcement**: set `BST_REQUIRE_ADMIN_ON_LOOPBACK=1` to require tokens even on localhost
+- **Rate limiting (remote writes)**: enabled by default; tune with `BST_RATE_LIMIT_WINDOW_MS` and `BST_RATE_LIMIT_MAX_REQUESTS`
+- **CSRF strategy (remote writes)**: set `BST_ENFORCE_REMOTE_CSRF=1` and provide `BST_CSRF_TOKEN`; clients send `x-bst-csrf-token`
+- **Origin allowlist**: optional `BST_TRUSTED_ORIGINS` as comma-separated origins (used with remote CSRF)
+- **Request auditing**: enabled by default; logs API write requests to `logs/api-audit.log` (override with `BST_AUDIT_LOG_FILE`)
 
 ## Test Environment (Light + Heavy)
 

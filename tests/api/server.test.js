@@ -89,7 +89,87 @@ describe('server API', () => {
       .send({ nope: true })
       .expect(400);
 
-    expect(response.body.error).toBe('Invalid classes data structure');
+    expect(response.body.error).toBe('Invalid classes payload');
+    expect(Array.isArray(response.body.details)).toBe(true);
+  });
+
+  it('rejects class records that violate field constraints', async () => {
+    const response = await request(app)
+      .post('/api/save/classes')
+      .send({
+        classes: [
+          {
+            id: 'class-1',
+            title: 'x'.repeat(241),
+            outline: [],
+            media: []
+          }
+        ]
+      })
+      .expect(400);
+
+    expect(response.body.error).toBe('Invalid classes payload');
+    expect(Array.isArray(response.body.details)).toBe(true);
+    expect(response.body.details.some((issue) => String(issue.path || '').includes('title'))).toBe(true);
+  });
+
+  it('rejects lesson plan class references that violate schema constraints', async () => {
+    const response = await request(app)
+      .post('/api/save/lessonPlans')
+      .send({
+        lessonPlans: [
+          {
+            id: 'plan-1',
+            title: 'Plan',
+            classes: ['']
+          }
+        ]
+      })
+      .expect(400);
+
+    expect(response.body.error).toBe('Invalid lesson plans payload');
+    expect(Array.isArray(response.body.details)).toBe(true);
+    expect(response.body.details.some((issue) => String(issue.path || '').includes('classes'))).toBe(true);
+  });
+
+  it('supports legacy lessonplans save route and marks it deprecated', async () => {
+    const payload = {
+      lessonPlans: [
+        {
+          id: 'lesson-1',
+          title: 'Legacy Save Route',
+          classes: ['class-1']
+        }
+      ]
+    };
+
+    const response = await request(app)
+      .post('/api/save/lessonplans')
+      .send(payload)
+      .expect(200);
+
+    expect(response.headers.deprecation).toBe('true');
+    expect(String(response.headers.link || '')).toContain('/api/save/lessonPlans');
+    expect(response.body.success).toBe(true);
+  });
+
+  it('adds a request id header for API write requests', async () => {
+    const response = await request(app)
+      .post('/api/save/classes')
+      .send({
+        classes: [
+          {
+            id: 'class-1',
+            title: 'Request Id Check',
+            outline: [],
+            media: []
+          }
+        ]
+      })
+      .expect(200);
+
+    expect(typeof response.headers['x-request-id']).toBe('string');
+    expect(response.headers['x-request-id'].length).toBeGreaterThan(10);
   });
 
   it('saves classes and reports degraded cloud sync when MongoDB is unavailable', async () => {
@@ -164,7 +244,7 @@ describe('server API', () => {
 
   it('returns 503 for partial Mongo lesson plan delete when MongoDB is disconnected', async () => {
     const response = await request(app)
-      .delete('/api/mongo/lessonplans/lesson-1')
+      .delete('/api/mongo/lessonPlans/lesson-1')
       .expect(503);
 
     expect(response.body.error).toContain('MongoDB is disconnected');

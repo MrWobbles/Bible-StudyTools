@@ -15,7 +15,7 @@ test.describe('admin token retry flow P1', () => {
       await dialog.accept();
     });
 
-    await page.route('**/api/data/lessonplans', async (route) => {
+    await page.route('**/api/data/lessonPlans', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
