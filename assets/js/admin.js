@@ -6,6 +6,10 @@ let currentClass = null;
 let currentMediaIndex = null;
 let currentSectionIndex = null;
 
+// Auto-save state
+let adminAutoSaveTimer = null;
+const ADMIN_AUTOSAVE_DELAY_MS = 3000; // debounce: save 3 s after last keystroke
+
 // Generate GUID for class IDs
 function generateGUID() {
   return 'class-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -29,15 +33,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 // Load lesson plans from JSON
 async function loadLessonPlans() {
   try {
-    console.log('Fetching lessonPlans.json from: assets/data/lessonPlans.json');
-    const response = await fetch('assets/data/lessonPlans.json');
-    console.log('Response status:', response.status, response.statusText);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
+    console.log('Fetching lesson plans from API');
+    const data = await window.BSTApi.getLessonPlans();
     console.log('Parsed JSON data:', data);
     allLessonPlans = data.lessonPlans || [];
     console.log('Set allLessonPlans to:', allLessonPlans);
@@ -50,8 +47,7 @@ async function loadLessonPlans() {
 // Load classes from JSON
 async function loadClasses() {
   try {
-    const response = await fetch('assets/data/classes.json');
-    const data = await response.json();
+    const data = await window.BSTApi.getClasses();
     allClasses = data.classes || [];
   } catch (error) {
     console.error('Failed to load classes:', error);
@@ -233,17 +229,18 @@ async function saveLessonPlansToFile() {
   // Try API endpoint (web server mode)
   try {
     console.log('Attempting API save to /api/save/lessonplans...');
-    const response = await fetch('/api/save/lessonplans', {
+    const response = await window.BSTApi.fetch('/api/save/lessonplans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(jsonData),
-    });
+    }, { requireAdmin: true });
 
     console.log('API response status:', response.status, response.statusText);
 
     if (response.ok) {
       const result = await response.json();
       console.log('[✓] Lesson plans saved successfully:', result);
+      showAdminSaveStatus('✓ Lesson plans saved' + (result.mongoSync ? ' + Atlas' : ''));
       return;
     } else {
       const errorText = await response.text();
@@ -285,7 +282,7 @@ function renderClassListForLessonPlan() {
       item.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <span class="class-item-title">${cls.title}</span>
+              <span class="class-item-title">${escapeHtml(cls.title || '')}</span>
           </div>
           <button class="btn-icon" onclick="removeClassFromLessonPlan(${index})" title="Remove">⊘</button>
         </div>
@@ -332,8 +329,8 @@ function showAvailableClassesModal() {
     const index = allClasses.indexOf(cls);
     html += `
       <button class="btn-secondary" style="text-align: left; padding: 10px;" onclick="addClassToLessonPlan(${index}); closeModal('class-add-modal');">
-        <strong>${cls.title}</strong><br/>
-        <span style="font-size: 12px; color: var(--muted);">${cls.subtitle || ''}</span>
+        <strong>${escapeHtml(cls.title || '')}</strong><br/>
+        <span style="font-size: 12px; color: var(--muted);">${escapeHtml(cls.subtitle || '')}</span>
       </button>
     `;
   });
@@ -825,7 +822,7 @@ function saveMedia() {
     const urls = document.getElementById('media-image-urls').value.split('\n').filter((u) => u.trim());
     urls.forEach((url) => {
       media.sources.push({ type: 'image', url: url.trim() });
-    });
+    }, { requireAdmin: true });
   } else if (type === 'audio') {
     const url = document.getElementById('media-audio-url').value;
     if (url) {
@@ -1048,11 +1045,11 @@ async function saveClassToFile() {
     try {
       await window.bst.saveFile('classes.json', JSON.stringify(jsonData, null, 2));
       console.log('[✓] Saved via Electron');
-      alert('Class saved successfully!');
+      showAdminSaveStatus('✓ Classes saved');
       return;
     } catch (err) {
       console.error('Failed to save class via Electron:', err);
-      alert('Failed to save class: ' + err.message);
+      showAdminSaveStatus('✗ Save failed: ' + err.message, true);
       return;
     }
   }
@@ -1060,18 +1057,18 @@ async function saveClassToFile() {
   // Try API endpoint (web server mode)
   try {
     console.log('Attempting API save to /api/save/classes...');
-    const response = await fetch('/api/save/classes', {
+    const response = await window.BSTApi.fetch('/api/save/classes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(jsonData),
-    });
+    }, { requireAdmin: true });
 
     console.log('API response status:', response.status, response.statusText);
 
     if (response.ok) {
       const result = await response.json();
       console.log('[✓] Save successful:', result);
-      alert('[✓] ' + result.message);
+      showAdminSaveStatus('✓ Classes saved' + (result.mongoSync ? ' + Atlas' : ''));
       return;
     } else {
       const errorText = await response.text();
@@ -1093,6 +1090,60 @@ async function saveClassToFile() {
 }
 
 // ===== UTILITY FUNCTIONS =====
+
+// ── Save status toast ────────────────────────────────────────────────────────
+
+let _toastTimeout = null;
+
+function showAdminSaveStatus(msg, isError = false) {
+  let toast = document.getElementById('admin-save-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'admin-save-toast';
+    Object.assign(toast.style, {
+      position:      'fixed',
+      bottom:        '24px',
+      right:         '24px',
+      padding:       '10px 18px',
+      borderRadius:  '6px',
+      fontSize:      '13px',
+      fontWeight:    '600',
+      color:         '#fff',
+      zIndex:        '9999',
+      opacity:       '0',
+      transition:    'opacity 0.3s ease',
+      pointerEvents: 'none',
+    });
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = msg;
+  toast.style.background = isError ? '#c0392b' : '#27ae60';
+  toast.style.opacity = '1';
+
+  clearTimeout(_toastTimeout);
+  _toastTimeout = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+}
+
+// ── Debounced auto-save for class editor fields ───────────────────────────────
+
+function scheduleClassAutoSave() {
+  clearTimeout(adminAutoSaveTimer);
+  adminAutoSaveTimer = setTimeout(() => {
+    // Read the live form values into memory before saving
+    const cls = allClasses[currentClass];
+    if (!cls) return;
+    const titleEl      = document.getElementById('classTitle');
+    const subtitleEl   = document.getElementById('classSubtitle');
+    const instructorEl = document.getElementById('classInstructor');
+    const channelEl    = document.getElementById('classChannel');
+    if (titleEl)      cls.title       = titleEl.value;
+    if (subtitleEl)   cls.subtitle    = subtitleEl.value;
+    if (instructorEl) cls.instructor  = instructorEl.value;
+    if (channelEl)    cls.channelName = channelEl.value;
+    saveClassToFile();
+  }, ADMIN_AUTOSAVE_DELAY_MS);
+}
 
 // Modal helpers
 function closeModal(modalId) {
@@ -1121,6 +1172,11 @@ function setupEventListeners() {
   document.getElementById('save-class-btn').addEventListener('click', saveClass);
   document.getElementById('save-class-btn-bottom')?.addEventListener('click', saveClass);
   document.getElementById('edit-content-btn')?.addEventListener('click', openContentEditor);
+
+  // Auto-save class form fields after 3 s of inactivity
+  ['classTitle', 'classSubtitle', 'classInstructor', 'classChannel'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', scheduleClassAutoSave);
+  });
 
   // Keep modals open while selecting/copying; require explicit close buttons to prevent accidental closes
 }
@@ -1319,11 +1375,11 @@ async function downloadYouTubeVideo() {
 
     // Try API download (may fail due to YouTube protection)
     try {
-      const response = await fetch('/api/download/youtube', {
+      const response = await window.BSTApi.fetch('/api/download/youtube', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl: youtubeUrl }),
-      });
+      }, { requireAdmin: true });
 
       if (response.ok) {
         const result = await response.json();
@@ -1396,7 +1452,7 @@ async function showBackupList(fileType) {
   container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Loading backups...</p>';
 
   try {
-    const response = await fetch(`/api/backups/${fileType}`);
+    const response = await window.BSTApi.fetch(`/api/backups/${fileType}`, {}, { requireAdmin: true });
     if (!response.ok) throw new Error('Failed to fetch backups');
 
     const data = await response.json();
@@ -1424,8 +1480,8 @@ async function showBackupList(fileType) {
       return `
         <div class="backup-item">
           <div class="backup-info">
-            <div class="backup-date"><span class="material-icons" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">event</span> ${displayDate}</div>
-            <div class="backup-filename">${backup.fileName}</div>
+            <div class="backup-date"><span class="material-icons" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">event</span> ${escapeHtml(displayDate)}</div>
+            <div class="backup-filename">${escapeHtml(backup.fileName)}</div>
           </div>
           <div class="backup-actions">
             <button onclick="restoreBackup('${backup.fileName}')" class="btn-small btn-restore" title="Restore this backup">
@@ -1443,7 +1499,7 @@ async function showBackupList(fileType) {
     console.error('Error loading backups:', err);
     container.innerHTML = `
       <div style="text-align: center; padding: 40px; color: #ff6b6b;">
-        <p>Error loading backups: ${err.message}</p>
+        <p>Error loading backups: ${escapeHtml(err.message || 'Unknown error')}</p>
         <p style="font-size: 13px; margin-top: 8px;">Make sure the server is running.</p>
       </div>
     `;
@@ -1453,11 +1509,11 @@ async function showBackupList(fileType) {
 // Create a manual backup
 async function createManualBackup(fileType) {
   try {
-    const response = await fetch('/api/backups/create', {
+    const response = await window.BSTApi.fetch('/api/backups/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileName: fileType })
-    });
+    }, { requireAdmin: true });
 
     if (!response.ok) {
       const error = await response.json();
@@ -1485,11 +1541,11 @@ async function restoreBackup(backupFileName) {
   if (!confirmRestore) return;
 
   try {
-    const response = await fetch('/api/backups/restore', {
+    const response = await window.BSTApi.fetch('/api/backups/restore', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ backupFileName })
-    });
+    }, { requireAdmin: true });
 
     if (!response.ok) {
       const error = await response.json();
@@ -1517,9 +1573,9 @@ async function deleteBackup(backupFileName) {
   if (!confirmDelete) return;
 
   try {
-    const response = await fetch(`/api/backups/${encodeURIComponent(backupFileName)}`, {
+    const response = await window.BSTApi.fetch(`/api/backups/${encodeURIComponent(backupFileName)}`, {
       method: 'DELETE'
-    });
+    }, { requireAdmin: true });
 
     if (!response.ok) {
       const error = await response.json();

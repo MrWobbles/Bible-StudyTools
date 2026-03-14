@@ -17,6 +17,9 @@ class1-notes.html
 *-notes-*.json
 *-notes-*.html
 
+# Environment secrets
+.env
+
 # Node modules
 node_modules/
 

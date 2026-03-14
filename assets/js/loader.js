@@ -4,8 +4,7 @@ let classId = new URLSearchParams(window.location.search).get('class') || '1';
 
 async function loadClassConfig() {
   try {
-    const response = await fetch('assets/data/classes.json');
-    const raw = await response.json();
+    const raw = await window.BSTApi.getClasses();
 
     // Normalize to an array of classes to support shapes:
     // - { classes: [...] }
@@ -80,9 +79,18 @@ function initializePageFromConfig() {
   // Update navigation
   const nav = document.querySelector('nav');
   if (nav && classConfig.navigation) {
-    nav.innerHTML = classConfig.navigation
-      .map(item => `<a class="pill ${item.number.toString() === classId ? 'active' : ''}" href="${item.href}">${item.title}</a>`)
-      .join('');
+    nav.replaceChildren();
+
+    classConfig.navigation.forEach((item) => {
+      const link = document.createElement('a');
+      link.className = 'pill';
+      if (item.number?.toString() === classId) {
+        link.classList.add('active');
+      }
+      link.href = sanitizeMediaUrl(item.href) || '#';
+      link.textContent = item.title || '';
+      nav.appendChild(link);
+    });
   }
 
   // Render media gallery
@@ -108,7 +116,7 @@ function renderMediaGallery() {
   const primaryMedia = classConfig.media.find(m => m.primary);
 
   if (primaryMedia) {
-    playerShell.innerHTML = '';
+    playerShell.replaceChildren();
 
     if (primaryMedia.type === 'video') {
       // Only render video player if there's a valid URL
@@ -119,53 +127,53 @@ function renderMediaGallery() {
         playerDiv.id = 'player';
         playerShell.appendChild(playerDiv);
       } else {
-        // Show placeholder for missing video
-        playerShell.innerHTML = `
-          <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); text-align: center; padding: 20px;">
-            <div>
-              <div style="font-size: 48px; margin-bottom: 10px;">📹</div>
-              <p>No video has been added yet</p>
-            </div>
-          </div>
-        `;
+        playerShell.appendChild(createPlaceholderPanel('📹', 'No video has been added yet'));
       }
     } else if (primaryMedia.type === 'image' || primaryMedia.type === 'images') {
       // Render image - support both url property and sources array
-      const imageUrl = primaryMedia.url || primaryMedia.sources?.[0]?.url;
+      const imageUrl = sanitizeMediaUrl(primaryMedia.url || primaryMedia.sources?.[0]?.url);
       if (imageUrl) {
-        playerShell.innerHTML = `
-          <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 20px; overflow: auto;">
-            <img src="${imageUrl}" alt="${primaryMedia.title || ''}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px;" />
-          </div>
-        `;
+        const wrapper = createCenteredWrapper();
+        const image = document.createElement('img');
+        image.src = imageUrl;
+        image.alt = primaryMedia.title || '';
+        image.style.maxWidth = '100%';
+        image.style.maxHeight = '100%';
+        image.style.objectFit = 'contain';
+        image.style.borderRadius = '10px';
+        wrapper.appendChild(image);
+        playerShell.appendChild(wrapper);
       }
     } else if (primaryMedia.type === 'pdf' || primaryMedia.type === 'document') {
       // Render PDF/Document viewer
       const source = primaryMedia.sources?.[0];
-      if (source?.url) {
-        playerShell.innerHTML = `
-          <iframe src="${source.url}" style="width: 100%; height: 100%; border: none; border-radius: 10px;"></iframe>
-        `;
+      const documentUrl = sanitizeMediaUrl(source?.url);
+      if (documentUrl) {
+        const frame = document.createElement('iframe');
+        frame.src = documentUrl;
+        frame.style.width = '100%';
+        frame.style.height = '100%';
+        frame.style.border = 'none';
+        frame.style.borderRadius = '10px';
+        playerShell.appendChild(frame);
       }
     } else if (primaryMedia.type === 'audio') {
       // Render audio player
       const source = primaryMedia.sources?.[0];
-      if (source?.url) {
-        playerShell.innerHTML = `
-          <audio controls style="width: 100%;" src="${source.url}"></audio>
-        `;
+      const audioUrl = sanitizeMediaUrl(source?.url);
+      if (audioUrl) {
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.style.width = '100%';
+        audio.src = audioUrl;
+        playerShell.appendChild(audio);
       }
     } else if (primaryMedia.type === 'link') {
       // Render link preview
       const source = primaryMedia.sources?.[0];
-      if (source?.url) {
-        playerShell.innerHTML = `
-          <div style="padding: 20px; text-align: center;">
-            <h3>${primaryMedia.title || 'External Resource'}</h3>
-            <p style="color: var(--muted); margin: 10px 0;">${source.description || ''}</p>
-            <a href="${source.url}" target="_blank" rel="noopener" class="btn-primary" style="display: inline-block; padding: 10px 20px; margin-top: 10px;">Open Link</a>
-          </div>
-        `;
+      const linkUrl = sanitizeMediaUrl(source?.url);
+      if (linkUrl) {
+        playerShell.appendChild(createLinkPreview(primaryMedia.title || 'External Resource', source.description || '', linkUrl));
       }
     }
   }
@@ -214,7 +222,7 @@ function openMediaInViewer(media) {
   const playerShell = document.querySelector('.player-shell');
   if (!playerShell) return;
 
-  const url = media.url || media.sources?.[0]?.url || '';
+  const url = sanitizeMediaUrl(media.url || media.sources?.[0]?.url || '');
 
   if (media.type === 'video') {
     // Extract YouTube ID
@@ -222,7 +230,10 @@ function openMediaInViewer(media) {
     const videoId = match ? match[1] : '';
     if (videoId) {
       // Replace the player shell with a fresh player div
-      playerShell.innerHTML = '<div id="player"></div>';
+      playerShell.replaceChildren();
+      const playerDiv = document.createElement('div');
+      playerDiv.id = 'player';
+      playerShell.appendChild(playerDiv);
 
       // Reinitialize the YouTube player with the new video so controls work
       if (window.YT && window.YT.Player) {
@@ -266,25 +277,140 @@ function openMediaInViewer(media) {
       }
     }
   } else if (media.type === 'image' || media.type === 'images') {
-    playerShell.innerHTML = `
-      <div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 20px; overflow: auto;">
-        <img src="${url}" alt="${media.title || ''}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px;" />
-      </div>
-    `;
+    playerShell.replaceChildren();
+    const wrapper = createCenteredWrapper();
+    const image = document.createElement('img');
+    image.src = url;
+    image.alt = media.title || '';
+    image.style.maxWidth = '100%';
+    image.style.maxHeight = '100%';
+    image.style.objectFit = 'contain';
+    image.style.borderRadius = '10px';
+    wrapper.appendChild(image);
+    playerShell.appendChild(wrapper);
   } else if (media.type === 'pdf' || media.type === 'document') {
-    playerShell.innerHTML = `
-      <iframe src="${url}" style="width: 100%; height: 100%; border: none; border-radius: 10px;"></iframe>
-    `;
+    playerShell.replaceChildren();
+    const frame = document.createElement('iframe');
+    frame.src = url;
+    frame.style.width = '100%';
+    frame.style.height = '100%';
+    frame.style.border = 'none';
+    frame.style.borderRadius = '10px';
+    playerShell.appendChild(frame);
   } else if (media.type === 'link') {
-    playerShell.innerHTML = `
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center; gap: 20px;">
-        <div style="font-size: 48px;">🔗</div>
-        <h3 style="margin: 0; color: var(--text);">${media.title || 'External Link'}</h3>
-        <p style="color: var(--muted); margin: 0; max-width: 500px; word-break: break-all;">${url}</p>
-        <a href="${url}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: var(--accent); color: #000; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; margin-top: 10px;">Open Link</a>
-      </div>
-    `;
+    playerShell.replaceChildren();
+    playerShell.appendChild(createLinkPreview(media.title || 'External Link', url, url, true));
   }
+}
+
+function sanitizeMediaUrl(url) {
+  if (typeof url !== 'string') return '';
+
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  try {
+    const parsed = new URL(trimmed, window.location.origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.href;
+    }
+  } catch (err) {
+    // Ignore parse failures and fall back to local-path handling.
+  }
+
+  return trimmed.startsWith('/') || trimmed.startsWith('assets/') || trimmed.startsWith('./') || trimmed.startsWith('../')
+    ? trimmed
+    : '';
+}
+
+function createCenteredWrapper() {
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'flex';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.justifyContent = 'center';
+  wrapper.style.height = '100%';
+  wrapper.style.padding = '20px';
+  wrapper.style.overflow = 'auto';
+  return wrapper;
+}
+
+function createPlaceholderPanel(icon, message) {
+  const wrapper = createCenteredWrapper();
+  wrapper.style.color = 'var(--muted)';
+  wrapper.style.textAlign = 'center';
+
+  const content = document.createElement('div');
+  const iconEl = document.createElement('div');
+  iconEl.style.fontSize = '48px';
+  iconEl.style.marginBottom = '10px';
+  iconEl.textContent = icon;
+
+  const messageEl = document.createElement('p');
+  messageEl.textContent = message;
+
+  content.appendChild(iconEl);
+  content.appendChild(messageEl);
+  wrapper.appendChild(content);
+  return wrapper;
+}
+
+function createLinkPreview(title, description, url, emphasizeUrl = false) {
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.justifyContent = 'center';
+  wrapper.style.height = '100%';
+  wrapper.style.padding = emphasizeUrl ? '40px' : '20px';
+  wrapper.style.textAlign = 'center';
+  wrapper.style.gap = emphasizeUrl ? '20px' : '10px';
+
+  if (emphasizeUrl) {
+    const icon = document.createElement('div');
+    icon.style.fontSize = '48px';
+    icon.textContent = '🔗';
+    wrapper.appendChild(icon);
+  }
+
+  const heading = document.createElement('h3');
+  heading.style.margin = '0';
+  heading.style.color = 'var(--text)';
+  heading.textContent = title;
+  wrapper.appendChild(heading);
+
+  const descriptionEl = document.createElement('p');
+  descriptionEl.style.color = 'var(--muted)';
+  descriptionEl.style.margin = emphasizeUrl ? '0' : '10px 0';
+  if (emphasizeUrl) {
+    descriptionEl.style.maxWidth = '500px';
+    descriptionEl.style.wordBreak = 'break-all';
+  }
+  descriptionEl.textContent = description;
+  wrapper.appendChild(descriptionEl);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Open Link';
+  if (emphasizeUrl) {
+    link.style.display = 'inline-block';
+    link.style.background = 'var(--accent)';
+    link.style.color = '#000';
+    link.style.padding = '14px 32px';
+    link.style.borderRadius = '10px';
+    link.style.textDecoration = 'none';
+    link.style.fontWeight = '600';
+    link.style.marginTop = '10px';
+  } else {
+    link.className = 'btn-primary';
+    link.style.display = 'inline-block';
+    link.style.padding = '10px 20px';
+    link.style.marginTop = '10px';
+  }
+  wrapper.appendChild(link);
+
+  return wrapper;
 }
 
 function getMediaIcon(type) {
@@ -318,26 +444,29 @@ function renderOutline() {
   const outlineContainer = document.getElementById('session-outline');
   if (!outlineContainer) return;
 
-  outlineContainer.innerHTML = classConfig.outline
-    .map((section, idx) => {
-      const isOpen = section.defaultOpen ? ' open' : '';
-      const pointsHtml = section.points
-        .map(point => {
-          const text = typeof point === 'object' ? point.text : point;
-          return `<li>${text}</li>`;
-        })
-        .join('');
+  outlineContainer.replaceChildren();
 
-      return `
-        <details class="accordion"${isOpen}>
-          <summary>${section.summary}</summary>
-          <ul>
-            ${pointsHtml}
-          </ul>
-        </details>
-      `;
-    })
-    .join('');
+  classConfig.outline.forEach((section) => {
+    const details = document.createElement('details');
+    details.className = 'accordion';
+    if (section.defaultOpen) {
+      details.open = true;
+    }
+
+    const summary = document.createElement('summary');
+    summary.textContent = section.summary || '';
+    details.appendChild(summary);
+
+    const list = document.createElement('ul');
+    (section.points || []).forEach((point) => {
+      const item = document.createElement('li');
+      item.textContent = typeof point === 'object' ? point.text || '' : point || '';
+      list.appendChild(item);
+    });
+
+    details.appendChild(list);
+    outlineContainer.appendChild(details);
+  });
 }
 
 // Load config when DOM is ready

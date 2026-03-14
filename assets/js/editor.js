@@ -6,6 +6,7 @@ import TextStyle from '@tiptap/extension-text-style';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
+import Strike from '@tiptap/extension-strike';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
@@ -110,7 +111,9 @@ function initializeEditor() {
         heading: {
           levels: [1, 2, 3, 4, 5, 6],
         },
+        strike: false,
       }),
+      Strike,
       TextStyle,
       Color,
       Underline,
@@ -481,8 +484,7 @@ async function saveBibleTranslationSetting() {
   try {
     if (currentClassId) {
       // Load current classes
-      const response = await fetch('assets/data/classes.json');
-      const data = await response.json();
+      const data = await window.BSTApi.getClasses();
       allClasses = data.classes || [];
       
       // Find and update the class
@@ -491,11 +493,11 @@ async function saveBibleTranslationSetting() {
         allClasses[classIndex].bibleTranslation = translation;
         
         // Save back to server
-        const saveResponse = await fetch('/api/save/classes', {
+        const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ classes: allClasses })
-        });
+        }, { requireAdmin: true });
         
         if (saveResponse.ok) {
           console.log('Bible translation preference saved:', translation);
@@ -894,9 +896,9 @@ async function saveDocument() {
   try {
     if (currentClassId) {
       // Load current classes
-      const response = await fetch('assets/data/classes.json');
+      const response = await window.BSTApi.fetch('/api/data/classes');
       if (!response.ok) {
-        throw new Error(`Failed to load classes.json: ${response.status}`);
+        throw new Error(`Failed to load classes data: ${response.status}`);
       }
       const data = await response.json();
       allClasses = data.classes || [];
@@ -913,11 +915,11 @@ async function saveDocument() {
 
         // Save back to server
         console.log('Saving document to server...');
-        const saveResponse = await fetch('/api/save/classes', {
+        const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ classes: allClasses })
-        });
+        }, { requireAdmin: true });
 
         if (!saveResponse.ok) {
           const errorData = await saveResponse.json().catch(() => ({}));
@@ -986,8 +988,7 @@ async function loadDocument() {
   try {
     if (currentClassId) {
       // Load class data
-      const response = await fetch('assets/data/classes.json');
-      const data = await response.json();
+      const data = await window.BSTApi.getClasses();
       allClasses = data.classes || [];
 
       // Find class by id or classNumber (backward compatibility)
@@ -1415,9 +1416,9 @@ async function applyOutlineToClass() {
 
   try {
     // Load current classes
-    const response = await fetch('assets/data/classes.json');
+    const response = await window.BSTApi.fetch('/api/data/classes');
     if (!response.ok) {
-      throw new Error(`Failed to load classes.json: ${response.status}`);
+      throw new Error(`Failed to load classes data: ${response.status}`);
     }
     const data = await response.json();
     allClasses = data.classes || [];
@@ -1440,11 +1441,11 @@ async function applyOutlineToClass() {
       const savePayload = { classes: allClasses };
       console.log('Sending to server:', JSON.stringify(savePayload).substring(0, 200) + '...');
       
-      const saveResponse = await fetch('/api/save/classes', {
+      const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(savePayload)
-      });
+      }, { requireAdmin: true });
 
       if (!saveResponse.ok) {
         const errorData = await saveResponse.json().catch(() => ({}));

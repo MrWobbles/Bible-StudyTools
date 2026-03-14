@@ -4,13 +4,20 @@
  * Serves static files and provides API endpoints for saving JSON data and downloading videos
  */
 
+require('dotenv').config();
+
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const ytdl = require('ytdl-core');
+const { connectDB, isConnected, loadDoc, saveDoc, closeDB } = require('./db');
+const { exec } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_TOKEN = (process.env.BST_ADMIN_TOKEN || process.env.ADMIN_TOKEN || '').trim();
+
+app.disable('x-powered-by');
 
 // Middleware - JSON parsing first
 // classes.json can exceed the default 100kb when outlines/content are expanded
@@ -20,6 +27,14 @@ app.use(express.json({ limit: '10mb' }));
 const DATA_DIR = path.join(__dirname, 'assets', 'data');
 const VIDEO_DIR = path.join(__dirname, 'assets', 'video');
 const BACKUP_DIR = path.join(__dirname, 'backups');
+const BACKUP_FILE_PATTERN = /^(classes|lessonPlans)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d{3}Z)?\.json$/;
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const DATA_FILE_MAP = {
+  classes: 'classes.json',
+  lessonplans: 'lessonPlans.json'
+};
+const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'editor.html', 'student.html', 'teacher.html'];
+const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
 
 // Backup settings
 const MAX_BACKUPS_PER_FILE = 50; // Keep last 50 backups per file
@@ -27,6 +42,109 @@ const BACKUP_THROTTLE_MS = 60000; // Don't create backups more than once per min
 
 // Track last backup time per file to avoid excessive backups
 const lastBackupTime = {};
+
+function isPathInsideDirectory(rootDir, targetPath) {
+  const normalizedRoot = path.resolve(rootDir);
+  const normalizedTarget = path.resolve(targetPath);
+  const relative = path.relative(normalizedRoot, normalizedTarget);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function resolveDataFilePath(fileKey) {
+  const normalizedKey = String(fileKey || '').toLowerCase();
+  const fileName = DATA_FILE_MAP[normalizedKey];
+  if (!fileName) {
+    const error = new Error('Invalid file name. Use "classes" or "lessonPlans"');
+    error.status = 400;
+    throw error;
+  }
+
+  const resolvedPath = path.resolve(DATA_DIR, fileName);
+  if (!isPathInsideDirectory(DATA_DIR, resolvedPath)) {
+    const error = new Error('Resolved data path is outside the data directory');
+    error.status = 400;
+    throw error;
+  }
+
+  return { fileName, resolvedPath };
+}
+
+function resolveBackupPathOrThrow(candidate) {
+  const normalizedName = typeof candidate === 'string' ? candidate.trim() : '';
+
+  if (!normalizedName) {
+    const error = new Error('backupFileName is required');
+    error.status = 400;
+    throw error;
+  }
+
+  if (path.basename(normalizedName) !== normalizedName) {
+    const error = new Error('Backup file name must be a base name only');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!BACKUP_FILE_PATTERN.test(normalizedName)) {
+    const error = new Error('Invalid backup file name format');
+    error.status = 400;
+    throw error;
+  }
+
+  const resolvedPath = path.resolve(BACKUP_DIR, normalizedName);
+  if (!isPathInsideDirectory(BACKUP_DIR, resolvedPath)) {
+    const error = new Error('Resolved backup path is outside the backup directory');
+    error.status = 400;
+    throw error;
+  }
+
+  return { backupFileName: normalizedName, backupPath: resolvedPath };
+}
+
+function isLoopbackRequest(req) {
+  const candidates = [req.ip, req.socket?.remoteAddress]
+    .filter(Boolean)
+    .map(value => String(value).trim());
+
+  return candidates.some(value => LOOPBACK_ADDRESSES.has(value));
+}
+
+function hasValidAdminToken(req) {
+  if (!ADMIN_TOKEN) {
+    return false;
+  }
+
+  const authHeader = String(req.get('authorization') || '');
+  const bearerToken = authHeader.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : '';
+  const headerToken = String(req.get('x-bst-admin-token') || '').trim();
+
+  return headerToken === ADMIN_TOKEN || bearerToken === ADMIN_TOKEN;
+}
+
+function requireAdminAccess(req, res, next) {
+  if (isLoopbackRequest(req)) {
+    return next();
+  }
+
+  if (!ADMIN_TOKEN) {
+    return res.status(403).json({
+      error: 'Remote write access is disabled. Set BST_ADMIN_TOKEN to allow authenticated remote administration.'
+    });
+  }
+
+  if (!hasValidAdminToken(req)) {
+    return res.status(401).json({ error: 'Admin token required' });
+  }
+
+  return next();
+}
+
+async function readDataDocument(fileKey) {
+  const { resolvedPath } = resolveDataFilePath(fileKey);
+  const content = await fs.readFile(resolvedPath, 'utf8');
+  return JSON.parse(content);
+}
 
 // ===== BACKUP FUNCTIONS =====
 
@@ -126,11 +244,23 @@ async function listBackups(fileName) {
 
 // ===== API ENDPOINTS =====
 
+app.get('/api/data/:fileName', async (req, res) => {
+  try {
+    const data = await readDataDocument(req.params.fileName);
+    res.json(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return res.status(404).json({ error: 'Data file not found' });
+    }
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 /**
  * POST /api/save/classes
  * Save classes.json with automatic backup
  */
-app.post('/api/save/classes', async (req, res) => {
+app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
   try {
     const filePath = path.join(DATA_DIR, 'classes.json');
     const data = req.body;
@@ -147,10 +277,14 @@ app.post('/api/save/classes', async (req, res) => {
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
     console.log('[✓] Saved classes.json');
 
+    // Sync to MongoDB Atlas (non-blocking — local file is the source of truth)
+    saveDoc('classes', data).catch(err => console.error('[MongoDB] classes sync failed:', err.message));
+
     res.json({
       success: true,
       message: 'Classes saved successfully',
-      backup: backupFile
+      backup: backupFile,
+      mongoSync: isConnected()
     });
   } catch (err) {
     console.error('Error saving classes:', err);
@@ -162,7 +296,7 @@ app.post('/api/save/classes', async (req, res) => {
  * POST /api/save/lessonplans
  * Save lessonPlans.json with automatic backup
  */
-app.post('/api/save/lessonplans', async (req, res) => {
+app.post('/api/save/lessonplans', requireAdminAccess, async (req, res) => {
   try {
     const filePath = path.join(DATA_DIR, 'lessonPlans.json');
     const data = req.body;
@@ -179,10 +313,14 @@ app.post('/api/save/lessonplans', async (req, res) => {
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
     console.log('[✓] Saved lessonPlans.json');
 
+    // Sync to MongoDB Atlas (non-blocking)
+    saveDoc('lessonPlans', data).catch(err => console.error('[MongoDB] lessonPlans sync failed:', err.message));
+
     res.json({
       success: true,
       message: 'Lesson plans saved successfully',
-      backup: backupFile
+      backup: backupFile,
+      mongoSync: isConnected()
     });
   } catch (err) {
     console.error('Error saving lesson plans:', err);
@@ -194,20 +332,14 @@ app.post('/api/save/lessonplans', async (req, res) => {
  * GET /api/backups/:fileName
  * List all backups for a specific file (classes or lessonPlans)
  */
-app.get('/api/backups/:fileName', async (req, res) => {
+app.get('/api/backups/:fileName', requireAdminAccess, async (req, res) => {
   try {
-    const { fileName } = req.params;
-
-    // Validate fileName
-    if (!['classes', 'lessonPlans'].includes(fileName)) {
-      return res.status(400).json({ error: 'Invalid file name. Use "classes" or "lessonPlans"' });
-    }
-
-    const backups = await listBackups(`${fileName}.json`);
+    const { fileName } = resolveDataFilePath(req.params.fileName);
+    const backups = await listBackups(fileName);
     res.json({ success: true, backups });
   } catch (err) {
     console.error('Error listing backups:', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -216,20 +348,9 @@ app.get('/api/backups/:fileName', async (req, res) => {
  * Restore a specific backup
  * Body: { backupFileName: "classes_2026-02-28T10-30-00.json" }
  */
-app.post('/api/backups/restore', async (req, res) => {
+app.post('/api/backups/restore', requireAdminAccess, async (req, res) => {
   try {
-    const { backupFileName } = req.body;
-
-    if (!backupFileName) {
-      return res.status(400).json({ error: 'backupFileName is required' });
-    }
-
-    // Validate the backup file name pattern for security
-    if (!backupFileName.match(/^(classes|lessonPlans)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}.*\.json$/)) {
-      return res.status(400).json({ error: 'Invalid backup file name format' });
-    }
-
-    const backupPath = path.join(BACKUP_DIR, backupFileName);
+    const { backupFileName, backupPath } = resolveBackupPathOrThrow(req.body?.backupFileName);
 
     // Check if backup exists
     try {
@@ -266,7 +387,7 @@ app.post('/api/backups/restore', async (req, res) => {
     });
   } catch (err) {
     console.error('Error restoring backup:', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -274,16 +395,9 @@ app.post('/api/backups/restore', async (req, res) => {
  * DELETE /api/backups/:backupFileName
  * Delete a specific backup
  */
-app.delete('/api/backups/:backupFileName', async (req, res) => {
+app.delete('/api/backups/:backupFileName', requireAdminAccess, async (req, res) => {
   try {
-    const { backupFileName } = req.params;
-
-    // Validate the backup file name pattern for security
-    if (!backupFileName.match(/^(classes|lessonPlans)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}.*\.json$/)) {
-      return res.status(400).json({ error: 'Invalid backup file name format' });
-    }
-
-    const backupPath = path.join(BACKUP_DIR, backupFileName);
+    const { backupFileName, backupPath } = resolveBackupPathOrThrow(req.params.backupFileName);
 
     await fs.unlink(backupPath);
     console.log(`[✓] Deleted backup: ${backupFileName}`);
@@ -294,7 +408,7 @@ app.delete('/api/backups/:backupFileName', async (req, res) => {
       return res.status(404).json({ error: 'Backup file not found' });
     }
     console.error('Error deleting backup:', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -303,17 +417,9 @@ app.delete('/api/backups/:backupFileName', async (req, res) => {
  * Manually create a backup of current data
  * Body: { fileName: "classes" or "lessonPlans" }
  */
-app.post('/api/backups/create', async (req, res) => {
+app.post('/api/backups/create', requireAdminAccess, async (req, res) => {
   try {
-    const { fileName } = req.body;
-
-    // Validate fileName
-    if (!['classes', 'lessonPlans'].includes(fileName)) {
-      return res.status(400).json({ error: 'Invalid file name. Use "classes" or "lessonPlans"' });
-    }
-
-    const sourceFile = `${fileName}.json`;
-    const sourcePath = path.join(DATA_DIR, sourceFile);
+    const { fileName: sourceFile, resolvedPath: sourcePath } = resolveDataFilePath(req.body?.fileName);
 
     // Read current data
     const content = await fs.readFile(sourcePath, 'utf8');
@@ -334,7 +440,7 @@ app.post('/api/backups/create', async (req, res) => {
     }
   } catch (err) {
     console.error('Error creating manual backup:', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -343,7 +449,11 @@ app.post('/api/backups/create', async (req, res) => {
  * Health check endpoint
  */
 app.get('/api/status', (req, res) => {
-  res.json({ status: 'ok', message: 'API is running' });
+  res.json({
+    status: 'ok',
+    message: 'API is running',
+    mongodb: isConnected() ? 'connected' : 'disconnected'
+  });
 });
 
 /**
@@ -351,7 +461,7 @@ app.get('/api/status', (req, res) => {
  * Download YouTube video
  * Body: { videoUrl: "https://www.youtube.com/watch?v=..." }
  */
-app.post('/api/download/youtube', async (req, res) => {
+app.post('/api/download/youtube', requireAdminAccess, async (req, res) => {
   try {
     const { videoUrl } = req.body;
 
@@ -455,7 +565,18 @@ app.post('/api/download/youtube', async (req, res) => {
 });
 
 // ===== STATIC FILES (must be after API routes) =====
-app.use(express.static('.'));
+PUBLIC_ASSET_DIRS.forEach((dirName) => {
+  app.use(`/assets/${dirName}`, express.static(path.join(__dirname, 'assets', dirName)));
+});
+
+PUBLIC_HTML_FILES.forEach((fileName) => {
+  const routePaths = fileName === 'index.html' ? ['/', '/index.html'] : [`/${fileName}`];
+  routePaths.forEach((routePath) => {
+    app.get(routePath, (req, res) => {
+      res.sendFile(path.join(__dirname, fileName));
+    });
+  });
+});
 
 // ===== ERROR HANDLING =====
 
@@ -476,6 +597,41 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: message });
 });
 
+// ===== MONGODB SYNC HELPERS =====
+
+/**
+ * On startup, sync data between Atlas and local JSON files.
+ * - If Atlas has data that is newer/different: overwrite the local file.
+ * - If Atlas has no data for a doc: seed it from the local file.
+ */
+async function syncFromMongoDB() {
+  const docs = [
+    { docId: 'classes',     fileName: 'classes.json' },
+    { docId: 'lessonPlans', fileName: 'lessonPlans.json' },
+  ];
+
+  for (const { docId, fileName } of docs) {
+    const filePath = path.join(DATA_DIR, fileName);
+    const mongoData = await loadDoc(docId);
+
+    if (mongoData) {
+      // Atlas has data — overwrite local file so they stay in sync
+      await fs.writeFile(filePath, JSON.stringify(mongoData, null, 2), 'utf8');
+      console.log(`[MongoDB] Synced "${docId}" Atlas → local file`);
+    } else {
+      // Atlas has no doc yet — seed it from the local file
+      try {
+        const localContent = await fs.readFile(filePath, 'utf8');
+        const localData = JSON.parse(localContent);
+        const ok = await saveDoc(docId, localData);
+        if (ok) console.log(`[MongoDB] Seeded "${docId}" local file → Atlas`);
+      } catch (err) {
+        console.log(`[MongoDB] No local file found for "${docId}"; skipping seed.`);
+      }
+    }
+  }
+}
+
 // ===== START SERVER =====
 
 app.listen(PORT, async () => {
@@ -484,6 +640,12 @@ app.listen(PORT, async () => {
     await fs.mkdir(BACKUP_DIR, { recursive: true });
   } catch (err) {
     // Directory might already exist
+  }
+
+  // Connect to MongoDB Atlas and sync data
+  const mongoOk = await connectDB();
+  if (mongoOk) {
+    await syncFromMongoDB();
   }
 
   console.log(`
@@ -512,4 +674,17 @@ API Endpoints:
 
 Press Ctrl+C to stop
   `);
+
+  // Auto-open admin page in the default browser
+  const adminUrl = `http://localhost:${PORT}/admin.html`;
+  const openCmd = process.platform === 'win32'  ? `start "" "${adminUrl}"`
+               : process.platform === 'darwin' ? `open "${adminUrl}"`
+               : `xdg-open "${adminUrl}"`;
+  exec(openCmd, err => {
+    if (err) console.warn('[!] Could not auto-open browser:', err.message);
+  });
 });
+
+// ===== GRACEFUL SHUTDOWN =====
+process.on('SIGINT',  async () => { await closeDB(); process.exit(0); });
+process.on('SIGTERM', async () => { await closeDB(); process.exit(0); });

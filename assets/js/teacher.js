@@ -22,8 +22,7 @@ let displayWindowCheckInterval = null;
 
 async function loadClassConfig() {
   try {
-    const response = await fetch('assets/data/classes.json');
-    const raw = await response.json();
+    const raw = await window.BSTApi.getClasses();
 
     // Store full data for saving
     allClassesData = raw;
@@ -726,7 +725,7 @@ function renderGeneratedOutline() {
   }
 
   // Render the editor content and make verse references clickable
-  let html = editorContent.html;
+  let html = sanitizeRichTextHtml(editorContent.html);
 
   // Bible verse reference pattern (matches formats like: John 3:16, Romans 5:1-8, 1 Corinthians 13, etc.)
   const bibleBooks = [
@@ -757,7 +756,7 @@ function renderGeneratedOutline() {
     return `<span class="verse-reference" data-verse="${match.trim()}">${match}</span>`;
   });
 
-  displayContainer.innerHTML = html;
+  displayContainer.innerHTML = sanitizeRichTextHtml(html);
 
   // Add click handlers to verse references
   const verseRefs = displayContainer.querySelectorAll('.verse-reference');
@@ -838,19 +837,39 @@ function insertQABreakMarkers(container, generatedOutline) {
       qaBreaks.forEach((qaBreak) => {
         const marker = document.createElement('div');
         marker.className = 'qa-break-marker';
-        marker.innerHTML = `
-          <div class="qa-break-icon">
-            <span class="material-icons">forum</span>
-          </div>
-          <div class="qa-break-content">
-            <strong>Q&A Discussion Point</strong>
-            <p>${qaBreak.text || 'Pause for discussion - See class guide'}</p>
-            <button class="qa-break-btn" data-section-id="${section.id}">
-              <span class="material-icons">assignment</span>
-              View Class Guide
-            </button>
-          </div>
-        `;
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'qa-break-icon';
+
+        const icon = document.createElement('span');
+        icon.className = 'material-icons';
+        icon.textContent = 'forum';
+        iconWrap.appendChild(icon);
+
+        const content = document.createElement('div');
+        content.className = 'qa-break-content';
+
+        const title = document.createElement('strong');
+        title.textContent = 'Q&A Discussion Point';
+
+        const text = document.createElement('p');
+        text.textContent = qaBreak.text || 'Pause for discussion - See class guide';
+
+        const button = document.createElement('button');
+        button.className = 'qa-break-btn';
+        button.dataset.sectionId = section.id;
+
+        const buttonIcon = document.createElement('span');
+        buttonIcon.className = 'material-icons';
+        buttonIcon.textContent = 'assignment';
+        button.appendChild(buttonIcon);
+        button.appendChild(document.createTextNode('View Class Guide'));
+
+        content.appendChild(title);
+        content.appendChild(text);
+        content.appendChild(button);
+
+        marker.appendChild(iconWrap);
+        marker.appendChild(content);
 
         // Insert after the heading's parent section
         const insertPoint = matchingHeading.parentElement.nextSibling;
@@ -1395,11 +1414,11 @@ async function setStoppedMarker(sectionId) {
  */
 async function saveStoppedMarker() {
   try {
-    const response = await fetch('/api/save/classes', {
+    const response = await window.BSTApi.fetch('/api/save/classes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(allClassesData)
-    });
+    }, { requireAdmin: true });
 
     if (!response.ok) {
       throw new Error('Failed to save');
@@ -1410,6 +1429,164 @@ async function saveStoppedMarker() {
     console.error('Failed to save stopped marker:', err);
     flashStatus('⚠️ Could not save marker - check server');
   }
+}
+
+function sanitizeRichTextHtml(html) {
+  if (typeof html !== 'string' || !html.trim()) {
+    return '';
+  }
+
+  const allowedTags = new Set([
+    'a', 'blockquote', 'br', 'code', 'details', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'hr', 'iframe', 'img', 'li', 'mark', 'ol', 'p', 'pre', 'span', 'strong', 'sub', 'summary',
+    'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul'
+  ]);
+  const allowedAttributes = new Set([
+    'alt', 'aria-hidden', 'class', 'colspan', 'data-section-id', 'data-verse', 'href', 'rel', 'rowspan',
+    'src', 'style', 'target', 'title'
+  ]);
+  const allowedStyleProperties = new Set(['background-color', 'color', 'text-align']);
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html');
+  const wrapper = document.createElement('div');
+
+  Array.from(doc.body.childNodes).forEach((child) => {
+    const sanitizedNode = sanitizeRichTextNode(child, {
+      allowedTags,
+      allowedAttributes,
+      allowedStyleProperties
+    });
+    if (sanitizedNode) {
+      wrapper.appendChild(sanitizedNode);
+    }
+  });
+
+  return wrapper.innerHTML;
+}
+
+function sanitizeRichTextNode(node, config) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return document.createTextNode(node.textContent || '');
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return null;
+  }
+
+  const tagName = node.tagName.toLowerCase();
+  const fragment = document.createDocumentFragment();
+
+  if (!config.allowedTags.has(tagName)) {
+    Array.from(node.childNodes).forEach((child) => {
+      const sanitizedChild = sanitizeRichTextNode(child, config);
+      if (sanitizedChild) {
+        fragment.appendChild(sanitizedChild);
+      }
+    });
+    return fragment;
+  }
+
+  const cleanElement = document.createElement(tagName);
+
+  Array.from(node.attributes).forEach((attribute) => {
+    const attrName = attribute.name.toLowerCase();
+    if (attrName.startsWith('on') || !config.allowedAttributes.has(attrName)) {
+      return;
+    }
+
+    if (attrName === 'href' || attrName === 'src') {
+      const safeUrl = sanitizeTeacherUrl(attribute.value);
+      if (!safeUrl) {
+        return;
+      }
+      cleanElement.setAttribute(attrName, safeUrl);
+      if (tagName === 'a') {
+        cleanElement.setAttribute('rel', 'noopener noreferrer');
+      }
+      return;
+    }
+
+    if (attrName === 'style') {
+      const safeStyle = sanitizeInlineStyle(attribute.value, config.allowedStyleProperties);
+      if (safeStyle) {
+        cleanElement.setAttribute('style', safeStyle);
+      }
+      return;
+    }
+
+    if (attrName === 'class') {
+      const safeClasses = attribute.value
+        .split(/\s+/)
+        .filter(token => /^[a-zA-Z0-9_-]+$/.test(token));
+      if (safeClasses.length > 0) {
+        cleanElement.setAttribute('class', safeClasses.join(' '));
+      }
+      return;
+    }
+
+    cleanElement.setAttribute(attrName, attribute.value);
+  });
+
+  Array.from(node.childNodes).forEach((child) => {
+    const sanitizedChild = sanitizeRichTextNode(child, config);
+    if (sanitizedChild) {
+      cleanElement.appendChild(sanitizedChild);
+    }
+  });
+
+  return cleanElement;
+}
+
+function sanitizeTeacherUrl(url) {
+  if (typeof url !== 'string') {
+    return '';
+  }
+
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(trimmed, window.location.origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.href;
+    }
+  } catch (err) {
+    // Ignore parse failures and fall back to local-path validation.
+  }
+
+  return trimmed.startsWith('/') || trimmed.startsWith('assets/') || trimmed.startsWith('./') || trimmed.startsWith('../')
+    ? trimmed
+    : '';
+}
+
+function sanitizeInlineStyle(styleValue, allowedProperties) {
+  if (typeof styleValue !== 'string') {
+    return '';
+  }
+
+  return styleValue
+    .split(';')
+    .map(rule => rule.trim())
+    .filter(Boolean)
+    .map((rule) => {
+      const [property, ...valueParts] = rule.split(':');
+      const normalizedProperty = property?.trim().toLowerCase();
+      const normalizedValue = valueParts.join(':').trim();
+
+      if (!allowedProperties.has(normalizedProperty)) {
+        return '';
+      }
+
+      if (!/^[#(),.%\-\w\s]+$/.test(normalizedValue)) {
+        return '';
+      }
+
+      return `${normalizedProperty}: ${normalizedValue}`;
+    })
+    .filter(Boolean)
+    .join('; ');
 }
 
 if (document.readyState === 'loading') {
