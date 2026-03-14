@@ -10,12 +10,23 @@ const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const ytdl = require('ytdl-core');
-const { connectDB, isConnected, loadDoc, saveDoc, closeDB } = require('./db');
+const {
+  connectDB,
+  isConnected,
+  loadDoc,
+  saveDoc,
+  upsertClassRecord,
+  deleteClassRecord,
+  upsertLessonPlanRecord,
+  deleteLessonPlanRecord,
+  closeDB
+} = require('./db');
 const { exec } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = (process.env.BST_ADMIN_TOKEN || process.env.ADMIN_TOKEN || '').trim();
+const SHOULD_AUTO_OPEN_BROWSER = process.env.BST_DISABLE_BROWSER_OPEN !== '1';
 
 app.disable('x-powered-by');
 
@@ -24,9 +35,15 @@ app.disable('x-powered-by');
 app.use(express.json({ limit: '10mb' }));
 
 // Data directory
-const DATA_DIR = path.join(__dirname, 'assets', 'data');
-const VIDEO_DIR = path.join(__dirname, 'assets', 'video');
-const BACKUP_DIR = path.join(__dirname, 'backups');
+const DATA_DIR = process.env.BST_DATA_DIR
+  ? path.resolve(process.env.BST_DATA_DIR)
+  : path.join(__dirname, 'assets', 'data');
+const VIDEO_DIR = process.env.BST_VIDEO_DIR
+  ? path.resolve(process.env.BST_VIDEO_DIR)
+  : path.join(__dirname, 'assets', 'video');
+const BACKUP_DIR = process.env.BST_BACKUP_DIR
+  ? path.resolve(process.env.BST_BACKUP_DIR)
+  : path.join(__dirname, 'backups');
 const BACKUP_FILE_PATTERN = /^(classes|lessonPlans)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d{3}Z)?\.json$/;
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const DATA_FILE_MAP = {
@@ -42,6 +59,9 @@ const BACKUP_THROTTLE_MS = 60000; // Don't create backups more than once per min
 
 // Track last backup time per file to avoid excessive backups
 const lastBackupTime = {};
+const fileWriteLocks = new Map();
+let serverInstance = null;
+let shutdownHandlersRegistered = false;
 
 function isPathInsideDirectory(rootDir, targetPath) {
   const normalizedRoot = path.resolve(rootDir);
@@ -146,6 +166,114 @@ async function readDataDocument(fileKey) {
   return JSON.parse(content);
 }
 
+function getHttpStatus(err, fallbackStatus = 500) {
+  return err?.status && Number.isInteger(err.status) ? err.status : fallbackStatus;
+}
+
+function sendApiError(res, err, fallbackMessage = 'Internal server error') {
+  const status = getHttpStatus(err);
+  const safeMessage = status >= 500 ? fallbackMessage : (err?.message || fallbackMessage);
+  res.status(status).json({ error: safeMessage });
+}
+
+function parseBooleanLike(value) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function shouldSkipCloudSync(req) {
+  const queryValue = req.query?.skipCloudSync;
+  const headerValue = req.get('x-bst-skip-cloud-sync');
+  return parseBooleanLike(queryValue) || parseBooleanLike(headerValue);
+}
+
+function requireMongoConnection(res) {
+  if (!isConnected()) {
+    res.status(503).json({
+      error: 'MongoDB is disconnected. Partial cloud updates are unavailable.',
+      mongodb: 'disconnected'
+    });
+    return false;
+  }
+
+  return true;
+}
+
+function areDocumentsEqual(firstDoc, secondDoc) {
+  return JSON.stringify(firstDoc) === JSON.stringify(secondDoc);
+}
+
+function withFileLock(lockKey, work) {
+  const previous = fileWriteLocks.get(lockKey) || Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(work);
+
+  fileWriteLocks.set(lockKey, current);
+  return current.finally(() => {
+    if (fileWriteLocks.get(lockKey) === current) {
+      fileWriteLocks.delete(lockKey);
+    }
+  });
+}
+
+async function writeJsonFileAtomic(targetPath, data) {
+  const payload = JSON.stringify(data, null, 2);
+  const dirPath = path.dirname(targetPath);
+  const tempPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
+
+  await fs.mkdir(dirPath, { recursive: true });
+
+  try {
+    await fs.writeFile(tempPath, payload, 'utf8');
+    await fs.rename(tempPath, targetPath);
+  } catch (err) {
+    try {
+      await fs.unlink(tempPath);
+    } catch (cleanupErr) {
+      // temp file may not exist; ignore cleanup errors
+    }
+    throw err;
+  }
+}
+
+async function syncDocumentToMongo(docId, data) {
+  if (!isConnected()) {
+    return {
+      ok: false,
+      state: 'disconnected',
+      message: 'Saved locally, but cloud sync is unavailable because MongoDB is disconnected.'
+    };
+  }
+
+  try {
+    const synced = await saveDoc(docId, data);
+    if (synced) {
+      return {
+        ok: true,
+        state: 'synced',
+        message: 'Saved locally and synced to cloud.'
+      };
+    }
+
+    return {
+      ok: false,
+      state: 'failed',
+      message: 'Saved locally, but cloud sync failed. Check MongoDB connectivity and logs.'
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      state: 'failed',
+      message: 'Saved locally, but cloud sync failed. Check MongoDB connectivity and logs.'
+    };
+  }
+}
+
 // ===== BACKUP FUNCTIONS =====
 
 /**
@@ -169,8 +297,8 @@ async function createBackup(fileName, data) {
     const backupFileName = `${path.basename(fileName, '.json')}_${timestamp}.json`;
     const backupPath = path.join(BACKUP_DIR, backupFileName);
 
-    // Write backup
-    await fs.writeFile(backupPath, JSON.stringify(data, null, 2), 'utf8');
+    // Write backup atomically
+    await writeJsonFileAtomic(backupPath, data);
     lastBackupTime[fileName] = now;
     console.log(`[✓] Backup created: ${backupFileName}`);
 
@@ -252,7 +380,7 @@ app.get('/api/data/:fileName', async (req, res) => {
     if (err.code === 'ENOENT') {
       return res.status(404).json({ error: 'Data file not found' });
     }
-    res.status(err.status || 500).json({ error: err.message });
+    sendApiError(res, err, 'Failed to load data file');
   }
 });
 
@@ -264,31 +392,56 @@ app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
   try {
     const filePath = path.join(DATA_DIR, 'classes.json');
     const data = req.body;
+    const skipCloudSync = shouldSkipCloudSync(req);
 
     // Validate that it has the expected structure
     if (!data.classes || !Array.isArray(data.classes)) {
       return res.status(400).json({ error: 'Invalid classes data structure' });
     }
 
-    // Create backup before saving
-    const backupFile = await createBackup('classes.json', data);
+    const { backupFile, cloudSync } = await withFileLock('classes.json', async () => {
+      let backupFileName = null;
 
-    // Write to file
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-    console.log('[✓] Saved classes.json');
+      try {
+        const currentContent = await fs.readFile(filePath, 'utf8');
+        const currentData = JSON.parse(currentContent);
+        backupFileName = await createBackup('classes.json', currentData);
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          console.warn('[Backup] Could not capture pre-save classes.json backup:', err.message);
+        }
+      }
 
-    // Sync to MongoDB Atlas (non-blocking — local file is the source of truth)
-    saveDoc('classes', data).catch(err => console.error('[MongoDB] classes sync failed:', err.message));
+      await writeJsonFileAtomic(filePath, data);
+      console.log('[✓] Saved classes.json (atomic write)');
 
-    res.json({
+      const syncResult = skipCloudSync
+        ? {
+          ok: true,
+          state: 'skipped',
+          message: 'Cloud sync skipped by request flag.'
+        }
+        : await syncDocumentToMongo('classes', data);
+      return { backupFile: backupFileName, cloudSync: syncResult };
+    });
+
+    const response = {
       success: true,
       message: 'Classes saved successfully',
       backup: backupFile,
-      mongoSync: isConnected()
-    });
+      mongoSync: cloudSync.ok,
+      cloudSync
+    };
+
+    if (!cloudSync.ok) {
+      response.partialSuccess = true;
+      response.warning = cloudSync.message;
+    }
+
+    res.json(response);
   } catch (err) {
     console.error('Error saving classes:', err);
-    res.status(500).json({ error: err.message });
+    sendApiError(res, err, 'Failed to save classes');
   }
 });
 
@@ -300,31 +453,56 @@ app.post('/api/save/lessonplans', requireAdminAccess, async (req, res) => {
   try {
     const filePath = path.join(DATA_DIR, 'lessonPlans.json');
     const data = req.body;
+    const skipCloudSync = shouldSkipCloudSync(req);
 
     // Validate that it has the expected structure
     if (!data.lessonPlans || !Array.isArray(data.lessonPlans)) {
       return res.status(400).json({ error: 'Invalid lesson plans data structure' });
     }
 
-    // Create backup before saving
-    const backupFile = await createBackup('lessonPlans.json', data);
+    const { backupFile, cloudSync } = await withFileLock('lessonPlans.json', async () => {
+      let backupFileName = null;
 
-    // Write to file
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-    console.log('[✓] Saved lessonPlans.json');
+      try {
+        const currentContent = await fs.readFile(filePath, 'utf8');
+        const currentData = JSON.parse(currentContent);
+        backupFileName = await createBackup('lessonPlans.json', currentData);
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          console.warn('[Backup] Could not capture pre-save lessonPlans.json backup:', err.message);
+        }
+      }
 
-    // Sync to MongoDB Atlas (non-blocking)
-    saveDoc('lessonPlans', data).catch(err => console.error('[MongoDB] lessonPlans sync failed:', err.message));
+      await writeJsonFileAtomic(filePath, data);
+      console.log('[✓] Saved lessonPlans.json (atomic write)');
 
-    res.json({
+      const syncResult = skipCloudSync
+        ? {
+          ok: true,
+          state: 'skipped',
+          message: 'Cloud sync skipped by request flag.'
+        }
+        : await syncDocumentToMongo('lessonPlans', data);
+      return { backupFile: backupFileName, cloudSync: syncResult };
+    });
+
+    const response = {
       success: true,
       message: 'Lesson plans saved successfully',
       backup: backupFile,
-      mongoSync: isConnected()
-    });
+      mongoSync: cloudSync.ok,
+      cloudSync
+    };
+
+    if (!cloudSync.ok) {
+      response.partialSuccess = true;
+      response.warning = cloudSync.message;
+    }
+
+    res.json(response);
   } catch (err) {
     console.error('Error saving lesson plans:', err);
-    res.status(500).json({ error: err.message });
+    sendApiError(res, err, 'Failed to save lesson plans');
   }
 });
 
@@ -339,7 +517,7 @@ app.get('/api/backups/:fileName', requireAdminAccess, async (req, res) => {
     res.json({ success: true, backups });
   } catch (err) {
     console.error('Error listing backups:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendApiError(res, err, 'Failed to list backups');
   }
 });
 
@@ -366,28 +544,43 @@ app.post('/api/backups/restore', requireAdminAccess, async (req, res) => {
     // Determine target file
     const targetFileName = backupFileName.startsWith('classes') ? 'classes.json' : 'lessonPlans.json';
     const targetPath = path.join(DATA_DIR, targetFileName);
+    const targetDocId = targetFileName === 'classes.json' ? 'classes' : 'lessonPlans';
 
-    // Read current file and backup it before restoring
-    try {
-      const currentContent = await fs.readFile(targetPath, 'utf8');
-      const currentData = JSON.parse(currentContent);
-      await createBackup(targetFileName, currentData);
-    } catch (err) {
-      // Current file might not exist, that's ok
-    }
+    const cloudSync = await withFileLock(targetFileName, async () => {
+      // Read current file and backup it before restoring
+      try {
+        const currentContent = await fs.readFile(targetPath, 'utf8');
+        const currentData = JSON.parse(currentContent);
+        await createBackup(targetFileName, currentData);
+      } catch (err) {
+        // Current file might not exist, that's ok
+      }
 
-    // Restore the backup
-    await fs.writeFile(targetPath, JSON.stringify(backupData, null, 2), 'utf8');
-    console.log(`[✓] Restored ${targetFileName} from ${backupFileName}`);
+      // Restore the backup atomically
+      await writeJsonFileAtomic(targetPath, backupData);
+      console.log(`[✓] Restored ${targetFileName} from ${backupFileName} (atomic write)`);
 
-    res.json({
+      // Re-sync Mongo immediately so local and remote do not drift after restore
+      return syncDocumentToMongo(targetDocId, backupData);
+    });
+
+    const response = {
       success: true,
       message: `Restored ${targetFileName} from backup`,
-      restoredFrom: backupFileName
-    });
+      restoredFrom: backupFileName,
+      mongoSync: cloudSync.ok,
+      cloudSync
+    };
+
+    if (!cloudSync.ok) {
+      response.partialSuccess = true;
+      response.warning = cloudSync.message;
+    }
+
+    res.json(response);
   } catch (err) {
     console.error('Error restoring backup:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendApiError(res, err, 'Failed to restore backup');
   }
 });
 
@@ -408,7 +601,7 @@ app.delete('/api/backups/:backupFileName', requireAdminAccess, async (req, res) 
       return res.status(404).json({ error: 'Backup file not found' });
     }
     console.error('Error deleting backup:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendApiError(res, err, 'Failed to delete backup');
   }
 });
 
@@ -440,7 +633,7 @@ app.post('/api/backups/create', requireAdminAccess, async (req, res) => {
     }
   } catch (err) {
     console.error('Error creating manual backup:', err);
-    res.status(err.status || 500).json({ error: err.message });
+    sendApiError(res, err, 'Failed to create backup');
   }
 });
 
@@ -454,6 +647,136 @@ app.get('/api/status', (req, res) => {
     message: 'API is running',
     mongodb: isConnected() ? 'connected' : 'disconnected'
   });
+});
+
+/**
+ * PUT /api/mongo/classes/:classId
+ * Upsert a single class record directly in MongoDB normalized storage
+ */
+app.put('/api/mongo/classes/:classId', requireAdminAccess, async (req, res) => {
+  try {
+    if (!requireMongoConnection(res)) {
+      return;
+    }
+
+    const classId = String(req.params.classId || '').trim();
+    const classData = req.body?.class && typeof req.body.class === 'object' ? req.body.class : req.body;
+
+    if (!classId || !classData || typeof classData !== 'object' || Array.isArray(classData)) {
+      return res.status(400).json({ error: 'Invalid class payload' });
+    }
+
+    const saved = await upsertClassRecord(classId, classData, 'api-partial-upsert');
+    if (!saved) {
+      return res.status(400).json({ error: 'Unable to upsert class record' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Class upserted in MongoDB',
+      classId,
+      class: saved,
+      mongodb: 'connected'
+    });
+  } catch (err) {
+    console.error('Error upserting Mongo class:', err);
+    sendApiError(res, err, 'Failed to upsert Mongo class');
+  }
+});
+
+/**
+ * DELETE /api/mongo/classes/:classId
+ * Delete a single class record directly in MongoDB normalized storage
+ */
+app.delete('/api/mongo/classes/:classId', requireAdminAccess, async (req, res) => {
+  try {
+    if (!requireMongoConnection(res)) {
+      return;
+    }
+
+    const classId = String(req.params.classId || '').trim();
+    if (!classId) {
+      return res.status(400).json({ error: 'classId is required' });
+    }
+
+    const deleted = await deleteClassRecord(classId, 'api-partial-delete');
+    return res.json({
+      success: true,
+      message: deleted ? 'Class deleted from MongoDB' : 'Class not found in MongoDB',
+      classId,
+      deleted,
+      mongodb: 'connected'
+    });
+  } catch (err) {
+    console.error('Error deleting Mongo class:', err);
+    sendApiError(res, err, 'Failed to delete Mongo class');
+  }
+});
+
+/**
+ * PUT /api/mongo/lessonplans/:planId
+ * Upsert a single lesson plan record directly in MongoDB normalized storage
+ */
+app.put('/api/mongo/lessonplans/:planId', requireAdminAccess, async (req, res) => {
+  try {
+    if (!requireMongoConnection(res)) {
+      return;
+    }
+
+    const planId = String(req.params.planId || '').trim();
+    const lessonPlanData = req.body?.lessonPlan && typeof req.body.lessonPlan === 'object'
+      ? req.body.lessonPlan
+      : req.body;
+
+    if (!planId || !lessonPlanData || typeof lessonPlanData !== 'object' || Array.isArray(lessonPlanData)) {
+      return res.status(400).json({ error: 'Invalid lesson plan payload' });
+    }
+
+    const saved = await upsertLessonPlanRecord(planId, lessonPlanData, 'api-partial-upsert');
+    if (!saved) {
+      return res.status(400).json({ error: 'Unable to upsert lesson plan record' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Lesson plan upserted in MongoDB',
+      planId,
+      lessonPlan: saved,
+      mongodb: 'connected'
+    });
+  } catch (err) {
+    console.error('Error upserting Mongo lesson plan:', err);
+    sendApiError(res, err, 'Failed to upsert Mongo lesson plan');
+  }
+});
+
+/**
+ * DELETE /api/mongo/lessonplans/:planId
+ * Delete a single lesson plan record directly in MongoDB normalized storage
+ */
+app.delete('/api/mongo/lessonplans/:planId', requireAdminAccess, async (req, res) => {
+  try {
+    if (!requireMongoConnection(res)) {
+      return;
+    }
+
+    const planId = String(req.params.planId || '').trim();
+    if (!planId) {
+      return res.status(400).json({ error: 'planId is required' });
+    }
+
+    const deleted = await deleteLessonPlanRecord(planId, 'api-partial-delete');
+    return res.json({
+      success: true,
+      message: deleted ? 'Lesson plan deleted from MongoDB' : 'Lesson plan not found in MongoDB',
+      planId,
+      deleted,
+      mongodb: 'connected'
+    });
+  } catch (err) {
+    console.error('Error deleting Mongo lesson plan:', err);
+    sendApiError(res, err, 'Failed to delete Mongo lesson plan');
+  }
 });
 
 /**
@@ -559,7 +882,7 @@ app.post('/api/download/youtube', requireAdminAccess, async (req, res) => {
   } catch (err) {
     console.error('YouTube download error:', err);
     res.status(500).json({
-      error: 'Failed to download video: ' + err.message,
+      error: 'Failed to download video',
     });
   }
 });
@@ -592,8 +915,8 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: 'Invalid JSON payload' });
   }
 
-  const status = err?.status && Number.isInteger(err.status) ? err.status : 500;
-  const message = err?.message || 'Internal server error';
+  const status = getHttpStatus(err);
+  const message = status >= 500 ? 'Internal server error' : (err?.message || 'Request failed');
   res.status(status).json({ error: message });
 });
 
@@ -613,19 +936,42 @@ async function syncFromMongoDB() {
   for (const { docId, fileName } of docs) {
     const filePath = path.join(DATA_DIR, fileName);
     const mongoData = await loadDoc(docId);
+    let localData = null;
+
+    try {
+      const localContent = await fs.readFile(filePath, 'utf8');
+      localData = JSON.parse(localContent);
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        console.warn(`[MongoDB] Could not parse local "${docId}" file; skipping startup sync for this document.`);
+        continue;
+      }
+    }
 
     if (mongoData) {
-      // Atlas has data — overwrite local file so they stay in sync
-      await fs.writeFile(filePath, JSON.stringify(mongoData, null, 2), 'utf8');
-      console.log(`[MongoDB] Synced "${docId}" Atlas → local file`);
+      if (!localData) {
+        await writeJsonFileAtomic(filePath, mongoData);
+        console.log(`[MongoDB] Synced "${docId}" Atlas → local file (local file missing)`);
+        continue;
+      }
+
+      if (areDocumentsEqual(localData, mongoData)) {
+        console.log(`[MongoDB] "${docId}" already in sync`);
+        continue;
+      }
+
+      const pushed = await saveDoc(docId, localData);
+      if (pushed) {
+        console.warn(`[MongoDB] Conflict detected for "${docId}". Preserved local edits and updated Atlas from local file.`);
+      } else {
+        console.warn(`[MongoDB] Conflict detected for "${docId}". Preserved local edits, but failed to update Atlas.`);
+      }
     } else {
       // Atlas has no doc yet — seed it from the local file
-      try {
-        const localContent = await fs.readFile(filePath, 'utf8');
-        const localData = JSON.parse(localContent);
+      if (localData) {
         const ok = await saveDoc(docId, localData);
         if (ok) console.log(`[MongoDB] Seeded "${docId}" local file → Atlas`);
-      } catch (err) {
+      } else {
         console.log(`[MongoDB] No local file found for "${docId}"; skipping seed.`);
       }
     }
@@ -634,7 +980,7 @@ async function syncFromMongoDB() {
 
 // ===== START SERVER =====
 
-app.listen(PORT, async () => {
+async function initializeServerState() {
   // Ensure backup directory exists on startup
   try {
     await fs.mkdir(BACKUP_DIR, { recursive: true });
@@ -647,21 +993,23 @@ app.listen(PORT, async () => {
   if (mongoOk) {
     await syncFromMongoDB();
   }
+}
 
+function logServerStartup(port) {
   console.log(`
 ╔════════════════════════════════════════╗
 ║   Bible Study Tools - Web Server       ║
 ╚════════════════════════════════════════╝
 
-Server running at: http://localhost:${PORT}
+Server running at: http://localhost:${port}
 Static files: ./
 Data saved to: ${DATA_DIR}
 Backups saved to: ${BACKUP_DIR}
 
 Open in browser:
-  - Admin:   http://localhost:${PORT}/admin.html
-  - Student: http://localhost:${PORT}/student.html
-  - Teacher: http://localhost:${PORT}/teacher.html
+  - Admin:   http://localhost:${port}/admin.html
+  - Student: http://localhost:${port}/student.html
+  - Teacher: http://localhost:${port}/teacher.html
 
 API Endpoints:
   - POST /api/save/classes       - Save classes.json (auto-backup)
@@ -671,20 +1019,103 @@ API Endpoints:
   - POST /api/backups/create     - Create manual backup
   - DELETE /api/backups/:file    - Delete a backup
   - GET  /api/status             - Health check
+  - PUT  /api/mongo/classes/:id  - Upsert one class in MongoDB
+  - DELETE /api/mongo/classes/:id - Delete one class in MongoDB
+  - PUT  /api/mongo/lessonplans/:id - Upsert one lesson plan in MongoDB
+  - DELETE /api/mongo/lessonplans/:id - Delete one lesson plan in MongoDB
 
 Press Ctrl+C to stop
   `);
+}
+
+function maybeOpenBrowser(port) {
+  if (!SHOULD_AUTO_OPEN_BROWSER) {
+    return;
+  }
 
   // Auto-open admin page in the default browser
-  const adminUrl = `http://localhost:${PORT}/admin.html`;
+  const adminUrl = `http://localhost:${port}/admin.html`;
   const openCmd = process.platform === 'win32'  ? `start "" "${adminUrl}"`
                : process.platform === 'darwin' ? `open "${adminUrl}"`
                : `xdg-open "${adminUrl}"`;
   exec(openCmd, err => {
     if (err) console.warn('[!] Could not auto-open browser:', err.message);
   });
-});
+}
 
-// ===== GRACEFUL SHUTDOWN =====
-process.on('SIGINT',  async () => { await closeDB(); process.exit(0); });
-process.on('SIGTERM', async () => { await closeDB(); process.exit(0); });
+function registerShutdownHandlers() {
+  if (shutdownHandlersRegistered) {
+    return;
+  }
+
+  shutdownHandlersRegistered = true;
+  process.on('SIGINT', async () => {
+    await stopServer();
+    process.exit(0);
+  });
+  process.on('SIGTERM', async () => {
+    await stopServer();
+    process.exit(0);
+  });
+}
+
+async function startServer(options = {}) {
+  const requestedPort = options.port || PORT;
+  const openBrowser = options.openBrowser ?? SHOULD_AUTO_OPEN_BROWSER;
+
+  if (serverInstance) {
+    return serverInstance;
+  }
+
+  await initializeServerState();
+
+  serverInstance = await new Promise((resolve, reject) => {
+    const listener = app.listen(requestedPort, () => resolve(listener));
+    listener.on('error', reject);
+  });
+
+  registerShutdownHandlers();
+  logServerStartup(requestedPort);
+
+  if (openBrowser) {
+    maybeOpenBrowser(requestedPort);
+  }
+
+  return serverInstance;
+}
+
+async function stopServer() {
+  if (serverInstance) {
+    await new Promise((resolve, reject) => {
+      serverInstance.close((err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    });
+    serverInstance = null;
+  }
+
+  await closeDB();
+}
+
+if (require.main === module) {
+  startServer().catch(async (err) => {
+    console.error('Failed to start server:', err);
+    await closeDB();
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  app,
+  startServer,
+  stopServer,
+  paths: {
+    DATA_DIR,
+    VIDEO_DIR,
+    BACKUP_DIR
+  }
+};

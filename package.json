@@ -5,7 +5,18 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "check:syntax": "node scripts/ci/run-syntax-checks.js",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:p0": "playwright test tests/e2e/.*\\.p0\\.spec\\.js",
+    "test:e2e:priority": "playwright test tests/e2e/.*\\.p[0-2]\\.spec\\.js",
+    "test:e2e:headed": "playwright test --headed",
+    "test:smoke:light": "node scripts/ci/api-smoke.js --mode=light",
+    "test:smoke:heavy": "node scripts/ci/api-smoke.js --mode=heavy",
+    "test:light": "npm run check:syntax && npm run test:unit && npm run test:smoke:light && npm run test:e2e:priority",
+    "test:heavy": "npm run check:syntax && npm run test:unit && npm run test:smoke:heavy && npm run test:e2e:priority && npm run test:e2e"
   },
   "keywords": [
     "bible-study",
@@ -31,5 +42,10 @@
     "express": "^4.18.2",
     "mongodb": "^7.1.0",
     "ytdl-core": "^4.11.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.0"
   }
 }

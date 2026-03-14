@@ -5,6 +5,7 @@
   --text: #e6edf7;
   --muted: #9fb3cc;
   --shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+  --teacher-drawer-toggle-width: 170px;
 }
 .question-notes {
   background: rgba(255, 255, 255, 0.05);
@@ -93,8 +94,9 @@ h1 {
 
 .drawer-toggles {
   position: fixed;
-  left: 16px;
+  left: max(16px, calc(50vw - 760px));
   top: 120px;
+  width: min(var(--teacher-drawer-toggle-width), calc(100vw - 32px));
   display: grid;
   gap: 10px;
   z-index: 1100;
@@ -102,6 +104,7 @@ h1 {
 
 .drawer-toggles .pill-link {
   justify-content: center;
+  width: 100%;
 }
 
 .layout {
@@ -946,6 +949,42 @@ details.accordion a {
 .page.verse-drawer-open {
   margin-left: min(420px, 92vw);
   transition: margin-left 0.25s ease;
+}
+
+@media (max-width: 1400px) {
+  body {
+    padding-bottom: 180px;
+  }
+
+  .drawer-toggles {
+    left: 16px;
+    right: 16px;
+    top: auto;
+    bottom: 96px;
+    width: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page.media-drawer-open,
+  .page.verse-drawer-open {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    padding-bottom: 230px;
+  }
+
+  .drawer-toggles {
+    grid-template-columns: 1fr;
+    bottom: 100px;
+  }
+
+  .media-drawer,
+  .verse-drawer {
+    width: 100vw;
+  }
 }
 
 /* Tab Interface Styles */

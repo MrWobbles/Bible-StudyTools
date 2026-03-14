@@ -98,6 +98,11 @@ body {
     color: var(--accent);
 }
 
+.save-status.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+}
+
 .save-status.error {
     background: rgba(239, 68, 68, 0.15);
     color: var(--error);

@@ -474,6 +474,79 @@ function loadBibleTranslationSetting() {
   select.value = translation;
 }
 
+function getCloudSyncWarning(result) {
+  if (!result || typeof result !== 'object') {
+    return '';
+  }
+
+  if (result.partialSuccess || result?.cloudSync?.ok === false || result.mongoSync === false) {
+    return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
+  }
+
+  return '';
+}
+
+function combineWarnings(...warnings) {
+  return warnings
+    .map((warning) => String(warning || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
+function shouldIgnorePartialSyncFailure(message) {
+  const text = String(message || '').toLowerCase();
+  return text.includes('cannot put')
+    || text.includes('404')
+    || text.includes('failed to fetch')
+    || text.includes('networkerror')
+    || text.includes('err_connection_refused');
+}
+
+function getClassIdentifier(cls) {
+  if (!cls || typeof cls !== 'object') {
+    return '';
+  }
+
+  return String(cls.id || cls.classNumber || '').trim();
+}
+
+async function saveClassesLocallyOnly() {
+  const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-bst-skip-cloud-sync': '1'
+    },
+    body: JSON.stringify({ classes: allClasses })
+  }, { requireAdmin: true });
+
+  if (!saveResponse.ok) {
+    const errorData = await saveResponse.json().catch(() => ({}));
+    throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
+  }
+
+  return saveResponse.json().catch(() => ({}));
+}
+
+async function persistClassWithPartialMongoSync(cls) {
+  const classId = getClassIdentifier(cls) || String(currentClassId || '').trim();
+  let partialWarning = '';
+
+  if (classId) {
+    try {
+      await window.BSTApi.upsertMongoClass(classId, { class: cls });
+    } catch (err) {
+      const message = err?.message || 'Cloud sync failed for this class.';
+      partialWarning = shouldIgnorePartialSyncFailure(message) ? '' : message;
+    }
+  }
+
+  const saveResult = await saveClassesLocallyOnly();
+  const localWarning = getCloudSyncWarning(saveResult);
+  return combineWarnings(partialWarning, localWarning);
+}
+
 // Save Bible translation setting
 async function saveBibleTranslationSetting() {
   const select = document.getElementById('bible-translation-select');
@@ -491,16 +564,12 @@ async function saveBibleTranslationSetting() {
       const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
       if (classIndex !== -1) {
         allClasses[classIndex].bibleTranslation = translation;
-        
-        // Save back to server
-        const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ classes: allClasses })
-        }, { requireAdmin: true });
-        
-        if (saveResponse.ok) {
-          console.log('Bible translation preference saved:', translation);
+
+        const cloudWarning = await persistClassWithPartialMongoSync(allClasses[classIndex]);
+        console.log('Bible translation preference saved:', translation);
+        if (cloudWarning) {
+          updateSaveStatus('⚠ Translation saved locally only (cloud sync failed)');
+        } else {
           updateSaveStatus('Translation saved');
           setTimeout(() => updateSaveStatus('Saved'), 2000);
         }
@@ -913,21 +982,15 @@ async function saveDocument() {
           allClasses[classIndex].generatedOutline = generatedOutline;
         }
 
-        // Save back to server
         console.log('Saving document to server...');
-        const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ classes: allClasses })
-        }, { requireAdmin: true });
-
-        if (!saveResponse.ok) {
-          const errorData = await saveResponse.json().catch(() => ({}));
-          throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
-        }
+        const cloudWarning = await persistClassWithPartialMongoSync(allClasses[classIndex]);
 
         isDirty = false;
-        updateSaveStatus('Saved');
+        if (cloudWarning) {
+          updateSaveStatus('⚠ Saved locally only (cloud sync failed)');
+        } else {
+          updateSaveStatus('Saved');
+        }
         console.log('Class content saved:', content);
       } else {
         throw new Error('Class not found');
@@ -977,6 +1040,8 @@ function updateSaveStatus(status) {
       statusEl.classList.add('saving');
     } else if (status === 'Modified') {
       statusEl.classList.add('modified');
+    } else if (status.startsWith('⚠')) {
+      statusEl.classList.add('warning');
     } else if (status.includes('failed')) {
       statusEl.classList.add('error');
     }
@@ -1437,28 +1502,17 @@ async function applyOutlineToClass() {
       console.log(`Updated class at index ${classIndex} with outline`);
       console.log('Outline structure:', generatedOutline);
 
-      // Save back to server
-      const savePayload = { classes: allClasses };
-      console.log('Sending to server:', JSON.stringify(savePayload).substring(0, 200) + '...');
-      
-      const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(savePayload)
-      }, { requireAdmin: true });
-
-      if (!saveResponse.ok) {
-        const errorData = await saveResponse.json().catch(() => ({}));
-        throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
-      }
-
-      const responseData = await saveResponse.json();
-      console.log('Server response:', responseData);
+      console.log('Sending to server: classes payload with partial Mongo sync');
+      const cloudWarning = await persistClassWithPartialMongoSync(allClasses[classIndex]);
 
       // Update the outline navigator to reflect new structure
       updateOutlineNavigatorFromGenerated(generatedOutline);
 
-      alert('Outline applied to class successfully!');
+      if (cloudWarning) {
+        alert(`Outline applied locally, but cloud sync failed.\n\n${cloudWarning}`);
+      } else {
+        alert('Outline applied to class successfully!');
+      }
       closeModal('outline-modal');
       console.log('Applied outline:', generatedOutline);
     } else {

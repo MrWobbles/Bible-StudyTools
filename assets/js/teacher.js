@@ -1360,7 +1360,12 @@ async function setStoppedMarkerEditor(headingId) {
   }
 
   // Save to server
-  await saveStoppedMarker();
+  const cloudWarning = await saveStoppedMarker();
+
+  if (cloudWarning) {
+    flashStatus(`⚠ Marker saved locally only. ${cloudWarning}`);
+    return;
+  }
 
   // Re-render both views to update UI
   renderOutlineWithQuestions();
@@ -1395,7 +1400,12 @@ async function setStoppedMarker(sectionId) {
   }
 
   // Save to server
-  await saveStoppedMarker();
+  const cloudWarning = await saveStoppedMarker();
+
+  if (cloudWarning) {
+    flashStatus(`⚠ Marker saved locally only. ${cloudWarning}`);
+    return;
+  }
 
   // Re-render both views to update UI
   renderOutlineWithQuestions();
@@ -1424,10 +1434,17 @@ async function saveStoppedMarker() {
       throw new Error('Failed to save');
     }
 
+    const result = await response.json().catch(() => ({}));
+    if (result?.partialSuccess || result?.cloudSync?.ok === false || result?.mongoSync === false) {
+      return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
+    }
+
     console.log('[✓] Saved stopped marker');
+    return '';
   } catch (err) {
     console.error('Failed to save stopped marker:', err);
     flashStatus('⚠️ Could not save marker - check server');
+    return '';
   }
 }
 

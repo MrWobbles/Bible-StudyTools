@@ -98,11 +98,55 @@
     return fetchJson('/api/data/lessonplans');
   }
 
+  async function upsertMongoClass(classId, classPayload) {
+    return fetchJson(`/api/mongo/classes/${encodeURIComponent(classId)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(classPayload)
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function deleteMongoClass(classId) {
+    return fetchJson(`/api/mongo/classes/${encodeURIComponent(classId)}`, {
+      method: 'DELETE'
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function upsertMongoLessonPlan(planId, lessonPlanPayload) {
+    return fetchJson(`/api/mongo/lessonplans/${encodeURIComponent(planId)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(lessonPlanPayload)
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function deleteMongoLessonPlan(planId) {
+    return fetchJson(`/api/mongo/lessonplans/${encodeURIComponent(planId)}`, {
+      method: 'DELETE'
+    }, {
+      requireAdmin: true
+    });
+  }
+
   window.BSTApi = {
     fetch: fetchWithSecurity,
     fetchJson,
     getClasses,
     getLessonPlans,
+    upsertMongoClass,
+    deleteMongoClass,
+    upsertMongoLessonPlan,
+    deleteMongoLessonPlan,
     getAdminToken,
     setAdminToken,
     clearAdminToken: () => setAdminToken(''),

@@ -14,6 +14,124 @@ const ADMIN_AUTOSAVE_DELAY_MS = 3000; // debounce: save 3 s after last keystroke
 function generateGUID() {
   return 'class-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
+function getCloudSyncWarning(result) {
+  if (!result || typeof result !== 'object') {
+    return '';
+  }
+
+  if (result.partialSuccess || result?.cloudSync?.ok === false || result.mongoSync === false) {
+    return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
+  }
+
+  return '';
+}
+
+function combineWarnings(...warnings) {
+  return warnings
+    .map((warning) => String(warning || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
+function shouldIgnorePartialSyncFailure(message) {
+  const text = String(message || '').toLowerCase();
+  return text.includes('cannot put')
+    || text.includes('cannot delete')
+    || text.includes('404')
+    || text.includes('failed to fetch')
+    || text.includes('networkerror')
+    || text.includes('err_connection_refused');
+}
+
+function getClassIdentifier(cls) {
+  if (!cls || typeof cls !== 'object') {
+    return '';
+  }
+
+  return String(cls.id || cls.classNumber || '').trim();
+}
+
+function getLessonPlanIdentifier(plan) {
+  if (!plan || typeof plan !== 'object') {
+    return '';
+  }
+
+  return String(plan.id || plan.planId || '').trim();
+}
+
+async function syncClassDeltaToMongo(options = {}) {
+  const { changedClassId = null, deletedClassId = null } = options;
+
+  if (!window.BSTApi) {
+    return '';
+  }
+
+  try {
+    if (deletedClassId) {
+      await window.BSTApi.deleteMongoClass(String(deletedClassId));
+      return '';
+    }
+
+    const normalizedClassId = String(changedClassId || '').trim();
+    if (!normalizedClassId) {
+      return '';
+    }
+
+    const cls = allClasses.find((item) => getClassIdentifier(item) === normalizedClassId);
+    if (!cls) {
+      return '';
+    }
+
+    await window.BSTApi.upsertMongoClass(normalizedClassId, { class: cls });
+    return '';
+  } catch (err) {
+    const message = err?.message || 'Cloud sync failed for class record.';
+    return shouldIgnorePartialSyncFailure(message) ? '' : message;
+  }
+}
+
+async function syncLessonPlanDeltaToMongo(options = {}) {
+  const { changedPlanId = null, deletedPlanId = null } = options;
+
+  if (!window.BSTApi) {
+    return '';
+  }
+
+  try {
+    if (deletedPlanId) {
+      await window.BSTApi.deleteMongoLessonPlan(String(deletedPlanId));
+      return '';
+    }
+
+    const normalizedPlanId = String(changedPlanId || '').trim();
+    if (!normalizedPlanId) {
+      return '';
+    }
+
+    const plan = allLessonPlans.find((item) => getLessonPlanIdentifier(item) === normalizedPlanId);
+    if (!plan) {
+      return '';
+    }
+
+    await window.BSTApi.upsertMongoLessonPlan(normalizedPlanId, { lessonPlan: plan });
+    return '';
+  } catch (err) {
+    const message = err?.message || 'Cloud sync failed for lesson plan record.';
+    return shouldIgnorePartialSyncFailure(message) ? '' : message;
+  }
+}
+
+function showAdminSaveResult(itemLabel, result) {
+  const warning = getCloudSyncWarning(result);
+  if (warning) {
+    showAdminSaveStatus(`⚠ ${itemLabel} saved locally only. ${warning}`, true);
+    return;
+  }
+
+  const syncedToCloud = result?.cloudSync?.ok === true || result?.mongoSync === true;
+  showAdminSaveStatus(`✓ ${itemLabel} saved${syncedToCloud ? ' + Atlas' : ''}`);
+}
 
 // Load data on page load
 window.addEventListener('DOMContentLoaded', async () => {
@@ -114,6 +232,7 @@ function editLessonPlan(index) {
 function saveLessonPlan() {
   const title = document.getElementById('lessonplan-title').value;
   const description = document.getElementById('lessonplan-description').value;
+  let changedPlanId = '';
 
   if (!title.trim()) {
     alert('Please enter a lesson plan title');
@@ -124,6 +243,7 @@ function saveLessonPlan() {
     // Update existing - only change title and description
     allLessonPlans[currentLessonPlan].title = title.trim();
     allLessonPlans[currentLessonPlan].description = description.trim();
+    changedPlanId = getLessonPlanIdentifier(allLessonPlans[currentLessonPlan]);
   } else {
     // Add new
     const plan = {
@@ -135,9 +255,10 @@ function saveLessonPlan() {
       classes: [],
     };
     allLessonPlans.push(plan);
+    changedPlanId = getLessonPlanIdentifier(plan);
   }
 
-  saveLessonPlansToFile();
+  saveLessonPlansToFile({ changedPlanId });
   closeModal('lessonplan-modal');
   renderLessonPlansList();
 }
@@ -145,8 +266,9 @@ function saveLessonPlan() {
 // Delete lesson plan
 function deleteLessonPlan(index) {
   if (confirm('Delete this lesson plan and all its classes?')) {
+    const deletedPlanId = getLessonPlanIdentifier(allLessonPlans[index]);
     allLessonPlans.splice(index, 1);
-    saveLessonPlansToFile();
+    saveLessonPlansToFile({ deletedPlanId });
     renderLessonPlansList();
   }
 }
@@ -209,9 +331,10 @@ function goBackToLessonPlans() {
 }
 
 // Save lesson plans to file
-async function saveLessonPlansToFile() {
+async function saveLessonPlansToFile(options = {}) {
   console.log('saveLessonPlansToFile called with', allLessonPlans.length, 'lesson plans');
   const jsonData = { lessonPlans: allLessonPlans };
+  const { changedPlanId = null, deletedPlanId = null } = options;
 
   // If running in Electron, save directly to file system
   if (window.bst && window.bst.saveFile) {
@@ -228,19 +351,32 @@ async function saveLessonPlansToFile() {
 
   // Try API endpoint (web server mode)
   try {
+    const partialSyncWarning = await syncLessonPlanDeltaToMongo({ changedPlanId, deletedPlanId });
+
     console.log('Attempting API save to /api/save/lessonplans...');
     const response = await window.BSTApi.fetch('/api/save/lessonplans', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bst-skip-cloud-sync': '1'
+      },
       body: JSON.stringify(jsonData),
     }, { requireAdmin: true });
 
     console.log('API response status:', response.status, response.statusText);
 
     if (response.ok) {
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      const saveWarning = getCloudSyncWarning(result);
+      const combinedWarning = combineWarnings(partialSyncWarning, saveWarning);
+
+      if (combinedWarning) {
+        result.partialSuccess = true;
+        result.warning = combinedWarning;
+      }
+
       console.log('[✓] Lesson plans saved successfully:', result);
-      showAdminSaveStatus('✓ Lesson plans saved' + (result.mongoSync ? ' + Atlas' : ''));
+      showAdminSaveResult('Lesson plans', result);
       return;
     } else {
       const errorText = await response.text();
@@ -349,7 +485,7 @@ function addClassToLessonPlan(classIndex) {
   if (!plan.classes.includes(classId)) {
     plan.classes.push(classId);
     renderClassListForLessonPlan();
-    saveLessonPlansToFile();
+    saveLessonPlansToFile({ changedPlanId: getLessonPlanIdentifier(plan) });
   }
 }
 
@@ -361,7 +497,7 @@ function removeClassFromLessonPlan(classIndex) {
 
   plan.classes = plan.classes.filter((id) => id !== classId);
   renderClassListForLessonPlan();
-  saveLessonPlansToFile();
+  saveLessonPlansToFile({ changedPlanId: getLessonPlanIdentifier(plan) });
 }
 
 // Create new class
@@ -401,7 +537,7 @@ function createNewClass() {
 
   // Auto-save the new class AND the lesson plan
   console.log('Auto-saving new class...');
-  saveClassToFile();
+  saveClassToFile({ changedClassId: newClassId });
 
   if (currentLessonPlan !== null) {
     console.log('Auto-saving lesson plan...');
@@ -1036,9 +1172,12 @@ function saveClass() {
 }
 
 // Save classes to file
-async function saveClassToFile() {
+async function saveClassToFile(options = {}) {
   console.log('saveClassToFile called with', allClasses.length, 'classes');
   const jsonData = { classes: allClasses };
+  const activeClassId = currentClass !== null ? getClassIdentifier(allClasses[currentClass]) : '';
+  const changedClassId = String(options?.changedClassId || activeClassId || '').trim();
+  const deletedClassId = String(options?.deletedClassId || '').trim();
 
   // If running in Electron, save directly to file system
   if (window.bst && window.bst.saveFile) {
@@ -1056,19 +1195,32 @@ async function saveClassToFile() {
 
   // Try API endpoint (web server mode)
   try {
+    const partialSyncWarning = await syncClassDeltaToMongo({ changedClassId, deletedClassId });
+
     console.log('Attempting API save to /api/save/classes...');
     const response = await window.BSTApi.fetch('/api/save/classes', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bst-skip-cloud-sync': '1'
+      },
       body: JSON.stringify(jsonData),
     }, { requireAdmin: true });
 
     console.log('API response status:', response.status, response.statusText);
 
     if (response.ok) {
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      const saveWarning = getCloudSyncWarning(result);
+      const combinedWarning = combineWarnings(partialSyncWarning, saveWarning);
+
+      if (combinedWarning) {
+        result.partialSuccess = true;
+        result.warning = combinedWarning;
+      }
+
       console.log('[✓] Save successful:', result);
-      showAdminSaveStatus('✓ Classes saved' + (result.mongoSync ? ' + Atlas' : ''));
+      showAdminSaveResult('Classes', result);
       return;
     } else {
       const errorText = await response.text();

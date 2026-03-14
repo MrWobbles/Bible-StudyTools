@@ -61,6 +61,54 @@ python docs/serve.py
 
 Then open `http://localhost:8000` in your browser.
 
+## MongoDB Storage Model (v2)
+
+When `MONGODB_URI` is configured, the server now stores cloud data in normalized collections:
+
+- `classes`: one document per class
+- `lessonPlans`: one document per lesson plan (with class references)
+- `appDataHistory`: append-only snapshot records for version/history tracking
+
+The legacy `appData` documents (`_id: "classes"` and `_id: "lessonPlans"`) are still supported for compatibility. If normalized collections are empty, the server auto-migrates legacy data on startup.
+
+For partial cloud updates (without writing full aggregate documents), use:
+
+- `PUT /api/mongo/classes/:classId`
+- `DELETE /api/mongo/classes/:classId`
+- `PUT /api/mongo/lessonplans/:planId`
+- `DELETE /api/mongo/lessonplans/:planId`
+
+These routes require admin access and return `503` when MongoDB is disconnected.
+
+## Test Environment (Light + Heavy)
+
+This project now uses a two-tier test strategy:
+
+- **Light checks (automatic on every push/PR):** fast syntax + API smoke checks
+- **Heavy checks (manual):** deeper save/backup/restore integrity checks, with optional desktop build validation
+
+### Local commands
+
+- `npm run check:syntax` - syntax validation for server + key frontend/backend scripts
+- `npm run test:unit` - `Vitest` + `Supertest` integration tests
+- `npm run test:e2e` - `Playwright` browser tests
+- `npm run test:e2e:p0` - focused `Playwright` P0 regression suite (`*.p0.spec.js`)
+- `npm run test:e2e:priority` - `Playwright` priority regression suite (`*.p0.spec.js` + `*.p1.spec.js` + `*.p2.spec.js`)
+- `npm run test:smoke:light` - starts server and runs lightweight API checks
+- `npm run test:smoke:heavy` - starts server and runs save/backup/restore integrity checks
+- `npm run test:light` - syntax + unit + light smoke + priority browser checks (P0-P2)
+- `npm run test:heavy` - syntax + unit + heavy smoke + priority browser checks (P0-P2) + full browser suite
+
+### GitHub Actions workflows
+
+- `.github/workflows/ci-light.yml` runs on push and pull_request
+- `.github/workflows/ci-heavy.yml` is manual (`workflow_dispatch`) and runs the heavier API/browser suite with an optional desktop build check
+
+### Recommended test split
+
+- **Vitest + Supertest:** route validation, save/restore logic, error handling, non-destructive integration checks
+- **Playwright:** admin/editor/teacher page load and broader end-to-end UI flows
+
 ## Features
 
 - **Synchronized controls**: Control the display screen from your laptop
