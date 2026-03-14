@@ -3599,21 +3599,7 @@
           ]
         }
       ],
-      "media": [
-        {
-          "id": "world-flesh-satan",
-          "type": "video",
-          "title": "The World / The Flesh / Satan",
-          "primary": false,
-          "sources": [
-            {
-              "type": "youtube",
-              "url": "q4x9yM7FYoM"
-            }
-          ],
-          "pausePoints": []
-        }
-      ],
+      "media": [],
       "subtitle": "World, Flesh, and Devil",
       "instructor": "Sean Collins",
       "channelName": "class-6-control",
@@ -6017,9 +6003,7 @@
             }
           ]
         }
-      ],
-      "stoppedAtEditorHeading": null,
-      "stoppedAtSection": null
+      ]
     }
   ]
 }

@@ -127,7 +127,7 @@ function renderMediaGallery() {
         playerDiv.id = 'player';
         playerShell.appendChild(playerDiv);
       } else {
-        playerShell.appendChild(createPlaceholderPanel('📹', 'No video has been added yet'));
+        playerShell.appendChild(createPlaceholderPanel('videocam_off', 'No video has been added yet'));
       }
     } else if (primaryMedia.type === 'image' || primaryMedia.type === 'images') {
       // Render image - support both url property and sources array
@@ -222,12 +222,11 @@ function openMediaInViewer(media) {
   const playerShell = document.querySelector('.player-shell');
   if (!playerShell) return;
 
-  const url = sanitizeMediaUrl(media.url || media.sources?.[0]?.url || '');
+  const rawUrl = media.url || media.sources?.[0]?.url || media.sources?.[0]?.path || '';
+  const url = sanitizeMediaUrl(rawUrl);
 
   if (media.type === 'video') {
-    // Extract YouTube ID
-    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/))([^&\?\/]+)/);
-    const videoId = match ? match[1] : '';
+    const videoId = extractYoutubeVideoId(rawUrl);
     if (videoId) {
       // Replace the player shell with a fresh player div
       playerShell.replaceChildren();
@@ -303,6 +302,19 @@ function openMediaInViewer(media) {
   }
 }
 
+function extractYoutubeVideoId(value) {
+  const input = String(value || '').trim();
+  if (!input) return '';
+
+  const directId = input.match(/^[A-Za-z0-9_-]{11}$/);
+  if (directId) {
+    return directId[0];
+  }
+
+  const match = input.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|shorts\/|embed\/))([^&\?\/]+)/);
+  return match ? match[1] : '';
+}
+
 function sanitizeMediaUrl(url) {
   if (typeof url !== 'string') return '';
 
@@ -334,16 +346,18 @@ function createCenteredWrapper() {
   return wrapper;
 }
 
-function createPlaceholderPanel(icon, message) {
+function createPlaceholderPanel(iconName, message) {
   const wrapper = createCenteredWrapper();
   wrapper.style.color = 'var(--muted)';
   wrapper.style.textAlign = 'center';
 
   const content = document.createElement('div');
-  const iconEl = document.createElement('div');
+  const iconEl = document.createElement('span');
+  iconEl.className = 'material-symbols-outlined';
   iconEl.style.fontSize = '48px';
   iconEl.style.marginBottom = '10px';
-  iconEl.textContent = icon;
+  iconEl.style.display = 'inline-block';
+  iconEl.textContent = iconName;
 
   const messageEl = document.createElement('p');
   messageEl.textContent = message;
@@ -366,9 +380,10 @@ function createLinkPreview(title, description, url, emphasizeUrl = false) {
   wrapper.style.gap = emphasizeUrl ? '20px' : '10px';
 
   if (emphasizeUrl) {
-    const icon = document.createElement('div');
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined';
     icon.style.fontSize = '48px';
-    icon.textContent = '🔗';
+    icon.textContent = 'link';
     wrapper.appendChild(icon);
   }
 
@@ -423,7 +438,7 @@ function getMediaIcon(type) {
     document: 'assignment',
     link: 'link',
     presentation: 'bar_chart',
-    verse: '📖'
+    verse: 'menu_book'
   };
   return icons[type] || 'folder';
 }

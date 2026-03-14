@@ -212,7 +212,7 @@ function renderOutlineWithQuestions() {
       actionsRow.appendChild(info);
 
       const jumpBtn = document.createElement('button');
-      jumpBtn.textContent = 'Jump here';
+      jumpBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">skip_next</span>Jump here';
       jumpBtn.onclick = () => sendCommand('jumpToPause', { index: pauseIdx });
       actionsRow.appendChild(jumpBtn);
     }
@@ -235,19 +235,19 @@ function renderOutlineWithQuestions() {
 
         // Add icons for different types
         const icons = {
-          verse: '📖',
-          question: '❓',
-          example: '💡',
-          note: '📝',
+          verse: 'menu_book',
+          question: 'help',
+          example: 'lightbulb',
+          note: 'edit_note',
           heading: '',
-          point: '•'
+          point: 'radio_button_unchecked'
         };
 
-        const icon = icons[pointType] || '•';
+        const icon = icons[pointType] || 'radio_button_unchecked';
         if (pointType === 'heading') {
           pointDiv.innerHTML = `<strong>${pointText}</strong>`;
         } else {
-          pointDiv.innerHTML = `<span class="point-icon">${icon}</span><span class="point-text">${pointText}</span>`;
+          pointDiv.innerHTML = `<span class="point-icon material-symbols-outlined">${icon}</span><span class="point-text">${pointText}</span>`;
         }
 
         // Check if the point text looks like a Bible verse reference and make it clickable
@@ -276,7 +276,7 @@ function renderOutlineWithQuestions() {
 
       const mediaMarksLabel = document.createElement('div');
       mediaMarksLabel.className = 'media-marks-label';
-      mediaMarksLabel.innerHTML = '<small>📌 Media marks (click to display)</small>';
+      mediaMarksLabel.innerHTML = '<small><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: text-bottom;">push_pin</span> Media marks (click to display)</small>';
       mediaMarksContainer.appendChild(mediaMarksLabel);
 
       const mediaMarksList = document.createElement('div');
@@ -320,7 +320,7 @@ function renderOutlineWithQuestions() {
         // Add "Display on screen" button
         const displayBtn = document.createElement('button');
         displayBtn.className = 'question-display-btn';
-        displayBtn.innerHTML = '📺 Show';
+        displayBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: text-bottom;">live_tv</span> Show';
         displayBtn.title = 'Display this question on the student screen';
         displayBtn.onclick = (e) => {
           e.stopPropagation();
@@ -525,11 +525,7 @@ function renderMediaGallery() {
       mediaPanel.querySelectorAll('.media-item').forEach(item => {
         item.addEventListener('click', () => {
           const idx = Number(item.dataset.mediaIndex);
-          const type = item.dataset.mediaType || '';
-          const url = item.dataset.mediaUrl || '';
-          if (type === 'link' && url && url !== '#') {
-            window.open(url, '_blank', 'noopener');
-          } else if (Number.isInteger(idx)) {
+          if (Number.isInteger(idx)) {
             sendMediaToStudent(idx);
           }
         });
@@ -616,7 +612,7 @@ function getMediaIcon(type) {
     document: 'assignment',
     link: 'link',
     presentation: 'bar_chart',
-    verse: '📖'
+    verse: 'menu_book'
   };
   return icons[type] || 'folder';
 }
@@ -967,18 +963,18 @@ function sendVerseToStudent(reference, translation = 'nkjv') {
 // Get icon for media mark type
 function getMediaMarkIcon(type) {
   const icons = {
-    verse: '📖',
-    video: '🎬',
-    image: '🖼️',
-    images: '🖼️',
-    link: '🔗',
-    pdf: '📄',
-    document: '📋',
-    audio: '🎵',
-    question: '❓',
-    presentation: '📊'
+    verse: 'menu_book',
+    video: 'movie',
+    image: 'image',
+    images: 'photo_library',
+    link: 'link',
+    pdf: 'description',
+    document: 'assignment',
+    audio: 'audio_file',
+    question: 'help',
+    presentation: 'bar_chart'
   };
-  return icons[type] || '📎';
+  return icons[type] || 'attach_file';
 }
 
 // Send section media directly to student
@@ -1051,12 +1047,11 @@ function sendSectionMediaToStudent(media) {
     return;
   }
 
-  // Handle link type - open in new tab (don't display on student)
+  // Handle link type - display in student window
   if (media.type === 'link') {
-    const url = media.url || (media.sources && media.sources[0]?.url) || '';
-    if (url) {
-      window.open(url, '_blank', 'noopener');
-    }
+    currentMediaType = 'link';
+    updateControlVisibility();
+    sendCommand('displayMedia', { media });
     return;
   }
 
@@ -1120,7 +1115,7 @@ function renderPauseList() {
     const label = document.createElement('div');
     label.innerHTML = `<strong>${point.label}</strong><br><small>${formatTime(point.time)}</small>`;
     const btn = document.createElement('button');
-    btn.textContent = 'Jump here';
+    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">skip_next</span>Jump here';
     btn.onclick = () => sendCommand('jumpToPause', { index: idx });
     item.appendChild(label);
     item.appendChild(btn);
@@ -1363,7 +1358,7 @@ async function setStoppedMarkerEditor(headingId) {
   const cloudWarning = await saveStoppedMarker();
 
   if (cloudWarning) {
-    flashStatus(`⚠ Marker saved locally only. ${cloudWarning}`);
+    flashStatus(`Warning: Marker saved locally only. ${cloudWarning}`);
     return;
   }
 
@@ -1403,7 +1398,7 @@ async function setStoppedMarker(sectionId) {
   const cloudWarning = await saveStoppedMarker();
 
   if (cloudWarning) {
-    flashStatus(`⚠ Marker saved locally only. ${cloudWarning}`);
+    flashStatus(`Warning: Marker saved locally only. ${cloudWarning}`);
     return;
   }
 
@@ -1439,11 +1434,11 @@ async function saveStoppedMarker() {
       return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
     }
 
-    console.log('[✓] Saved stopped marker');
+    console.log('[OK] Saved stopped marker');
     return '';
   } catch (err) {
     console.error('Failed to save stopped marker:', err);
-    flashStatus('⚠️ Could not save marker - check server');
+    flashStatus('Warning: Could not save marker - check server');
     return '';
   }
 }

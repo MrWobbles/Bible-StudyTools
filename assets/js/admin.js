@@ -125,12 +125,12 @@ async function syncLessonPlanDeltaToMongo(options = {}) {
 function showAdminSaveResult(itemLabel, result) {
   const warning = getCloudSyncWarning(result);
   if (warning) {
-    showAdminSaveStatus(`⚠ ${itemLabel} saved locally only. ${warning}`, true);
+    showAdminSaveStatus(`${itemLabel} saved locally only. ${warning}`, true, 'warning');
     return;
   }
 
   const syncedToCloud = result?.cloudSync?.ok === true || result?.mongoSync === true;
-  showAdminSaveStatus(`✓ ${itemLabel} saved${syncedToCloud ? ' + Atlas' : ''}`);
+  showAdminSaveStatus(`${itemLabel} saved${syncedToCloud ? ' + Atlas' : ''}`, false, 'check_circle');
 }
 
 // Load data on page load
@@ -192,7 +192,7 @@ function renderLessonPlansList() {
       <div class="lessonplan-card-header">
         <div class="lessonplan-card-title">${escapeHtml(plan.title)}</div>
         <div class="lessonplan-card-actions">
-          <button class="btn-icon" onclick="editLessonPlan(${index})" title="Edit">✎</button>
+          <button class="btn-icon" onclick="editLessonPlan(${index})" title="Edit"><span class="material-symbols-outlined">edit</span></button>
           <button class="btn-icon" onclick="deleteLessonPlan(${index})" title="Delete">⊘</button>
         </div>
       </div>
@@ -340,7 +340,7 @@ async function saveLessonPlansToFile(options = {}) {
   if (window.bst && window.bst.saveFile) {
     try {
       await window.bst.saveFile('lessonPlans.json', JSON.stringify(jsonData, null, 2));
-      console.log('[✓] Lesson plans saved via Electron');
+      console.log('[OK] Lesson plans saved via Electron');
       return;
     } catch (err) {
       console.error('Failed to save lesson plans via Electron:', err);
@@ -375,7 +375,7 @@ async function saveLessonPlansToFile(options = {}) {
         result.warning = combinedWarning;
       }
 
-      console.log('[✓] Lesson plans saved successfully:', result);
+      console.log('[OK] Lesson plans saved successfully:', result);
       showAdminSaveResult('Lesson plans', result);
       return;
     } else {
@@ -1183,12 +1183,12 @@ async function saveClassToFile(options = {}) {
   if (window.bst && window.bst.saveFile) {
     try {
       await window.bst.saveFile('classes.json', JSON.stringify(jsonData, null, 2));
-      console.log('[✓] Saved via Electron');
-      showAdminSaveStatus('✓ Classes saved');
+      console.log('[OK] Saved via Electron');
+      showAdminSaveStatus('Classes saved', false, 'check_circle');
       return;
     } catch (err) {
       console.error('Failed to save class via Electron:', err);
-      showAdminSaveStatus('✗ Save failed: ' + err.message, true);
+      showAdminSaveStatus('Save failed: ' + err.message, true, 'error');
       return;
     }
   }
@@ -1219,7 +1219,7 @@ async function saveClassToFile(options = {}) {
         result.warning = combinedWarning;
       }
 
-      console.log('[✓] Save successful:', result);
+      console.log('[OK] Save successful:', result);
       showAdminSaveResult('Classes', result);
       return;
     } else {
@@ -1247,7 +1247,7 @@ async function saveClassToFile(options = {}) {
 
 let _toastTimeout = null;
 
-function showAdminSaveStatus(msg, isError = false) {
+function showAdminSaveStatus(msg, isError = false, iconName = '') {
   let toast = document.getElementById('admin-save-toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -1269,7 +1269,11 @@ function showAdminSaveStatus(msg, isError = false) {
     document.body.appendChild(toast);
   }
 
-  toast.textContent = msg;
+  if (iconName) {
+    toast.innerHTML = `<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 6px;">${iconName}</span>${escapeHtml(String(msg || ''))}`;
+  } else {
+    toast.textContent = msg;
+  }
   toast.style.background = isError ? '#c0392b' : '#27ae60';
   toast.style.opacity = '1';
 
@@ -1673,7 +1677,7 @@ async function createManualBackup(fileType) {
     }
 
     const result = await response.json();
-    alert(`✓ Backup created: ${result.backupFileName}`);
+    alert(`Backup created: ${result.backupFileName}`);
     showBackupList(currentBackupTab);
 
   } catch (err) {
@@ -1705,7 +1709,7 @@ async function restoreBackup(backupFileName) {
     }
 
     const result = await response.json();
-    alert(`✓ ${result.message}\n\nPlease refresh the page to see the restored data.`);
+    alert(`${result.message}\n\nPlease refresh the page to see the restored data.`);
 
     // Refresh the page to load restored data
     if (confirm('Refresh the page now to load the restored data?')) {

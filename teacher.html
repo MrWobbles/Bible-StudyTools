@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/teacher.css" />
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="apple-touch-icon" href="assets/images/icon.png" />
@@ -24,7 +25,8 @@
         <p class="subtitle">Loading class content...</p>
       </div>
       <div class="title-group" style="align-items: flex-end; text-align: right;">
-        <button id="open-display-btn" class="pill-link">Open display page</button>
+        <button id="open-display-btn" class="pill-link"><span class="material-symbols-outlined"
+            style="font-size: 16px; vertical-align: middle; margin-right: 4px;">cast</span>Open display page</button>
         <small class="subtitle">Load that window on the TV; control it from here.</small>
       </div>
     </header>
@@ -64,8 +66,10 @@
             </div>
           </div>
           <div class="note-actions">
-            <button id="download-notes">Download notes</button>
-            <button id="upload-notes">Load notes file</button>
+            <button id="download-notes"><span class="material-symbols-outlined"
+                style="font-size: 16px; vertical-align: middle; margin-right: 4px;">download</span>Download notes</button>
+            <button id="upload-notes"><span class="material-symbols-outlined"
+                style="font-size: 16px; vertical-align: middle; margin-right: 4px;">upload</span>Load notes file</button>
             <input id="notes-file" type="file" accept="application/json,text/html,text/plain" style="display:none" />
           </div>
         </section>
@@ -106,8 +110,10 @@
   <script src="assets/js/teacher.js"></script>
 
   <div class="drawer-toggles">
-    <button id="toggle-media-btn" class="pill-link">Media resources</button>
-    <button id="toggle-verse-btn" class="pill-link">Quick verse</button>
+    <button id="toggle-media-btn" class="pill-link"><span class="material-symbols-outlined"
+        style="font-size: 16px; vertical-align: middle; margin-right: 4px;">videocam</span>Media resources</button>
+    <button id="toggle-verse-btn" class="pill-link"><span class="material-symbols-outlined"
+        style="font-size: 16px; vertical-align: middle; margin-right: 4px;">menu_book</span>Quick verse</button>
   </div>
 
   <iframe id="student-preview" src=""

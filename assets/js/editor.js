@@ -50,7 +50,11 @@ const QAPauseMarker = Node.create({
       [
         'div',
         { class: 'qa-pause-icon' },
-        '💬',
+        [
+          'span',
+          { class: 'material-symbols-outlined' },
+          'forum'
+        ],
       ],
       [
         'div',
@@ -119,9 +123,11 @@ function initializeEditor() {
       Underline,
       Highlight.configure({ multicolor: true }),
       Link.configure({
-        openOnClick: false,
+        openOnClick: true,
         HTMLAttributes: {
           class: 'editor-link',
+          target: '_blank',
+          rel: 'noopener noreferrer',
         },
       }),
       Image.configure({
@@ -568,7 +574,7 @@ async function saveBibleTranslationSetting() {
         const cloudWarning = await persistClassWithPartialMongoSync(allClasses[classIndex]);
         console.log('Bible translation preference saved:', translation);
         if (cloudWarning) {
-          updateSaveStatus('⚠ Translation saved locally only (cloud sync failed)');
+          updateSaveStatus('Warning: Translation saved locally only (cloud sync failed)');
         } else {
           updateSaveStatus('Translation saved');
           setTimeout(() => updateSaveStatus('Saved'), 2000);
@@ -704,7 +710,7 @@ function injectQAPauseMarkers(outline) {
   // Set the new content with markers
   editor.commands.setContent({ type: 'doc', content: newContent });
 
-  console.log(`✓ Successfully injected ${sectionsWithQA.length} Q&A pause markers`);
+  console.log(`[OK] Successfully injected ${sectionsWithQA.length} Q&A pause markers`);
 }
 
 function closeModal(modalId) {
@@ -987,7 +993,7 @@ async function saveDocument() {
 
         isDirty = false;
         if (cloudWarning) {
-          updateSaveStatus('⚠ Saved locally only (cloud sync failed)');
+          updateSaveStatus('Warning: Saved locally only (cloud sync failed)');
         } else {
           updateSaveStatus('Saved');
         }
@@ -1040,7 +1046,7 @@ function updateSaveStatus(status) {
       statusEl.classList.add('saving');
     } else if (status === 'Modified') {
       statusEl.classList.add('modified');
-    } else if (status.startsWith('⚠')) {
+    } else if (status.startsWith('Warning:')) {
       statusEl.classList.add('warning');
     } else if (status.includes('failed')) {
       statusEl.classList.add('error');
@@ -1278,7 +1284,7 @@ async function generateAndShowOutline() {
             <div style="font-size: 48px; margin-bottom: 16px;"><span class="material-symbols-outlined" style="font-size: 48px;">hourglass_bottom</span></div>
             <div style="font-size: 16px; margin-bottom: 8px;">${useAI ? 'AI is analyzing your content...' : 'Parsing content structure...'}</div>
             <div style="font-size: 13px;">${useAI ? 'This may take 1-3 minutes (first run is slower)' : 'This should be quick'}</div>
-            ${useAI ? '<div style="font-size: 12px; margin-top: 12px; color: var(--text-muted);">💡 Tip: Try "Phi-3" model for faster results</div>' : ''}
+            ${useAI ? '<div style="font-size: 12px; margin-top: 12px; color: var(--text-muted);"><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: text-bottom;">lightbulb</span> Tip: Try "Phi-3" model for faster results</div>' : ''}
         </div>
     `;
 
@@ -1327,7 +1333,7 @@ async function generateAndShowOutline() {
     // Success feedback
     startBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">check_circle</span>Generated Successfully';
     setTimeout(() => {
-      startBtn.textContent = 'Generate Outline';
+      startBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">auto_awesome</span>Generate Outline';
       startBtn.disabled = false;
     }, 2000);
 
@@ -1362,7 +1368,7 @@ async function generateAndShowOutline() {
     } else if (errorMsg.includes('Ollama') || errorMsg.includes('Not Found') || errorMsg.includes('404')) {
       suggestions = `
                 <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 12px; border-radius: 6px; margin-top: 16px; text-align: left;">
-                    <strong>💡 To use AI generation:</strong>
+                    <strong><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: text-bottom;">lightbulb</span> To use AI generation:</strong>
                     <ol style="margin: 8px 0 0 0; padding-left: 20px; font-size: 13px;">
                         <li>Download Ollama from <a href="https://ollama.ai" target="_blank" style="color: #0066cc;">ollama.ai</a></li>
                         <li>Install and start it (should auto-start)</li>
@@ -1387,7 +1393,7 @@ async function generateAndShowOutline() {
             </div>
         `;
 
-    startBtn.textContent = 'Try Again';
+    startBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">refresh</span>Try Again';
     startBtn.disabled = false;
   }
 }
@@ -1411,7 +1417,7 @@ async function enhanceCurrentOutline() {
     }
 
     enhanceBtn.disabled = true;
-    enhanceBtn.textContent = 'Enhancing...';
+    enhanceBtn.innerHTML = '<span class="material-symbols-outlined rotating" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">progress_activity</span>Enhancing...';
 
     const enhanced = await enhanceOutlineWithLLM(generatedOutline, editor);
     generatedOutline = enhanced;
@@ -1425,14 +1431,14 @@ async function enhanceCurrentOutline() {
 
     enhanceBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">check_circle</span>Enhanced';
     setTimeout(() => {
-      enhanceBtn.textContent = 'Enhance with AI';
+      enhanceBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">auto_fix_high</span>Enhance with AI';
       enhanceBtn.disabled = false;
     }, 2000);
 
   } catch (error) {
     console.error('Enhancement failed:', error);
     alert('Failed to enhance outline: ' + error.message);
-    enhanceBtn.textContent = 'Enhance with AI';
+    enhanceBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">auto_fix_high</span>Enhance with AI';
     enhanceBtn.disabled = false;
   }
 }
@@ -1450,10 +1456,10 @@ async function copyOutlineJSON() {
 
     // Visual feedback
     const btn = document.getElementById('btn-copy-outline');
-    const originalText = btn.textContent;
+    const originalHtml = btn.innerHTML;
     btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">done</span>Copied!';
     setTimeout(() => {
-      btn.textContent = originalText;
+      btn.innerHTML = originalHtml;
     }, 2000);
   } catch (error) {
     console.error('Copy failed:', error);
@@ -1610,7 +1616,7 @@ Please answer their question thoughtfully, considering the content they've creat
 
   } catch (error) {
     console.error('AI question failed:', error);
-    responseDiv.innerHTML = `<span style="color: #721c24;">❌ Error: ${error.message}</span>`;
+    responseDiv.innerHTML = `<span style="color: #721c24;"><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: text-bottom;">error</span> Error: ${error.message}</span>`;
   } finally {
     // Reset button
     askBtn.disabled = false;

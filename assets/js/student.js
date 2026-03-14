@@ -32,6 +32,7 @@ function initConfig() {
   const classId = new URLSearchParams(window.location.search).get('class') || '1';
   const config = window.BIBLE_STUDY_CONFIG || {};
   VIDEO_ID = config.videoId || '';
+  window.VIDEO_ID = VIDEO_ID;
   // Normalize pausePoints: allow seconds (number) or "MM:SS" strings
   pausePoints = Array.isArray(config.pausePoints)
     ? config.pausePoints.map((p) => ({
@@ -289,7 +290,7 @@ function renderPauseList() {
     const label = document.createElement('div');
     label.innerHTML = `<strong>${point.label}</strong><br><small>${formatTime(point.time)}</small>`;
     const btn = document.createElement('button');
-    btn.textContent = 'Jump here';
+    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">skip_next</span>Jump here';
     btn.onclick = () => jumpToPause(idx);
     item.appendChild(label);
     item.appendChild(btn);
@@ -440,6 +441,10 @@ function handlePendingMedia() {
       const source = pendingMedia.sources[0];
       videoId = source.videoId || '';
       videoUrl = source.url || source.path || '';
+
+      if (!videoId && source.type === 'youtube') {
+        videoId = extractVideoId(videoUrl);
+      }
     } else if (pendingMedia.url) {
       videoUrl = pendingMedia.url;
     } else if (pendingMedia.videoId) {
@@ -478,6 +483,7 @@ function handlePendingMedia() {
 
     if (newVideoId) {
       VIDEO_ID = newVideoId;
+      window.VIDEO_ID = VIDEO_ID;
       // Destroy existing player if any
       if (player) {
         player.destroy();
@@ -510,13 +516,7 @@ function handlePendingMedia() {
       pendingMedia = null;
     }
   } else if (pendingMedia.type === 'image' || pendingMedia.type === 'images') {
-    // Support both sources array and direct url
-    let imgUrl = '';
-    if (pendingMedia.sources && pendingMedia.sources[0]) {
-      imgUrl = pendingMedia.sources[0].url;
-    } else if (pendingMedia.url) {
-      imgUrl = pendingMedia.url;
-    }
+    const imgUrl = getMediaSourceUrl(pendingMedia);
 
     if (imgUrl) {
       // Destroy player if exists
@@ -527,6 +527,52 @@ function handlePendingMedia() {
       playerDiv.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:contain;" alt="${pendingMedia.title || 'Image'}">`;
       pendingMedia = null;
     }
+  } else if (pendingMedia.type === 'pdf' || pendingMedia.type === 'document') {
+    const docUrl = getMediaSourceUrl(pendingMedia);
+    if (!docUrl) return;
+
+    if (player) {
+      player.destroy();
+      player = null;
+    }
+
+    playerDiv.innerHTML = `
+      <iframe src="${docUrl}" style="width:100%; height:100%; border:none; border-radius:10px;"></iframe>
+    `;
+    pendingMedia = null;
+  } else if (pendingMedia.type === 'audio') {
+    const audioUrl = getMediaSourceUrl(pendingMedia);
+    if (!audioUrl) return;
+
+    if (player) {
+      player.destroy();
+      player = null;
+    }
+
+    playerDiv.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:center; height:100%; padding:24px;">
+        <audio controls autoplay style="width:min(900px, 100%);" src="${audioUrl}"></audio>
+      </div>
+    `;
+    pendingMedia = null;
+  } else if (pendingMedia.type === 'link') {
+    const linkUrl = getMediaSourceUrl(pendingMedia);
+    if (!linkUrl) return;
+
+    if (player) {
+      player.destroy();
+      player = null;
+    }
+
+    const safeTitle = escapeHtml(pendingMedia.title || 'External Link');
+    playerDiv.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; text-align:center; gap:12px; padding:30px;">
+        <span class="material-symbols-outlined" style="font-size:56px;">link</span>
+        <h3 style="margin:0;">${safeTitle}</h3>
+        <a href="${linkUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary" style="display:inline-block; padding:10px 20px;">Open Link</a>
+      </div>
+    `;
+    pendingMedia = null;
   } else if (pendingMedia.type === 'verse') {
     const media = pendingMedia;
     pendingMedia = null;
@@ -536,6 +582,17 @@ function handlePendingMedia() {
     pendingMedia = null;
     renderQuestionMedia(media);
   }
+}
+
+function getMediaSourceUrl(media) {
+  if (!media || typeof media !== 'object') return '';
+  if (typeof media.url === 'string' && media.url.trim()) return media.url.trim();
+  if (Array.isArray(media.sources) && media.sources.length > 0) {
+    const first = media.sources[0];
+    if (typeof first?.url === 'string' && first.url.trim()) return first.url.trim();
+    if (typeof first?.path === 'string' && first.path.trim()) return first.path.trim();
+  }
+  return '';
 }
 
 // Render a question/discussion prompt on the student screen
@@ -555,7 +612,7 @@ function renderQuestionMedia(media) {
     <div class="question-frame" style="padding:60px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);position:relative;overflow:hidden;">
       <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"none\" stroke=\"rgba(240,180,41,0.1)\" stroke-width=\"0.5\"/></svg>') repeat;opacity:0.3;"></div>
       <div style="text-align:center;max-width:85%;position:relative;z-index:1;">
-        <div style="font-size:48px;margin-bottom:24px;">❓</div>
+        <div style="font-size:48px;margin-bottom:24px;"><span class="material-symbols-outlined" style="font-size: 48px;">help</span></div>
         <h1 class="question-prompt" style="color:#fff;font-size:52px;line-height:1.4;font-weight:600;margin:0;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">${escapeHtml(prompt)}</h1>
         ${media.title && media.title !== prompt ? `<div style="color:rgba(255,255,255,0.7);font-size:24px;margin-top:24px;">${escapeHtml(media.title)}</div>` : ''}
       </div>
@@ -963,7 +1020,14 @@ function previousVersePage() {
 }
 
 function extractVideoId(url) {
-  if (!url) return '';
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/))([^&\?\/]+)/);
+  const input = String(url || '').trim();
+  if (!input) return '';
+
+  const directId = input.match(/^[A-Za-z0-9_-]{11}$/);
+  if (directId) {
+    return directId[0];
+  }
+
+  const match = input.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|shorts\/|embed\/))([^&\?\/]+)/);
   return match ? match[1] : '';
 }
