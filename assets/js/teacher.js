@@ -1367,20 +1367,23 @@ async function setStoppedMarkerEditorLine(lineId) {
       allClassesData.classes[classIndex].stoppedAtSection = null;
       allClassesData.classes[classIndex].stoppedAtEditorHeading = null;
       allClassesData.classes[classIndex].stoppedAtEditorLine = lineId;
+    } else {
+      console.warn('Could not find class in allClassesData to update marker');
     }
+  } else {
+    console.warn('allClassesData or allClassesData.classes not available for marker update');
   }
 
   const cloudWarning = await saveStoppedMarker();
 
-  if (cloudWarning) {
-    flashStatus(`Warning: Marker saved locally only. ${cloudWarning}`);
-    return;
-  }
-
+  // Re-render both views to update UI (even if save failed, show local state)
   renderOutlineWithQuestions();
   renderGeneratedOutline();
 
-  if (lineId) {
+  // Show feedback
+  if (cloudWarning) {
+    flashStatus(`Warning: ${cloudWarning}`);
+  } else if (lineId) {
     flashStatus('Marked where you stopped');
   } else {
     flashStatus('Marker removed');
@@ -1406,23 +1409,24 @@ async function setStoppedMarkerEditor(headingId) {
       allClassesData.classes[classIndex].stoppedAtSection = null;
       allClassesData.classes[classIndex].stoppedAtEditorHeading = headingId;
       allClassesData.classes[classIndex].stoppedAtEditorLine = null;
+    } else {
+      console.warn('Could not find class in allClassesData to update marker');
     }
+  } else {
+    console.warn('allClassesData or allClassesData.classes not available for marker update');
   }
 
   // Save to server
   const cloudWarning = await saveStoppedMarker();
 
-  if (cloudWarning) {
-    flashStatus(`Warning: Marker saved locally only. ${cloudWarning}`);
-    return;
-  }
-
-  // Re-render both views to update UI
+  // Re-render both views to update UI (even if save failed, show local state)
   renderOutlineWithQuestions();
   renderGeneratedOutline();
 
   // Show feedback
-  if (headingId) {
+  if (cloudWarning) {
+    flashStatus(`Warning: ${cloudWarning}`);
+  } else if (headingId) {
     flashStatus('Marked where you stopped');
   } else {
     flashStatus('Marker removed');
@@ -1448,23 +1452,27 @@ async function setStoppedMarker(sectionId) {
       allClassesData.classes[classIndex].stoppedAtEditorHeading = null;
       allClassesData.classes[classIndex].stoppedAtEditorLine = null;
       allClassesData.classes[classIndex].stoppedAtSection = sectionId;
+    } else {
+      console.warn('Could not find class in allClassesData to update marker', {
+        classConfigId: classConfig.id,
+        classConfigNumber: classConfig.classNumber
+      });
     }
+  } else {
+    console.warn('allClassesData or allClassesData.classes not available for marker update');
   }
 
   // Save to server
   const cloudWarning = await saveStoppedMarker();
 
-  if (cloudWarning) {
-    flashStatus(`Warning: Marker saved locally only. ${cloudWarning}`);
-    return;
-  }
-
-  // Re-render both views to update UI
+  // Re-render both views to update UI (even if save failed, show local state)
   renderOutlineWithQuestions();
   renderGeneratedOutline();
 
   // Show feedback
-  if (sectionId) {
+  if (cloudWarning) {
+    flashStatus(`Warning: ${cloudWarning}`);
+  } else if (sectionId) {
     flashStatus('Marked where you stopped');
   } else {
     flashStatus('Marker removed');
@@ -1475,6 +1483,12 @@ async function setStoppedMarker(sectionId) {
  * Save the stopped marker to server
  */
 async function saveStoppedMarker() {
+  // If allClassesData is not available, can't save
+  if (!allClassesData) {
+    console.error('Cannot save stopped marker: allClassesData not loaded');
+    return 'Data not loaded - please refresh the page';
+  }
+
   try {
     const response = await window.BSTApi.fetch('/api/save/classes', {
       method: 'POST',
@@ -1483,7 +1497,8 @@ async function saveStoppedMarker() {
     }, { requireAdmin: true });
 
     if (!response.ok) {
-      throw new Error('Failed to save');
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Server returned ${response.status}: ${errorText}`);
     }
 
     const result = await response.json().catch(() => ({}));
@@ -1495,8 +1510,7 @@ async function saveStoppedMarker() {
     return '';
   } catch (err) {
     console.error('Failed to save stopped marker:', err);
-    flashStatus('Warning: Could not save marker - check server');
-    return '';
+    return `Could not save marker: ${err.message || 'check server'}`;
   }
 }
 
