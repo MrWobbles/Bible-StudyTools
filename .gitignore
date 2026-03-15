@@ -26,7 +26,8 @@ playwright-report/
 test-results/
 .playwright/
 
-# Backups are tracked
+# Backups
+backups/*
 
 # Large media files (download manually, not tracked)
 assets/video/*
