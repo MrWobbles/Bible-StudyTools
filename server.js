@@ -514,6 +514,18 @@ async function syncDocumentToMongo(docId, data) {
 // ===== BACKUP FUNCTIONS =====
 
 /**
+ * Compare two data objects for equality (using JSON serialization)
+ */
+function dataHasChanged(currentData, newData) {
+  try {
+    return JSON.stringify(currentData) !== JSON.stringify(newData);
+  } catch {
+    // If serialization fails, assume data changed to be safe
+    return true;
+  }
+}
+
+/**
  * Create a backup of a file before saving
  */
 async function createBackup(fileName, data) {
@@ -649,7 +661,11 @@ app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
       try {
         const currentContent = await fs.readFile(filePath, 'utf8');
         const currentData = JSON.parse(currentContent);
-        backupFileName = await createBackup('classes.json', currentData);
+        if (dataHasChanged(currentData, data)) {
+          backupFileName = await createBackup('classes.json', currentData);
+        } else {
+          console.log('[Backup] No changes detected in classes.json, skipping backup');
+        }
       } catch (err) {
         if (err.code !== 'ENOENT') {
           console.warn('[Backup] Could not capture pre-save classes.json backup:', err.message);
@@ -720,7 +736,11 @@ app.post([
       try {
         const currentContent = await fs.readFile(filePath, 'utf8');
         const currentData = JSON.parse(currentContent);
-        backupFileName = await createBackup('lessonPlans.json', currentData);
+        if (dataHasChanged(currentData, data)) {
+          backupFileName = await createBackup('lessonPlans.json', currentData);
+        } else {
+          console.log('[Backup] No changes detected in lessonPlans.json, skipping backup');
+        }
       } catch (err) {
         if (err.code !== 'ENOENT') {
           console.warn('[Backup] Could not capture pre-save lessonPlans.json backup:', err.message);
@@ -1189,7 +1209,7 @@ app.use((err, req, res, next) => {
  */
 async function syncFromMongoDB() {
   const docs = [
-    { docId: 'classes',     fileName: 'classes.json' },
+    { docId: 'classes', fileName: 'classes.json' },
     { docId: 'lessonPlans', fileName: 'lessonPlans.json' },
   ];
 
@@ -1295,9 +1315,9 @@ function maybeOpenBrowser(port) {
 
   // Auto-open admin page in the default browser
   const adminUrl = `http://localhost:${port}/admin.html`;
-  const openCmd = process.platform === 'win32'  ? `start "" "${adminUrl}"`
-               : process.platform === 'darwin' ? `open "${adminUrl}"`
-               : `xdg-open "${adminUrl}"`;
+  const openCmd = process.platform === 'win32' ? `start "" "${adminUrl}"`
+    : process.platform === 'darwin' ? `open "${adminUrl}"`
+      : `xdg-open "${adminUrl}"`;
   exec(openCmd, err => {
     if (err) console.warn('[!] Could not auto-open browser:', err.message);
   });
