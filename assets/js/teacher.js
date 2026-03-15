@@ -545,16 +545,25 @@ function renderMediaGallery() {
   if (!versePanel) return;
 
   versePanel.innerHTML = `
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <input id="verse-ref-input" type="text" placeholder="e.g., John 3:16–18" style="flex:1; min-width:200px;" />
-      <input id="verse-translation-input" type="text" value="nkjv" style="width:80px;" />
-      <button id="verse-send-btn">Show</button>
+    <div class="quick-verse-form-row quick-verse-main-row">
+      <input id="verse-ref-input" class="quick-verse-input" type="text" placeholder="e.g., John 3:16–18" />
+      <select id="verse-translation-input" class="quick-verse-select" aria-label="Bible version">
+        <option value="nkjv" selected>NKJV</option>
+        <option value="kjv">KJV</option>
+        <option value="esv">ESV</option>
+        <option value="niv">NIV</option>
+        <option value="nasb">NASB</option>
+        <option value="nlt">NLT</option>
+        <option value="amp">AMP</option>
+        <option value="web">WEB</option>
+      </select>
+      <button id="verse-send-btn" class="quick-verse-btn">Show</button>
     </div>
-    <div style="display:flex; gap:8px; margin-top:8px;">
-      <button id="verse-prev" style="flex:1;">← Previous</button>
-      <button id="verse-next" style="flex:1;">Next →</button>
+    <div class="quick-verse-form-row quick-verse-nav-row">
+      <button id="verse-prev" class="quick-verse-btn quick-verse-btn-nav"><span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; margin-right:4px;">navigate_before</span>Previous</button>
+      <button id="verse-next" class="quick-verse-btn quick-verse-btn-nav">Next<span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; margin-left:4px;">navigate_next</span></button>
     </div>
-    <div style="font-size:12px; color:var(--muted); margin-top:6px;">
+    <div class="quick-verse-help">
       Defaults to NKJV via labs.bible.org, falls back to KJV and bible-api.com
     </div>
   `;
@@ -772,13 +781,13 @@ function renderGeneratedOutline() {
     });
   });
 
-  // Add stopped-here markers to headings
-  addStoppedMarkersToEditorContent(displayContainer);
-
   // Add Q&A break markers if generatedOutline exists
   if (classConfig.generatedOutline && classConfig.generatedOutline.length > 0) {
     insertQABreakMarkers(displayContainer, classConfig.generatedOutline);
   }
+
+  // Add stopped-here markers with line numbers
+  addStoppedMarkersToEditorContent(displayContainer);
 
   // Add click handlers to external links - require Alt key to open
   const links = displayContainer.querySelectorAll('a[href]');
@@ -1289,49 +1298,89 @@ function updateControlVisibility() {
 // ===== STOPPED HERE MARKER =====
 
 /**
- * Add stopped-here markers to headings in editor content
+ * Add stopped-here markers to editor lines with line numbers
  */
 function addStoppedMarkersToEditorContent(container) {
-  const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+  const lineCandidates = Array.from(container.childNodes).filter((node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const el = /** @type {HTMLElement} */ (node);
+    return !!el.textContent?.trim();
+  });
 
-  headings.forEach((heading, index) => {
-    const headingId = `editor-heading-${index}`;
-    const isStoppedHere = classConfig.stoppedAtEditorHeading === headingId;
+  let headingIndex = 0;
 
-    // Wrap heading content
+  lineCandidates.forEach((lineElement, index) => {
+    const lineId = `editor-line-${index + 1}`;
+    const isHeading = /^H[1-6]$/.test(lineElement.tagName);
+    const legacyHeadingId = isHeading ? `editor-heading-${headingIndex}` : null;
+    if (isHeading) headingIndex += 1;
+
+    const isLegacyMatch = !!legacyHeadingId && classConfig.stoppedAtEditorHeading === legacyHeadingId;
+    const isStoppedHere = classConfig.stoppedAtEditorLine === lineId || isLegacyMatch;
+
     const wrapper = document.createElement('div');
-    wrapper.className = `editor-heading-wrapper${isStoppedHere ? ' stopped-here' : ''}`;
-    wrapper.setAttribute('data-heading-id', headingId);
+    wrapper.className = `editor-line-row${isStoppedHere ? ' stopped-here' : ''}`;
+    wrapper.setAttribute('data-line-id', lineId);
 
-    // Move heading into wrapper
-    heading.parentNode.insertBefore(wrapper, heading);
-    wrapper.appendChild(heading);
-
-    // Add stopped indicator if marked
-    if (isStoppedHere) {
-      const indicator = document.createElement('span');
-      indicator.className = 'stopped-indicator editor-stopped';
-      indicator.innerHTML = '<span class="material-icons">location_on</span> Stopped here';
-      heading.appendChild(indicator);
-    }
-
-    // Add marker button
     const markerBtn = document.createElement('button');
-    markerBtn.className = `stop-marker-btn editor-marker${isStoppedHere ? ' active' : ''}`;
-    markerBtn.innerHTML = isStoppedHere
-      ? '<span class="material-icons">check</span>'
-      : '<span class="material-icons">location_on</span>';
+    markerBtn.className = `stop-marker-btn editor-line-marker${isStoppedHere ? ' active' : ''}`;
+    markerBtn.setAttribute('type', 'button');
+    markerBtn.setAttribute('aria-label', isStoppedHere ? `Remove stop marker from line ${index + 1}` : `Set stop marker at line ${index + 1}`);
     markerBtn.title = isStoppedHere ? 'Click to remove marker' : 'Mark where you stopped';
+    markerBtn.innerHTML = `<span class="line-number-text">${index + 1}</span>`;
     markerBtn.onclick = (e) => {
       e.stopPropagation();
-      if (isStoppedHere) {
-        setStoppedMarkerEditor(null);
+      if (classConfig.stoppedAtEditorLine === lineId) {
+        setStoppedMarkerEditorLine(null);
       } else {
-        setStoppedMarkerEditor(headingId);
+        setStoppedMarkerEditorLine(lineId);
       }
     };
+
+    const parent = lineElement.parentNode;
+    if (!parent) return;
+    parent.insertBefore(wrapper, lineElement);
     wrapper.appendChild(markerBtn);
+    wrapper.appendChild(lineElement);
+    lineElement.classList.add('editor-line-content');
   });
+}
+
+/**
+ * Set the "stopped here" marker on an editor line
+ * @param {string|null} lineId - Line ID to mark, or null to clear
+ */
+async function setStoppedMarkerEditorLine(lineId) {
+  classConfig.stoppedAtSection = null;
+  classConfig.stoppedAtEditorHeading = null;
+  classConfig.stoppedAtEditorLine = lineId;
+
+  if (allClassesData && allClassesData.classes) {
+    const classIndex = allClassesData.classes.findIndex(c =>
+      c.id === classConfig.id || c.classNumber === classConfig.classNumber
+    );
+    if (classIndex !== -1) {
+      allClassesData.classes[classIndex].stoppedAtSection = null;
+      allClassesData.classes[classIndex].stoppedAtEditorHeading = null;
+      allClassesData.classes[classIndex].stoppedAtEditorLine = lineId;
+    }
+  }
+
+  const cloudWarning = await saveStoppedMarker();
+
+  if (cloudWarning) {
+    flashStatus(`Warning: Marker saved locally only. ${cloudWarning}`);
+    return;
+  }
+
+  renderOutlineWithQuestions();
+  renderGeneratedOutline();
+
+  if (lineId) {
+    flashStatus('Marked where you stopped');
+  } else {
+    flashStatus('Marker removed');
+  }
 }
 
 /**
@@ -1342,6 +1391,7 @@ async function setStoppedMarkerEditor(headingId) {
   // Clear any outline section marker (only one marker per class)
   classConfig.stoppedAtSection = null;
   classConfig.stoppedAtEditorHeading = headingId;
+  classConfig.stoppedAtEditorLine = null;
 
   // Update the allClassesData
   if (allClassesData && allClassesData.classes) {
@@ -1351,6 +1401,7 @@ async function setStoppedMarkerEditor(headingId) {
     if (classIndex !== -1) {
       allClassesData.classes[classIndex].stoppedAtSection = null;
       allClassesData.classes[classIndex].stoppedAtEditorHeading = headingId;
+      allClassesData.classes[classIndex].stoppedAtEditorLine = null;
     }
   }
 
@@ -1381,6 +1432,7 @@ async function setStoppedMarkerEditor(headingId) {
 async function setStoppedMarker(sectionId) {
   // Clear any editor heading marker (only one marker per class)
   classConfig.stoppedAtEditorHeading = null;
+  classConfig.stoppedAtEditorLine = null;
   classConfig.stoppedAtSection = sectionId;
 
   // Update the allClassesData with the new marker
@@ -1390,6 +1442,7 @@ async function setStoppedMarker(sectionId) {
     );
     if (classIndex !== -1) {
       allClassesData.classes[classIndex].stoppedAtEditorHeading = null;
+      allClassesData.classes[classIndex].stoppedAtEditorLine = null;
       allClassesData.classes[classIndex].stoppedAtSection = sectionId;
     }
   }

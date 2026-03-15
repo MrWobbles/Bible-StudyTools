@@ -4,6 +4,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      try {
+        var theme = localStorage.getItem('bst-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
   <title>Presenter View — Bible Study</title>
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,21 +27,28 @@
   <link rel="apple-touch-icon" href="assets/images/icon.png" />
 </head>
 
-<body>
-  <div class="page">
-    <header>
-      <div class="title-group">
+<body class="page page--teacher">
+  <div class="page app app--teacher">
+    <header class="app__header">
+      <div class="title-group app__title-group">
         <h1>Presenter View</h1>
-        <p class="subtitle">Loading class content...</p>
+        <p class="subtitle app__subtitle">Loading class content...</p>
       </div>
-      <div class="title-group" style="align-items: flex-end; text-align: right;">
+      <div class="title-group app__title-group" style="align-items: flex-end; text-align: right;">
         <button id="open-display-btn" class="pill-link"><span class="material-symbols-outlined"
             style="font-size: 16px; vertical-align: middle; margin-right: 4px;">cast</span>Open display page</button>
         <small class="subtitle">Load that window on the TV; control it from here.</small>
       </div>
     </header>
 
-    <div class="layout">
+    <div class="layout app__layout app__layout--teacher">
+      <aside class="drawer-toggles">
+        <button id="toggle-media-btn" class="pill-link"><span class="material-symbols-outlined"
+            style="font-size: 16px; vertical-align: middle; margin-right: 4px;">videocam</span>Media resources</button>
+        <button id="toggle-verse-btn" class="pill-link"><span class="material-symbols-outlined"
+            style="font-size: 16px; vertical-align: middle; margin-right: 4px;">menu_book</span>Quick verse</button>
+      </aside>
+
       <section class="card" id="question-bank">
         <div class="tag">Outline & prompts</div>
         <div class="outline-tabs">
@@ -62,7 +79,7 @@
               <button type="button" data-cmd="formatBlock" data-value="p">Paragraph</button>
               <button type="button" data-cmd="removeFormat">Clear</button>
             </div>
-            <div id="notes" class="rte-editor" contenteditable="true" spellcheck="true" aria-label="Presenter notes">
+            <div id="notes" class="rte-editor" contenteditable="true" spellcheck="true" role="textbox" aria-label="Presenter notes">
             </div>
           </div>
           <div class="note-actions">
@@ -105,16 +122,10 @@
   </div>
 
   <script src="assets/js/api.js"></script>
+  <script src="assets/js/theme.js"></script>
   <script src="assets/js/loader.js"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/teacher.js"></script>
-
-  <div class="drawer-toggles">
-    <button id="toggle-media-btn" class="pill-link"><span class="material-symbols-outlined"
-        style="font-size: 16px; vertical-align: middle; margin-right: 4px;">videocam</span>Media resources</button>
-    <button id="toggle-verse-btn" class="pill-link"><span class="material-symbols-outlined"
-        style="font-size: 16px; vertical-align: middle; margin-right: 4px;">menu_book</span>Quick verse</button>
-  </div>
 
   <iframe id="student-preview" src=""
     style="position: fixed; bottom: 90px; right: 20px; width: 400px; height: 225px; border: 1px solid #ccc; z-index: 1000; pointer-events: none; display: none;"></iframe>

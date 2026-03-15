@@ -4,6 +4,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      try {
+        var theme = localStorage.getItem('bst-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
   <title>Bible Study Class</title>
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,16 +26,16 @@
   <link rel="apple-touch-icon" href="assets/images/icon.png" />
 </head>
 
-<body>
-  <div class="page">
-    <header>
-      <div class="title-group">
+<body class="page page--student">
+  <div class="page app app--student">
+    <header class="app__header">
+      <div class="title-group app__title-group">
         <h1>Loading...</h1>
-        <p class="subtitle">Loading class content...</p>
+        <p class="subtitle app__subtitle">Loading class content...</p>
       </div>
     </header>
 
-    <div class="layout">
+    <div class="layout app__layout app__layout--student">
       <section class="card video-card" id="video-card">
         <div class="player-shell">
           <div id="player"></div>
@@ -59,6 +69,7 @@
   </div>
 
   <script src="assets/js/api.js"></script>
+  <script src="assets/js/theme.js"></script>
   <script src="assets/js/loader.js"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/student.js"></script>

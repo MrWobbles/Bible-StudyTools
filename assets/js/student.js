@@ -357,6 +357,8 @@ function goFullscreen() {
   console.log('[Fullscreen] Current state:', isFullscreenActive(), '-> Should enter:', shouldEnter);
 
   if (shouldEnter) {
+    document.body.classList.add('fullscreen-mode');
+
     const req = container.requestFullscreen?.bind(container)
       || container.webkitRequestFullscreen?.bind(container)
       || container.mozRequestFullScreen?.bind(container)
@@ -391,6 +393,69 @@ function goFullscreen() {
     console.log('[Fullscreen] Exited fullscreen');
   }
 }
+
+function returnToDefaultView() {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
+  pendingMedia = null;
+  versePages = [];
+  currentVersePageIndex = 0;
+  currentVerseLines = [];
+  verseScrollContainer = null;
+
+  const exit = document.exitFullscreen?.bind(document)
+    || document.webkitExitFullscreen?.bind(document)
+    || document.mozCancelFullScreen?.bind(document)
+    || document.msExitFullscreen?.bind(document);
+
+  if (exit && (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement)) {
+    exit().catch(() => {
+      // ignore exit failures and continue resetting view
+    });
+  }
+
+  document.body.classList.remove('fullscreen-mode');
+
+  if (player && typeof player.destroy === 'function') {
+    try {
+      player.destroy();
+    } catch (err) {
+      console.warn('[Student] Failed to destroy player while clearing screen', err);
+    }
+  }
+  player = null;
+  window.player = null;
+
+  playerDiv.innerHTML = '<div id="player"></div>';
+
+  if (typeof YT !== 'undefined' && YT.Player && VIDEO_ID) {
+    player = new YT.Player('player', {
+      height: '100%',
+      width: '100%',
+      videoId: VIDEO_ID,
+      playerVars: {
+        rel: 0,
+        modestbranding: 1,
+        color: 'white',
+        playsinline: 1,
+        mute: isInIframe ? 1 : 0
+      },
+      events: {
+        onReady: function (event) {
+          player = event.target;
+          window.player = event.target;
+          onPlayerReady(event);
+        },
+        onStateChange: onPlayerStateChange
+      }
+    });
+  }
+
+  resetNextPause();
+}
+
+window.returnToDefaultView = returnToDefaultView;
 
 // Listen for fullscreen changes to keep CSS class in sync
 document.addEventListener('fullscreenchange', syncFullscreenClass);

@@ -1,0 +1,90 @@
+$breakpoints: (
+  xs: 480px,
+  sm: 768px,
+  md: 1024px,
+  lg: 1280px,
+  xl: 1536px
+);
+
+$font-sans: 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+$font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+:root {
+  --bg-page: #020308;
+  --bg-surface-primary: #070815;
+  --bg-surface-secondary: #0c0e20;
+  --bg-surface-elevated: #101227;
+  --bg-surface-subtle: #050612;
+
+  --accent-purple: #a855ff;
+  --accent-purple-soft: #8b5cf6;
+  --accent-purple-neon: #d946ef;
+  --accent-pink: #fb37ff;
+  --accent-pink-soft: #f472b6;
+  --accent-blue: #38bdf8;
+  --accent-blue-soft: #22d3ee;
+  --accent-green: #22c55e;
+  --accent-red: #f97373;
+  --accent-amber: #facc15;
+
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --text-inverse: #020617;
+
+  --border-subtle: #111827;
+  --border-strong: #1f2937;
+  --border-accent-purple: #a855ff;
+  --border-accent-blue: #38bdf8;
+  --border-accent-pink: #fb37ff;
+
+  --status-success: #22c55e;
+  --status-error: #f97373;
+  --status-warning: #facc15;
+  --status-info: #38bdf8;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --shadow-card-soft: 0 18px 45px rgba(15, 23, 42, 0.65);
+  --shadow-card-strong: 0 24px 80px rgba(0, 0, 0, 0.85);
+  --shadow-glow-purple: 0 0 35px rgba(168, 85, 255, 0.65);
+  --shadow-glow-blue: 0 0 35px rgba(56, 189, 248, 0.65);
+  --shadow-glow-pink: 0 0 35px rgba(251, 55, 255, 0.7);
+
+  --space-xxs: 4px;
+  --space-xs: 6px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+  --space-section: 48px;
+
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --layer-card-primary: radial-gradient(circle at top left, rgba(168, 85, 255, 0.16), transparent 60%), radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.16), transparent 60%), #050814;
+  --layer-card-secondary: #050814;
+  --layer-card-metric: linear-gradient(135deg, rgba(24, 24, 37, 0.96), rgba(15, 23, 42, 0.98));
+  --layer-chip-neon: radial-gradient(circle at top left, rgba(248, 250, 252, 0.18), transparent 55%), rgba(15, 23, 42, 0.6);
+  --layer-surface-toolbar: rgba(15, 23, 42, 0.96);
+}
+
+@mixin up($name) {
+  @media (min-width: map-get($breakpoints, $name)) {
+    @content;
+  }
+}
+
+@mixin down($name) {
+  @media (max-width: map-get($breakpoints, $name)) {
+    @content;
+  }
+}

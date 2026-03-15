@@ -101,6 +101,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   currentClassId = urlParams.get('class');
 
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+  });
+
   initializeEditor();
   setupEventListeners();
   loadDocument();
@@ -263,6 +268,15 @@ function setupEventListeners() {
     });
   });
 
+  // Close modal when clicking the backdrop
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal(modal.id);
+      }
+    });
+  });
+
   // Verse insertion
   document.getElementById('btn-insert-verse').addEventListener('click', insertVerseReference);
   document.getElementById('bible-translation-select')?.addEventListener('change', saveBibleTranslationSetting);
@@ -316,6 +330,13 @@ function setupEventListeners() {
     if (e.ctrlKey && e.key === 'f') {
       e.preventDefault();
       openModal('search-modal');
+    }
+
+    if (e.key === 'Escape') {
+      const openModalElement = document.querySelector('.modal.is-open');
+      if (openModalElement?.id) {
+        closeModal(openModalElement.id);
+      }
     }
   });
 }
@@ -455,7 +476,12 @@ function openModal(modalId) {
     if (modalId === 'verse-modal') {
       loadBibleTranslationSetting();
     }
-    modal.style.display = 'flex';
+    document.querySelectorAll('.modal.is-open').forEach(openModalEl => {
+      openModalEl.classList.remove('is-open');
+      openModalEl.setAttribute('aria-hidden', 'true');
+    });
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
   }
 }
 
@@ -716,7 +742,8 @@ function injectQAPauseMarkers(outline) {
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
-    modal.style.display = 'none';
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
   }
 }
 

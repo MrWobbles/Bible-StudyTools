@@ -1,0 +1,188 @@
+@use 'tokens';
+@use 'base';
+
+body.page--admin {
+  --page-bg: #0f1419;
+  --panel-bg: #1a1f28;
+  --text-primary: #f8f9fa;
+  --text-secondary: #9ca3af;
+  --accent-color: #3b82f6;
+  --accent-color-hover: #2563eb;
+  --focus-ring: rgba(59, 130, 246, 0.16);
+  --surface-border: rgba(255, 255, 255, 0.1);
+  --header-border: rgba(255, 255, 255, 0.1);
+
+  html[data-theme='light'] & {
+    --page-bg: #f5f7fb;
+    --panel-bg: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-color: #2563eb;
+    --accent-color-hover: #1d4ed8;
+    --focus-ring: rgba(37, 99, 235, 0.2);
+    --surface-border: rgba(148, 163, 184, 0.5);
+    --header-border: rgba(148, 163, 184, 0.5);
+  }
+
+  padding: 20px;
+
+  .app {
+    display: grid;
+    gap: 20px;
+    height: calc(100vh - 40px);
+    min-height: calc(100vh - 40px);
+    grid-template-rows: 75px minmax(0, 1fr);
+  }
+
+  .app__header {
+    height: 75px;
+    min-height: 75px;
+    padding: 0 20px;
+    border-radius: 12px;
+  }
+
+  .app__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .title-group h1 {
+    font-size: 24px;
+    line-height: 1.1;
+  }
+
+  .title-group .subtitle {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .layout-admin {
+    grid-template-columns: 320px 1fr;
+    min-height: 0;
+    flex: 1;
+    margin-top: 0;
+  }
+
+  #lessonplan-view.layout-admin {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+  }
+
+  .classes-list,
+  .lessonplans-list,
+  #editor {
+    overflow: auto;
+    padding: 16px;
+  }
+
+  .classes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .lessonplans-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+
+  .class-item,
+  .lessonplan-card,
+  .media-item,
+  .outline-item,
+  .question-field,
+  .backup-item {
+    border-radius: 12px;
+    border: 1px solid rgba(55, 65, 81, 0.8);
+    background: rgba(2, 6, 23, 0.92);
+    padding: 12px;
+    transition: all var(--duration-normal) var(--ease-standard);
+    margin-bottom: 0;
+  }
+
+  .class-item:hover,
+  .lessonplan-card:hover,
+  .media-item:hover,
+  .outline-item:hover,
+  .backup-item:hover {
+    border-color: var(--border-accent-purple);
+    box-shadow: var(--shadow-glow-purple);
+  }
+
+  .class-item.active {
+    border-color: var(--border-accent-blue);
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(168, 85, 255, 0.18));
+  }
+
+  .form-section {
+    border-radius: 16px;
+    border: 1px solid rgba(31, 41, 55, 0.9);
+    background: var(--layer-card-secondary);
+    padding: 18px;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+  }
+
+  .form-group {
+    margin-bottom: 14px;
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+  }
+
+  #no-selection {
+    color: var(--text-secondary) !important;
+  }
+
+  @media (max-width: 1024px) {
+    .app {
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .app__header {
+      height: auto;
+      min-height: 75px;
+      padding: 10px 12px;
+    }
+
+    .layout-admin {
+      grid-template-columns: 1fr;
+    }
+  }
+}

@@ -1,0 +1,496 @@
+{
+  "meta": {
+    "name": "PlasmaDarkDashboard",
+    "description": "Design tokens extracted from 3 marketing/dashboard hero shots in a dark neon style.",
+    "version": "1.0.0"
+  },
+
+  "breakpoints": {
+    "xs": "480px",
+    "sm": "768px",
+    "md": "1024px",
+    "lg": "1280px",
+    "xl": "1536px"
+  },
+
+  "grid": {
+    "pageMaxWidth": "1440px",
+    "gutter": "24px",
+    "sectionVerticalPadding": {
+      "desktop": "96px",
+      "tablet": "72px",
+      "mobile": "56px"
+    },
+    "columnCount": 12
+  },
+
+  "palette": {
+    "background": {
+      "page": "#020308",
+      "surfacePrimary": "#070815",
+      "surfaceSecondary": "#0C0E20",
+      "surfaceElevated": "#101227",
+      "surfaceSubtle": "#050612"
+    },
+    "accent": {
+      "purple": "#A855FF",
+      "purpleSoft": "#8B5CF6",
+      "purpleNeon": "#D946EF",
+      "pink": "#FB37FF",
+      "pinkSoft": "#F472B6",
+      "blue": "#38BDF8",
+      "blueSoft": "#22D3EE",
+      "green": "#22C55E",
+      "red": "#F97373",
+      "amber": "#FACC15"
+    },
+    "content": {
+      "primary": "#F9FAFB",
+      "secondary": "#9CA3AF",
+      "muted": "#6B7280",
+      "inverse": "#020617"
+    },
+    "borders": {
+      "subtle": "#111827",
+      "strong": "#1F2937",
+      "accentPurple": "#A855FF",
+      "accentBlue": "#38BDF8",
+      "accentPink": "#FB37FF"
+    },
+    "charts": {
+      "linePrimary": "#38BDF8",
+      "lineSecondary": "#A855FF",
+      "lineTertiary": "#FB37FF",
+      "areaGradientStart": "#A855FF",
+      "areaGradientEnd": "rgba(168, 85, 255, 0)"
+    },
+    "status": {
+      "success": "#22C55E",
+      "error": "#F97373",
+      "warning": "#FACC15",
+      "info": "#38BDF8"
+    },
+    "elevations": {
+      "cardOverlay": "rgba(15, 23, 42, 0.9)",
+      "frosted": "rgba(15, 23, 42, 0.6)"
+    }
+  },
+
+  "typography": {
+    "fontFamilies": {
+      "sans": "'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif",
+      "mono": "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace"
+    },
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    },
+    "lineHeights": {
+      "tight": 1.1,
+      "snug": 1.25,
+      "normal": 1.4,
+      "relaxed": 1.6
+    },
+    "scale": {
+      "displayXL": { "size": "56px", "weight": "bold", "tracking": "-0.04em", "lineHeight": 1.05 },
+      "displayL":  { "size": "44px", "weight": "bold", "tracking": "-0.04em", "lineHeight": 1.05 },
+      "displayM":  { "size": "36px", "weight": "bold", "tracking": "-0.03em", "lineHeight": 1.1 },
+      "h1":        { "size": "30px", "weight": "semibold", "tracking": "-0.02em", "lineHeight": 1.15 },
+      "h2":        { "size": "24px", "weight": "semibold", "tracking": "-0.02em", "lineHeight": 1.2 },
+      "h3":        { "size": "20px", "weight": "medium",   "tracking": "-0.01em", "lineHeight": 1.3 },
+      "bodyL":     { "size": "18px", "weight": "regular",  "tracking": "0em",     "lineHeight": 1.5 },
+      "body":      { "size": "16px", "weight": "regular",  "tracking": "0em",     "lineHeight": 1.5 },
+      "bodyS":     { "size": "14px", "weight": "regular",  "tracking": "0em",     "lineHeight": 1.5 },
+      "label":     { "size": "13px", "weight": "medium",   "tracking": "0.04em",  "lineHeight": 1.4 },
+      "labelXS":   { "size": "11px", "weight": "medium",   "tracking": "0.08em",  "lineHeight": 1.4 },
+      "numericXL": { "size": "40px", "weight": "semibold", "tracking": "-0.04em", "lineHeight": 1.05 },
+      "numericL":  { "size": "32px", "weight": "semibold", "tracking": "-0.03em", "lineHeight": 1.05 },
+      "numericM":  { "size": "24px", "weight": "semibold", "tracking": "-0.02em", "lineHeight": 1.1 }
+    }
+  },
+
+  "radii": {
+    "xs": "4px",
+    "sm": "6px",
+    "md": "10px",
+    "lg": "16px",
+    "xl": "24px",
+    "pill": "999px"
+  },
+
+  "shadows": {
+    "none": "none",
+    "cardSoft": "0 18px 45px rgba(15, 23, 42, 0.65)",
+    "cardStrong": "0 24px 80px rgba(0, 0, 0, 0.85)",
+    "glowPurple": "0 0 35px rgba(168, 85, 255, 0.65)",
+    "glowBlue": "0 0 35px rgba(56, 189, 248, 0.65)",
+    "glowPink": "0 0 35px rgba(251, 55, 255, 0.7)"
+  },
+
+  "blurs": {
+    "frostedMd": "18px",
+    "frostedLg": "32px"
+  },
+
+  "opacity": {
+    "disabled": 0.4,
+    "muted": 0.6,
+    "borderSubtle": 0.5
+  },
+
+  "spacing": {
+    "xxs": "4px",
+    "xs": "6px",
+    "sm": "8px",
+    "md": "12px",
+    "lg": "16px",
+    "xl": "24px",
+    "xxl": "32px",
+    "sectionGap": "48px"
+  },
+
+  "animation": {
+    "durations": {
+      "fast": "120ms",
+      "normal": "200ms",
+      "slow": "320ms"
+    },
+    "easings": {
+      "standard": "cubic-bezier(0.4, 0.0, 0.2, 1)",
+      "emphasized": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+      "decelerate": "cubic-bezier(0.0, 0.0, 0.2, 1)"
+    }
+  },
+
+  "layerStyles": {
+    "cardPrimary": {
+      "background": "radial-gradient(circle at top left, rgba(168, 85, 255, 0.16), transparent 60%), radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.16), transparent 60%), #050814",
+      "border": "1px solid rgba(15, 23, 42, 0.9)",
+      "radius": "16px",
+      "shadow": "cardSoft"
+    },
+    "cardSecondary": {
+      "background": "#050814",
+      "border": "1px solid rgba(31, 41, 55, 0.9)",
+      "radius": "16px",
+      "shadow": "cardSoft"
+    },
+    "cardMetric": {
+      "background": "linear-gradient(135deg, rgba(24, 24, 37, 0.96), rgba(15, 23, 42, 0.98))",
+      "border": "1px solid rgba(75, 85, 99, 0.7)",
+      "radius": "16px",
+      "shadow": "cardSoft"
+    },
+    "chipNeonPurple": {
+      "background": "radial-gradient(circle at top left, rgba(248, 250, 252, 0.18), transparent 55%), rgba(15, 23, 42, 0.6)",
+      "border": "1px solid rgba(248, 250, 252, 0.22)",
+      "radius": "999px",
+      "shadow": "glowPurple",
+      "backdropFilter": "blur(22px)"
+    },
+    "chipSoft": {
+      "background": "rgba(15, 23, 42, 0.9)",
+      "border": "1px solid rgba(55, 65, 81, 0.8)",
+      "radius": "999px"
+    },
+    "badgeOutline": {
+      "background": "transparent",
+      "border": "1px solid rgba(55, 65, 81, 0.9)",
+      "radius": "999px"
+    },
+    "surfaceToolbar": {
+      "background": "rgba(15, 23, 42, 0.96)",
+      "borderBottom": "1px solid rgba(31, 41, 55, 0.9)",
+      "backdropFilter": "blur(18px)"
+    }
+  },
+
+  "textStyles": {
+    "heroKicker": {
+      "fontFamily": "sans",
+      "size": "14px",
+      "weight": "medium",
+      "letterSpacing": "0.12em",
+      "transform": "uppercase",
+      "color": "palette.content.secondary"
+    },
+    "heroTitleGradient": {
+      "fontFamily": "sans",
+      "size": "56px",
+      "weight": "bold",
+      "lineHeight": 1.05,
+      "letterSpacing": "-0.04em",
+      "backgroundImage": "linear-gradient(110deg, #38BDF8 0%, #A855FF 40%, #FB37FF 80%)",
+      "backgroundClip": "text",
+      "textFillColor": "transparent"
+    },
+    "heroSubtitle": {
+      "fontFamily": "sans",
+      "size": "16px",
+      "weight": "regular",
+      "lineHeight": 1.6,
+      "color": "palette.content.secondary"
+    },
+    "cardTitle": {
+      "fontFamily": "sans",
+      "size": "18px",
+      "weight": "semibold",
+      "lineHeight": 1.4,
+      "color": "palette.content.primary"
+    },
+    "cardBody": {
+      "fontFamily": "sans",
+      "size": "14px",
+      "weight": "regular",
+      "lineHeight": 1.5,
+      "color": "palette.content.secondary"
+    },
+    "metricLabel": {
+      "fontFamily": "sans",
+      "size": "13px",
+      "weight": "medium",
+      "letterSpacing": "0.08em",
+      "transform": "uppercase",
+      "color": "palette.content.muted"
+    },
+    "metricValue": {
+      "fontFamily": "sans",
+      "size": "40px",
+      "weight": "semibold",
+      "lineHeight": 1.05,
+      "color": "palette.content.primary"
+    },
+    "metricDeltaPositive": {
+      "fontFamily": "sans",
+      "size": "14px",
+      "weight": "medium",
+      "color": "palette.status.success"
+    },
+    "metricDeltaNegative": {
+      "fontFamily": "sans",
+      "size": "14px",
+      "weight": "medium",
+      "color": "palette.status.error"
+    },
+    "buttonLabel": {
+      "fontFamily": "sans",
+      "size": "15px",
+      "weight": "medium",
+      "letterSpacing": "0.02em"
+    },
+    "codeLog": {
+      "fontFamily": "mono",
+      "size": "12px",
+      "lineHeight": 1.5,
+      "color": "palette.content.secondary"
+    }
+  },
+
+  "buttons": {
+    "primary": {
+      "height": "52px",
+      "paddingX": "28px",
+      "radius": "pill",
+      "background": "linear-gradient(120deg, #38BDF8 0%, #A855FF 50%, #FB37FF 100%)",
+      "backgroundHover": "linear-gradient(120deg, #38BDF8 0%, #C084FC 50%, #FB37FF 100%)",
+      "shadow": "glowPurple",
+      "border": "1px solid rgba(248, 250, 252, 0.12)",
+      "textStyle": "buttonLabel",
+      "textColor": "#F9FAFB",
+      "iconGap": "8px"
+    },
+    "secondary": {
+      "height": "48px",
+      "paddingX": "22px",
+      "radius": "pill",
+      "background": "rgba(15, 23, 42, 0.9)",
+      "backgroundHover": "rgba(31, 41, 55, 0.95)",
+      "border": "1px solid rgba(55, 65, 81, 0.96)",
+      "shadow": "cardSoft",
+      "textStyle": "buttonLabel",
+      "textColor": "#E5E7EB"
+    },
+    "ghost": {
+      "height": "40px",
+      "paddingX": "16px",
+      "radius": "pill",
+      "background": "transparent",
+      "backgroundHover": "rgba(15, 23, 42, 0.9)",
+      "border": "1px solid rgba(55, 65, 81, 0.7)",
+      "textStyle": "buttonLabel",
+      "textColor": "#9CA3AF"
+    },
+    "iconCircle": {
+      "size": "36px",
+      "radius": "pill",
+      "background": "rgba(15, 23, 42, 0.95)",
+      "border": "1px solid rgba(55, 65, 81, 0.9)",
+      "iconColor": "#9CA3AF"
+    }
+  },
+
+  "chips": {
+    "aiPrompt": {
+      "layerStyle": "chipNeonPurple",
+      "height": "44px",
+      "paddingX": "18px",
+      "iconGap": "10px",
+      "textStyle": "bodyS",
+      "textColor": "#F9FAFB"
+    },
+    "tag": {
+      "layerStyle": "chipSoft",
+      "height": "32px",
+      "paddingX": "14px",
+      "textStyle": "label",
+      "textColor": "#E5E7EB"
+    }
+  },
+
+  "icons": {
+    "style": "line-rounded",
+    "strokeWidth": 1.6,
+    "sizes": {
+      "sm": 14,
+      "md": 18,
+      "lg": 22
+    },
+    "colors": {
+      "default": "#9CA3AF",
+      "accent": "#A855FF",
+      "success": "#22C55E",
+      "error": "#F97373"
+    }
+  },
+
+  "components": {
+    "heroSection": {
+      "layout": {
+        "columns": 12,
+        "contentSpan": { "lg": 7, "md": 12 },
+        "previewSpan": { "lg": 5, "md": 12 },
+        "gap": "64px"
+      },
+      "background": {
+        "color": "palette.background.page",
+        "gradientTop": "radial-gradient(circle at top left, rgba(168, 85, 255, 0.46), transparent 55%)",
+        "gradientBottom": "radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.40), transparent 60%)"
+      },
+      "kickerStyle": "heroKicker",
+      "titleStyle": "heroTitleGradient",
+      "subtitleStyle": "heroSubtitle",
+      "primaryButton": "buttons.primary",
+      "secondaryButton": "buttons.secondary"
+    },
+
+    "statStrip": {
+      "background": "transparent",
+      "borderTop": "1px solid rgba(31, 41, 55, 0.8)",
+      "paddingY": "32px",
+      "gap": "40px",
+      "item": {
+        "labelStyle": "metricLabel",
+        "valueStyle": "numericM",
+        "valueColor": "#F9FAFB"
+      }
+    },
+
+    "metricCard": {
+      "layerStyle": "cardMetric",
+      "padding": "24px",
+      "gap": "16px",
+      "titleStyle": "cardTitle",
+      "valueStyle": "metricValue",
+      "deltaStylePositive": "metricDeltaPositive",
+      "deltaStyleNegative": "metricDeltaNegative",
+      "footerLabelStyle": "metricLabel"
+    },
+
+    "featureRow": {
+      "background": "transparent",
+      "paddingTop": "40px",
+      "gap": "32px",
+      "item": {
+        "iconCircleSize": "40px",
+        "iconCircleBackground": "rgba(15, 23, 42, 1)",
+        "iconCircleBorder": "1px solid rgba(55, 65, 81, 0.9)",
+        "titleStyle": "cardTitle",
+        "bodyStyle": "cardBody"
+      }
+    },
+
+    "chartPanel": {
+      "layerStyle": "cardPrimary",
+      "padding": "24px",
+      "header": {
+        "titleStyle": "cardTitle",
+        "bodyStyle": "cardBody",
+        "icon": "icons.style"
+      },
+      "chart": {
+        "type": "line",
+        "height": 220,
+        "gridColor": "rgba(31, 41, 55, 0.75)",
+        "axisLabelStyle": "labelXS",
+        "axisLabelColor": "#6B7280",
+        "lineWidth": 2.2,
+        "lineCurved": true,
+        "seriesColors": [
+          "palette.charts.linePrimary",
+          "palette.charts.lineSecondary",
+          "palette.charts.lineTertiary"
+        ],
+        "pointRadius": 0,
+        "fill": false
+      }
+    },
+
+    "flowBuilderCanvas": {
+      "background": "#020308",
+      "gridDotColor": "rgba(31, 41, 55, 0.6)",
+      "gridDotSize": 1,
+      "gridDotSpacing": 18,
+      "sidebars": {
+        "leftWidth": "64px",
+        "rightWidth": "360px",
+        "background": "#020617",
+        "borderColor": "rgba(31, 41, 55, 0.95)"
+      },
+      "node": {
+        "base": {
+          "radius": "16px",
+          "padding": "18px",
+          "background": "#050814",
+          "border": "1px solid rgba(31, 41, 55, 0.95)",
+          "shadow": "cardSoft",
+          "titleStyle": "cardTitle",
+          "subtitleStyle": "cardBody"
+        },
+        "primary": {
+          "border": "1px solid rgba(56, 189, 248, 0.8)"
+        },
+        "danger": {
+          "border": "1px solid rgba(239, 68, 68, 0.85)"
+        }
+      },
+      "connection": {
+        "strokeWidth": 2,
+        "colorPrimary": "#A855FF",
+        "colorSecondary": "#38BDF8",
+        "glow": "0 0 16px rgba(168, 85, 255, 0.7)",
+        "curve": "smooth"
+      },
+      "logPanel": {
+        "background": "#020617",
+        "borderLeft": "1px solid rgba(31, 41, 55, 0.95)",
+        "headerHeight": "56px",
+        "rowHeight": "24px",
+        "textStyle": "codeLog",
+        "timestampColor": "#6B7280",
+        "messageColor": "#E5E7EB"
+      }
+    }
+  }
+}
