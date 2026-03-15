@@ -17,6 +17,7 @@
     <link rel="icon" href="assets/images/icon.png" type="image/png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/editor.css">
@@ -33,10 +34,10 @@
                 </div>
             </div>
             <div class="header-right">
-                <button id="theme-toggle-editor" class="btn btn-secondary" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode"><span class="material-symbols-outlined theme-toggle__icon" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">light_mode</span><span class="theme-toggle__label">Light mode</span></button>
-                <button id="btn-save" class="btn btn-primary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">save</span>Save</button>
-                <button id="btn-view-teacher" class="btn btn-secondary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">co_present</span>View Teacher</button>
-                <a href="admin.html" class="btn btn-secondary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">arrow_back</span>Back to Admin</a>
+                <button id="theme-toggle-editor" class="btn btn-secondary" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode"><span class="material-symbols-outlined theme-toggle__icon">light_mode</span><span class="theme-toggle__label">Light mode</span></button>
+                <button id="btn-save" class="btn btn-primary"><span class="material-symbols-outlined">save</span>Save</button>
+                <button id="btn-view-teacher" class="btn btn-secondary"><span class="material-symbols-outlined">co_present</span>View Teacher</button>
+                <a href="admin.html" class="btn btn-secondary"><span class="material-symbols-outlined">arrow_back</span>Back to Admin</a>
             </div>
         </header>
 
@@ -168,7 +169,7 @@
                         <button class="toolbar-btn" id="btn-generate-outline" title="Generate Outline">
                             <span class="material-symbols-outlined">account_tree</span>
                         </button>
-                        <button class="toolbar-btn" id="btn-ai-assistant" title="AI Assistant" style="background: rgba(240, 180, 41, 0.1);">
+                        <button class="toolbar-btn" id="btn-ai-assistant" title="AI Assistant">
                             <span class="material-symbols-outlined">psychology</span>
                         </button>
                     </div>
@@ -210,8 +211,8 @@
                 </small>
             </div>
             <div class="modal-footer">
-                <button id="btn-insert-verse" class="btn btn-primary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">add</span>Insert</button>
-                <button class="btn btn-secondary modal-close" data-modal="verse-modal"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+                <button id="btn-insert-verse" class="btn btn-primary"><span class="material-symbols-outlined">add</span>Insert</button>
+                <button class="btn btn-secondary modal-close" data-modal="verse-modal"><span class="material-symbols-outlined">close</span>Cancel</button>
             </div>
         </div>
     </div>
@@ -238,10 +239,10 @@
                 <div id="search-results"></div>
             </div>
             <div class="modal-footer">
-                <button id="btn-find-next" class="btn btn-secondary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">search</span>Find Next</button>
-                <button id="btn-replace" class="btn btn-secondary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">find_replace</span>Replace</button>
-                <button id="btn-replace-all" class="btn btn-primary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">done_all</span>Replace All</button>
-                <button class="btn btn-secondary modal-close" data-modal="search-modal"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">close</span>Close</button>
+                <button id="btn-find-next" class="btn btn-secondary"><span class="material-symbols-outlined">search</span>Find Next</button>
+                <button id="btn-replace" class="btn btn-secondary"><span class="material-symbols-outlined">find_replace</span>Replace</button>
+                <button id="btn-replace-all" class="btn btn-primary"><span class="material-symbols-outlined">done_all</span>Replace All</button>
+                <button class="btn btn-secondary modal-close" data-modal="search-modal"><span class="material-symbols-outlined">close</span>Close</button>
             </div>
         </div>
     </div>
@@ -264,8 +265,8 @@
                 <input type="text" id="image-alt" placeholder="Description of image">
             </div>
             <div class="modal-footer">
-                <button id="btn-insert-image" class="btn btn-primary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">image</span>Insert Image</button>
-                <button class="btn btn-secondary modal-close" data-modal="image-modal"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+                <button id="btn-insert-image" class="btn btn-primary"><span class="material-symbols-outlined">image</span>Insert Image</button>
+                <button class="btn btn-secondary modal-close" data-modal="image-modal"><span class="material-symbols-outlined">close</span>Cancel</button>
             </div>
         </div>
     </div>
@@ -285,8 +286,8 @@
                 <input type="text" id="link-url" placeholder="https://example.com">
             </div>
             <div class="modal-footer">
-                <button id="btn-insert-link" class="btn btn-primary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">link</span>Insert Link</button>
-                <button class="btn btn-secondary modal-close" data-modal="link-modal"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+                <button id="btn-insert-link" class="btn btn-primary"><span class="material-symbols-outlined">link</span>Insert Link</button>
+                <button class="btn btn-secondary modal-close" data-modal="link-modal"><span class="material-symbols-outlined">close</span>Cancel</button>
             </div>
         </div>
     </div>
@@ -324,11 +325,11 @@
                         <option value="gemma2">Gemma 2</option>
                     </select>
                     <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
-                        <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">lightbulb</span> AI mode works with any text - no headings required!
+                        <span class="material-symbols-outlined">lightbulb</span> AI mode works with any text - no headings required!
                     </p>
                 </div>
                 <button id="btn-start-generation" class="btn btn-primary" style="margin-top: 12px;">
-                    <span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">auto_awesome</span>
+                    <span class="material-symbols-outlined">auto_awesome</span>
                     Generate Outline
                 </button>
             </div>
@@ -337,10 +338,10 @@
                 <p style="color: var(--text-muted); text-align: center; padding: 40px;">Click "Generate Outline" to analyze your content</p>
             </div>
             <div class="modal-footer">
-                <button id="btn-copy-outline" class="btn btn-secondary" disabled><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">content_copy</span>Copy JSON</button>
-                <button id="btn-apply-outline" class="btn btn-primary" disabled><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">check_circle</span>Apply to Class</button>
-                <button id="btn-enhance-outline" class="btn btn-secondary" disabled style="display: none;"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">auto_fix_high</span>Enhance with AI</button>
-                <button class="btn btn-secondary modal-close" data-modal="outline-modal"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">close</span>Close</button>
+                <button id="btn-copy-outline" class="btn btn-secondary" disabled><span class="material-symbols-outlined">content_copy</span>Copy JSON</button>
+                <button id="btn-apply-outline" class="btn btn-primary" disabled><span class="material-symbols-outlined">check_circle</span>Apply to Class</button>
+                <button id="btn-enhance-outline" class="btn btn-secondary" disabled style="display: none;"><span class="material-symbols-outlined">auto_fix_high</span>Enhance with AI</button>
+                <button class="btn btn-secondary modal-close" data-modal="outline-modal"><span class="material-symbols-outlined">close</span>Close</button>
             </div>
         </div>
     </div>
@@ -349,7 +350,7 @@
     <div id="ai-assistant-modal" class="modal">
         <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
-                <h3><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 8px;">psychology</span>AI Assistant</h3>
+                <h3><span class="material-symbols-outlined">psychology</span>AI Assistant</h3>
                 <button class="modal-close" data-modal="ai-assistant-modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -362,15 +363,15 @@
                 
                 <div style="margin-top: 10px; font-size: 13px; color: var(--text-muted);">
                     <p style="margin: 4px 0;"><strong>Suggested questions:</strong></p>
-                    <button class="ai-suggestion-btn" data-question="What multimedia resources would you suggest to help engagement and retention?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">lightbulb</span> Multimedia suggestions</button>
-                    <button class="ai-suggestion-btn" data-question="What are the key themes in this content?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">target</span> Key themes</button>
-                    <button class="ai-suggestion-btn" data-question="What discussion questions would work well with this content?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">forum</span> Discussion questions</button>
-                    <button class="ai-suggestion-btn" data-question="How can I make this content more accessible to beginners?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">school</span> Simplify for beginners</button>
-                    <button class="ai-suggestion-btn" data-question="What Bible passages would complement this lesson?"><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">menu_book</span> Related scriptures</button>
+                    <button class="ai-suggestion-btn" data-question="What multimedia resources would you suggest to help engagement and retention?"><span class="material-symbols-outlined">lightbulb</span> Multimedia suggestions</button>
+                    <button class="ai-suggestion-btn" data-question="What are the key themes in this content?"><span class="material-symbols-outlined">target</span> Key themes</button>
+                    <button class="ai-suggestion-btn" data-question="What discussion questions would work well with this content?"><span class="material-symbols-outlined">forum</span> Discussion questions</button>
+                    <button class="ai-suggestion-btn" data-question="How can I make this content more accessible to beginners?"><span class="material-symbols-outlined">school</span> Simplify for beginners</button>
+                    <button class="ai-suggestion-btn" data-question="What Bible passages would complement this lesson?"><span class="material-symbols-outlined">menu_book</span> Related scriptures</button>
                 </div>
                 
                 <button id="btn-ask-ai" class="btn btn-primary" style="margin-top: 12px; width: 100%;">
-                    <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">send</span>
+                    <span class="material-symbols-outlined">send</span>
                     Ask AI
                 </button>
                 
@@ -383,13 +384,13 @@
                         <!-- AI response will appear here -->
                     </div>
                     <button id="btn-copy-response" class="btn btn-secondary" style="margin-top: 10px;">
-                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">content_copy</span>
+                        <span class="material-symbols-outlined">content_copy</span>
                         Copy Response
                     </button>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary modal-close" data-modal="ai-assistant-modal"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">close</span>Close</button>
+                <button class="btn btn-secondary modal-close" data-modal="ai-assistant-modal"><span class="material-symbols-outlined">close</span>Close</button>
             </div>
         </div>
     </div>
@@ -414,8 +415,8 @@
                 </p>
             </div>
             <div class="modal-footer">
-                <button id="btn-insert-qa-pause" class="btn btn-primary"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">add_circle</span>Insert Marker</button>
-                <button class="btn btn-secondary modal-close" data-modal="qa-pause-modal"><span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+                <button id="btn-insert-qa-pause" class="btn btn-primary"><span class="material-symbols-outlined">add_circle</span>Insert Marker</button>
+                <button class="btn btn-secondary modal-close" data-modal="qa-pause-modal"><span class="material-symbols-outlined">close</span>Cancel</button>
             </div>
         </div>
     </div>

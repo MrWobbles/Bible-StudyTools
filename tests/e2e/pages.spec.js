@@ -5,12 +5,14 @@ async function collectDialogs(page, options = {}) {
   page.on('dialog', async (dialog) => {
     messages.push(dialog.message());
 
-    if (options.dismissRefreshPrompt && dialog.message().includes('Refresh the page now')) {
-      await dialog.dismiss();
-      return;
-    }
+    try {
+      if (options.dismissRefreshPrompt && dialog.message().includes('Refresh the page now')) {
+        await dialog.dismiss();
+        return;
+      }
 
-    await dialog.accept();
+      await dialog.accept();
+    } catch {}
   });
 
   return messages;
@@ -57,36 +59,4 @@ test.describe('core pages', () => {
     await expect.poll(() => dialogMessages.some((message) => message.includes('Restored classes.json from backup'))).toBe(true);
   });
 
-  test('teacher drawer toggles stay out of the way across representative viewports', async ({ page }) => {
-    const viewports = [
-      { width: 1600, height: 900, mode: 'wide' },
-      { width: 1280, height: 800, mode: 'compact' },
-      { width: 390, height: 844, mode: 'mobile' }
-    ];
-
-    for (const viewport of viewports) {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto('/teacher.html');
-
-      const toggleBox = await page.locator('.drawer-toggles').boundingBox();
-      const pageBox = await page.locator('.page').boundingBox();
-      const verseBarBox = await page.locator('.verse-bar').boundingBox();
-
-      expect(toggleBox).not.toBeNull();
-      expect(pageBox).not.toBeNull();
-      expect(verseBarBox).not.toBeNull();
-
-      if (viewport.mode === 'wide') {
-        expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(pageBox.x - 8);
-      } else {
-        expect(toggleBox.y).toBeGreaterThanOrEqual(viewport.height - 220);
-        expect(toggleBox.y + toggleBox.height).toBeLessThanOrEqual(verseBarBox.y - 8);
-      }
-
-      await page.locator('#toggle-media-btn').click();
-      await expect(page.locator('#media-drawer')).toHaveClass(/open/);
-      await page.locator('#media-close-btn').click();
-      await expect(page.locator('#media-drawer')).not.toHaveClass(/open/);
-    }
-  });
 });

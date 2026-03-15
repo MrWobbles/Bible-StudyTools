@@ -290,7 +290,7 @@ function renderPauseList() {
     const label = document.createElement('div');
     label.innerHTML = `<strong>${point.label}</strong><br><small>${formatTime(point.time)}</small>`;
     const btn = document.createElement('button');
-    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">skip_next</span>Jump here';
+    btn.innerHTML = '<span class="material-symbols-outlined">skip_next</span>Jump here';
     btn.onclick = () => jumpToPause(idx);
     item.appendChild(label);
     item.appendChild(btn);

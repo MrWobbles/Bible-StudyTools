@@ -11,6 +11,11 @@ body.page--admin {
   --focus-ring: rgba(59, 130, 246, 0.16);
   --surface-border: rgba(255, 255, 255, 0.1);
   --header-border: rgba(255, 255, 255, 0.1);
+  --admin-item-bg: rgba(2, 6, 23, 0.92);
+  --admin-item-border: rgba(55, 65, 81, 0.8);
+  --admin-item-hover-border: var(--border-accent-purple);
+  --admin-form-bg: var(--layer-card-secondary);
+  --admin-active-bg: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(168, 85, 255, 0.18));
 
   html[data-theme='light'] & {
     --page-bg: #f5f7fb;
@@ -22,6 +27,11 @@ body.page--admin {
     --focus-ring: rgba(37, 99, 235, 0.2);
     --surface-border: rgba(148, 163, 184, 0.5);
     --header-border: rgba(148, 163, 184, 0.5);
+    --admin-item-bg: #ffffff;
+    --admin-item-border: rgba(148, 163, 184, 0.65);
+    --admin-item-hover-border: rgba(37, 99, 235, 0.55);
+    --admin-form-bg: #ffffff;
+    --admin-active-bg: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(14, 165, 233, 0.12));
   }
 
   padding: 20px;
@@ -46,6 +56,7 @@ body.page--admin {
     flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-end;
+    align-items: center;
   }
 
   .title-group h1 {
@@ -90,6 +101,25 @@ body.page--admin {
     }
   }
 
+  #class-list-panel .panel-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 10px;
+  }
+
+  #class-list-panel .panel-header h2 {
+    width: 100%;
+  }
+
+  #new-class-btn {
+    width: 100%;
+    min-height: 36px;
+    padding-top: 0;
+    padding-bottom: 0;
+    font-size: 0.72rem;
+  }
+
   .classes-list,
   .lessonplans-list,
   #editor {
@@ -109,6 +139,39 @@ body.page--admin {
     gap: 10px;
   }
 
+  .lessonplan-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .lessonplan-card-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+
+  .lessonplan-card-actions .btn-icon {
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    gap: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .lessonplan-card-actions .btn-icon .material-symbols-outlined {
+    font-size: 18px;
+    line-height: 1;
+  }
+
   .class-item,
   .lessonplan-card,
   .media-item,
@@ -116,8 +179,8 @@ body.page--admin {
   .question-field,
   .backup-item {
     border-radius: 12px;
-    border: 1px solid rgba(55, 65, 81, 0.8);
-    background: rgba(2, 6, 23, 0.92);
+    border: 1px solid var(--admin-item-border);
+    background: var(--admin-item-bg);
     padding: 12px;
     transition: all var(--duration-normal) var(--ease-standard);
     margin-bottom: 0;
@@ -128,19 +191,19 @@ body.page--admin {
   .media-item:hover,
   .outline-item:hover,
   .backup-item:hover {
-    border-color: var(--border-accent-purple);
+    border-color: var(--admin-item-hover-border);
     box-shadow: var(--shadow-glow-purple);
   }
 
   .class-item.active {
     border-color: var(--border-accent-blue);
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(168, 85, 255, 0.18));
+    background: var(--admin-active-bg);
   }
 
   .form-section {
     border-radius: 16px;
-    border: 1px solid rgba(31, 41, 55, 0.9);
-    background: var(--layer-card-secondary);
+    border: 1px solid var(--admin-item-border);
+    background: var(--admin-form-bg);
     padding: 18px;
     margin-bottom: 16px;
 

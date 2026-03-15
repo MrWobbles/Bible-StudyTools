@@ -13,6 +13,7 @@
   }
 
   function applyTheme(theme) {
+    const previousTheme = document.documentElement.getAttribute('data-theme') || DARK;
     const nextTheme = theme === LIGHT ? LIGHT : DARK;
     document.documentElement.setAttribute('data-theme', nextTheme);
     document.body?.setAttribute('data-theme', nextTheme);
@@ -40,6 +41,21 @@
         button.setAttribute('title', 'Switch to light mode');
       }
     });
+
+    const textColorInput = document.getElementById('text-color');
+    if (textColorInput) {
+      const darkDefault = '#f8f9fa';
+      const lightDefault = '#0f172a';
+      const currentValue = String(textColorInput.value || '').toLowerCase();
+
+      if (nextTheme === LIGHT && (currentValue === darkDefault || previousTheme === DARK)) {
+        textColorInput.value = lightDefault;
+      }
+
+      if (nextTheme === DARK && (currentValue === lightDefault || previousTheme === LIGHT)) {
+        textColorInput.value = darkDefault;
+      }
+    }
   }
 
   function toggleTheme() {

@@ -13,6 +13,7 @@
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:a11y": "playwright test tests/e2e/accessibility.p1.spec.js",
+    "test:e2e:contrast": "playwright test tests/e2e/contrast.p1.spec.js",
     "test:e2e:p0": "playwright test tests/e2e/.*\\.p0\\.spec\\.js",
     "test:e2e:priority": "playwright test tests/e2e/.*\\.p[0-2]\\.spec\\.js",
     "test:e2e:headed": "playwright test --headed",

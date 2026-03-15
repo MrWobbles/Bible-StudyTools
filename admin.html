@@ -18,6 +18,7 @@
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
@@ -36,22 +37,22 @@
       </div>
       <div class="app__actions" style="display: flex; gap: 10px;">
         <button id="theme-toggle-admin" class="pill-link" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode">
-          <span class="material-symbols-outlined theme-toggle__icon" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">light_mode</span>
+          <span class="material-symbols-outlined theme-toggle__icon">light_mode</span>
           <span class="theme-toggle__label">Light mode</span>
         </button>
         <button id="backup-btn" class="pill-link"
           style="background: rgba(76, 175, 80, 0.15); border-color: rgba(76, 175, 80, 0.4);"><span
-            class="material-icons" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">save</span>
+            class="material-icons">save</span>
           Backups</button>
         <button id="back-btn" class="pill-link"
-          style="display: none; background: var(--accent); border: none; cursor: pointer;"><span
-            class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">arrow_back</span>Back</button>
+          style="display: none;"><span
+            class="material-symbols-outlined">arrow_back</span>Back</button>
         <a id="view-student-link" href="student.html" class="pill-link" target="_blank" rel="noopener"
           style="display: none;"><span class="material-symbols-outlined"
-            style="font-size: 16px; vertical-align: middle; margin-right: 4px;">cast</span>View Student</a>
+            >cast</span>View Student</a>
         <a id="view-teacher-link" href="teacher.html" class="pill-link" target="_blank" rel="noopener"
           style="display: none;"><span class="material-symbols-outlined"
-            style="font-size: 16px; vertical-align: middle; margin-right: 4px;">co_present</span>View Teacher</a>
+            >co_present</span>View Teacher</a>
       </div>
     </header>
 
@@ -61,7 +62,7 @@
         <div class="panel-header">
           <h2>Lesson Plans</h2>
             <button id="new-lessonplan-btn" class="btn-primary"><span class="material-symbols-outlined"
-              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">add</span>New Lesson Plan</button>
+              >add</span>New Lesson Plan</button>
         </div>
         <div id="lessonplans-list" class="lessonplans-list"></div>
       </section>
@@ -74,7 +75,7 @@
         <div class="panel-header">
           <h2 id="class-list-title">Classes</h2>
             <button id="new-class-btn" class="btn-primary"><span class="material-symbols-outlined"
-              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">add</span>New Class</button>
+              >add</span>New Class</button>
         </div>
         <div id="classes-list" class="classes-list"></div>
       </section>
@@ -85,9 +86,9 @@
           <h2 id="edit-title">Select a class to edit</h2>
           <div style="display: flex; gap: 8px;">
             <button id="edit-content-btn" class="btn-secondary" style="display: none;"><span class="material-symbols-outlined"
-                style="font-size: 16px; vertical-align: middle; margin-right: 4px;">edit</span>Edit Content</button>
+                >edit</span>Edit Content</button>
             <button id="save-class-btn" class="btn-primary" style="display: none;"><span class="material-symbols-outlined"
-              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">save</span>Save Changes</button>
+              >save</span>Save Changes</button>
           </div>
         </div>
 
@@ -118,7 +119,7 @@
             <h3>Media</h3>
             <div id="media-list"></div>
             <button id="add-media-btn" class="btn-secondary"><span class="material-symbols-outlined"
-              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">videocam</span>Add Media</button>
+              >videocam</span>Add Media</button>
           </div>
 
           <!-- Outline Management -->
@@ -126,18 +127,18 @@
             <h3>Outline Sections</h3>
             <div id="outline-list"></div>
             <button id="add-section-btn" class="btn-secondary"><span class="material-symbols-outlined"
-              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">add</span>Add Section</button>
+              >add</span>Add Section</button>
           </div>
 
           <!-- Actions -->
           <div class="form-section">
             <div style="display: flex; gap: 10px;">
               <button id="save-class-btn-bottom" class="btn-primary"><span class="material-symbols-outlined"
-                style="font-size: 16px; vertical-align: middle; margin-right: 4px;">save</span>Save Class</button>
+                >save</span>Save Class</button>
                 <button id="delete-class-btn" class="btn-danger"><span class="material-symbols-outlined"
-                  style="font-size: 16px; vertical-align: middle; margin-right: 4px;">delete</span>Delete Class</button>
+                  >delete</span>Delete Class</button>
                 <button id="export-class-btn" class="btn-secondary"><span class="material-symbols-outlined"
-                  style="font-size: 16px; vertical-align: middle; margin-right: 4px;">download</span>Export JSON</button>
+                  >download</span>Export JSON</button>
             </div>
           </div>
         </div>
@@ -186,9 +187,9 @@
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeModal('media-modal')"><span class="material-symbols-outlined"
-          style="font-size: 16px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+          >close</span>Cancel</button>
         <button class="btn-primary" onclick="saveMedia()"><span class="material-symbols-outlined"
-          style="font-size: 16px; vertical-align: middle; margin-right: 4px;">save</span>Save Media</button>
+          >save</span>Save Media</button>
       </div>
     </div>
   </div>
@@ -220,13 +221,13 @@
         </div>
         <div id="section-questions-container"></div>
         <button id="add-question-btn" class="btn-secondary" onclick="addQuestionField()"><span class="material-symbols-outlined"
-          style="font-size: 16px; vertical-align: middle; margin-right: 4px;">add</span>Add Question</button>
+          >add</span>Add Question</button>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeModal('section-modal')"><span class="material-symbols-outlined"
-          style="font-size: 16px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+          >close</span>Cancel</button>
         <button class="btn-primary" onclick="saveSection()"><span class="material-symbols-outlined"
-          style="font-size: 16px; vertical-align: middle; margin-right: 4px;">save</span>Save Section</button>
+          >save</span>Save Section</button>
       </div>
     </div>
   </div>
@@ -250,9 +251,9 @@
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeModal('lessonplan-modal')"><span class="material-symbols-outlined"
-          style="font-size: 16px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+          >close</span>Cancel</button>
         <button class="btn-primary" onclick="saveLessonPlan()"><span class="material-symbols-outlined"
-          style="font-size: 16px; vertical-align: middle; margin-right: 4px;">add</span>Create Lesson Plan</button>
+          >add</span>Create Lesson Plan</button>
       </div>
     </div>
   </div>
@@ -267,7 +268,7 @@
       <div class="modal-body" id="class-add-modal-content"></div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeModal('class-add-modal')"><span class="material-symbols-outlined"
-            style="font-size: 16px; vertical-align: middle; margin-right: 4px;">close</span>Cancel</button>
+            >close</span>Cancel</button>
       </div>
     </div>
   </div>
@@ -276,7 +277,7 @@
   <div id="backup-modal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 700px;">
       <div class="modal-header">
-        <h3><span class="material-icons" style="font-size: 20px; vertical-align: middle; margin-right: 6px;">save</span>
+        <h3><span class="material-icons">save</span>
           Backup Management</h3>
         <button class="modal-close" onclick="closeModal('backup-modal')">&times;</button>
       </div>
@@ -284,11 +285,11 @@
         <div style="display: flex; gap: 12px; margin-bottom: 20px;">
           <button onclick="createManualBackup('classes')" class="btn-secondary" style="flex: 1;">
             <span class="material-icons"
-              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">assignment</span> Backup Classes Now
+              >assignment</span> Backup Classes Now
           </button>
           <button onclick="createManualBackup('lessonPlans')" class="btn-secondary" style="flex: 1;">
             <span class="material-icons"
-              style="font-size: 16px; vertical-align: middle; margin-right: 4px;">library_books</span> Backup Lesson
+              >library_books</span> Backup Lesson
             Plans Now
           </button>
         </div>
@@ -314,7 +315,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeModal('backup-modal')"><span class="material-symbols-outlined"
-            style="font-size: 16px; vertical-align: middle; margin-right: 4px;">close</span>Close</button>
+            >close</span>Close</button>
       </div>
     </div>
   </div>

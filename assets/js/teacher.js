@@ -212,7 +212,7 @@ function renderOutlineWithQuestions() {
       actionsRow.appendChild(info);
 
       const jumpBtn = document.createElement('button');
-      jumpBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">skip_next</span>Jump here';
+      jumpBtn.innerHTML = '<span class="material-symbols-outlined">skip_next</span>Jump here';
       jumpBtn.onclick = () => sendCommand('jumpToPause', { index: pauseIdx });
       actionsRow.appendChild(jumpBtn);
     }
@@ -320,7 +320,7 @@ function renderOutlineWithQuestions() {
         // Add "Display on screen" button
         const displayBtn = document.createElement('button');
         displayBtn.className = 'question-display-btn';
-        displayBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: text-bottom;">live_tv</span> Show';
+        displayBtn.innerHTML = '<span class="material-symbols-outlined">live_tv</span> Show';
         displayBtn.title = 'Display this question on the student screen';
         displayBtn.onclick = (e) => {
           e.stopPropagation();
@@ -470,7 +470,9 @@ function renderMediaGallery() {
           <div class="tag">Media resources</div>
           <h3 style="margin: 6px 0 0;">Lesson media</h3>
         </div>
-        <button id="media-close-btn">Close</button>
+        <button id="media-close-btn" aria-label="Close media resources panel" title="Close">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
       </div>
       <div class="media-drawer-body" id="media-panel"></div>
     `;
@@ -488,7 +490,9 @@ function renderMediaGallery() {
           <div class="tag">Bible verse</div>
           <h3 style="margin: 6px 0 0;">Quick verse</h3>
         </div>
-        <button id="verse-close-btn">Close</button>
+        <button id="verse-close-btn" aria-label="Close quick verse panel" title="Close">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
       </div>
       <div class="media-drawer-body" id="verse-panel"></div>
     `;
@@ -560,8 +564,8 @@ function renderMediaGallery() {
       <button id="verse-send-btn" class="quick-verse-btn">Show</button>
     </div>
     <div class="quick-verse-form-row quick-verse-nav-row">
-      <button id="verse-prev" class="quick-verse-btn quick-verse-btn-nav"><span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; margin-right:4px;">navigate_before</span>Previous</button>
-      <button id="verse-next" class="quick-verse-btn quick-verse-btn-nav">Next<span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; margin-left:4px;">navigate_next</span></button>
+      <button id="verse-prev" class="quick-verse-btn quick-verse-btn-nav"><span class="material-symbols-outlined">navigate_before</span>Previous</button>
+      <button id="verse-next" class="quick-verse-btn quick-verse-btn-nav"><span class="material-symbols-outlined">navigate_next</span>Next</button>
     </div>
     <div class="quick-verse-help">
       Defaults to NKJV via labs.bible.org, falls back to KJV and bible-api.com
@@ -1124,7 +1128,7 @@ function renderPauseList() {
     const label = document.createElement('div');
     label.innerHTML = `<strong>${point.label}</strong><br><small>${formatTime(point.time)}</small>`;
     const btn = document.createElement('button');
-    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle; margin-right: 4px;">skip_next</span>Jump here';
+    btn.innerHTML = '<span class="material-symbols-outlined">skip_next</span>Jump here';
     btn.onclick = () => sendCommand('jumpToPause', { index: idx });
     item.appendChild(label);
     item.appendChild(btn);

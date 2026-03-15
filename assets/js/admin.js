@@ -193,7 +193,7 @@ function renderLessonPlansList() {
         <div class="lessonplan-card-title">${escapeHtml(plan.title)}</div>
         <div class="lessonplan-card-actions">
           <button class="btn-icon" onclick="editLessonPlan(${index})" title="Edit"><span class="material-symbols-outlined">edit</span></button>
-          <button class="btn-icon" onclick="deleteLessonPlan(${index})" title="Delete">⊘</button>
+          <button class="btn-icon" onclick="deleteLessonPlan(${index})" title="Delete"><span class="material-symbols-outlined">delete</span></button>
         </div>
       </div>
       <div class="lessonplan-card-description">${escapeHtml(plan.description || '')}</div>
@@ -286,8 +286,8 @@ function openLessonPlan(index) {
   // Show View Student/Teacher links when in a lesson plan
   const studentLink = document.getElementById('view-student-link');
   const teacherLink = document.getElementById('view-teacher-link');
-  if (studentLink) studentLink.style.display = 'inline-block';
-  if (teacherLink) teacherLink.style.display = 'inline-block';
+  if (studentLink) studentLink.style.display = 'inline-flex';
+  if (teacherLink) teacherLink.style.display = 'inline-flex';
 
   // Show class editor, hide lesson plan list
   document.getElementById('lessonplan-view').style.display = 'none';
@@ -420,7 +420,7 @@ function renderClassListForLessonPlan() {
           <div>
               <span class="class-item-title">${escapeHtml(cls.title || '')}</span>
           </div>
-          <button class="btn-icon" onclick="removeClassFromLessonPlan(${index})" title="Remove">⊘</button>
+          <button class="btn-icon" onclick="removeClassFromLessonPlan(${index})" title="Remove"><span class="material-symbols-outlined">delete</span></button>
         </div>
       `;
       item.addEventListener('click', (e) => {
