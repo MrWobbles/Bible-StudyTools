@@ -94,6 +94,7 @@ let isDirty = false;
 let currentClassId = null; // Can be either GUID or legacy classNumber
 let allClasses = [];
 let generatedOutline = null; // Stores the generated outline from the outline generator
+let editorMediaItems = [];
 
 // Initialize editor on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -167,6 +168,14 @@ function initializeEditor() {
 
   // Add click handler for Q&A pause markers
   document.getElementById('editor').addEventListener('click', handleQAPauseClick);
+
+  // Prevent navigating away when media tiles inside the editor are clicked
+  document.getElementById('editor').addEventListener('click', (e) => {
+    const mediaTile = e.target.closest('.editor-media-tile');
+    if (mediaTile) {
+      e.preventDefault();
+    }
+  });
 }
 
 // Handle clicks on Q&A pause markers
@@ -338,6 +347,171 @@ function setupEventListeners() {
         closeModal(openModalElement.id);
       }
     }
+  });
+
+  setupMediaDropSupport();
+}
+
+function getMediaIconForEditor(type) {
+  const icons = {
+    verse: 'menu_book',
+    video: 'videocam',
+    image: 'image',
+    images: 'photo_library',
+    link: 'link',
+    pdf: 'description',
+    document: 'assignment',
+    audio: 'audio_file',
+    question: 'help',
+    presentation: 'bar_chart'
+  };
+  return icons[type] || 'attach_file';
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeClassesData(data) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (Array.isArray(data?.classes)) {
+    return data.classes;
+  }
+  return [];
+}
+
+function collectClassMedia(cls) {
+  if (!cls || typeof cls !== 'object') {
+    return [];
+  }
+
+  const orderedMedia = [];
+  const classMedia = Array.isArray(cls.media) ? cls.media : [];
+
+  orderedMedia.push(...classMedia.filter(m => m?.primary));
+
+  if (Array.isArray(cls.outline)) {
+    cls.outline.forEach((section) => {
+      if (!Array.isArray(section?.media)) {
+        return;
+      }
+      section.media.forEach((media) => {
+        orderedMedia.push({
+          ...media,
+          sectionTitle: section.summary || ''
+        });
+      });
+    });
+  }
+
+  orderedMedia.push(...classMedia.filter(m => !m?.primary));
+
+  return orderedMedia
+    .filter(Boolean)
+    .map((media, idx) => ({
+      ...media,
+      __editorMediaId: media.id || `media-${idx}-${media.type || 'item'}`
+    }));
+}
+
+function insertMediaTile(media) {
+  if (!editor || !media) return;
+
+  const title = media.title || media.reference || media.prompt || media.type || 'Media';
+  const icon = getMediaIconForEditor(media.type);
+  const payload = encodeURIComponent(JSON.stringify(media));
+
+  const tileHtml = `<a href="bst-media:${payload}" class="editor-media-tile" title="${escapeHtml(title)}"><span class="material-symbols-outlined">${icon}</span><span>${escapeHtml(title)}</span></a>&nbsp;`;
+
+  editor.chain().focus().insertContent(tileHtml).run();
+}
+
+function safeParseMediaPayload(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    console.warn('Invalid media payload:', error);
+    return null;
+  }
+}
+
+function setupMediaDropSupport() {
+  const editorHost = document.getElementById('editor');
+  if (!editorHost) return;
+
+  editorHost.addEventListener('dragover', (e) => {
+    const hasMediaPayload = Array.from(e.dataTransfer?.types || []).includes('application/x-bst-media');
+    if (hasMediaPayload) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  });
+
+  editorHost.addEventListener('drop', (e) => {
+    const payload = e.dataTransfer?.getData('application/x-bst-media');
+    if (!payload) return;
+
+    e.preventDefault();
+    const media = safeParseMediaPayload(payload);
+    if (media) {
+      insertMediaTile(media);
+    }
+  });
+}
+
+function renderEditorMediaSidebar(cls) {
+  const mediaList = document.getElementById('editor-media-list');
+  if (!mediaList) return;
+
+  editorMediaItems = collectClassMedia(cls);
+
+  if (editorMediaItems.length === 0) {
+    mediaList.innerHTML = '<p class="editor-media-empty">No media found for this class.</p>';
+    return;
+  }
+
+  mediaList.innerHTML = editorMediaItems.map((media, idx) => {
+    const title = media.title || media.reference || media.prompt || media.type || 'Media';
+    const icon = getMediaIconForEditor(media.type);
+    const section = media.sectionTitle ? `<small>${escapeHtml(media.sectionTitle)}</small>` : '';
+    return `
+      <button type="button" class="editor-media-item" draggable="true" data-media-index="${idx}" title="Click to insert in notes, or drag into the editor">
+        <span class="material-symbols-outlined">${icon}</span>
+        <span class="editor-media-item-text">
+          <strong>${escapeHtml(title)}</strong>
+          <em>${escapeHtml(media.type || 'media')}</em>
+          ${section}
+        </span>
+      </button>
+    `;
+  }).join('');
+
+  mediaList.querySelectorAll('.editor-media-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const idx = Number(item.dataset.mediaIndex);
+      const media = editorMediaItems[idx];
+      if (media) {
+        insertMediaTile(media);
+      }
+    });
+
+    item.addEventListener('dragstart', (e) => {
+      const idx = Number(item.dataset.mediaIndex);
+      const media = editorMediaItems[idx];
+      if (!media) return;
+
+      const payload = JSON.stringify(media);
+      e.dataTransfer.setData('application/x-bst-media', payload);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
   });
 }
 
@@ -590,7 +764,7 @@ async function saveBibleTranslationSetting() {
     if (currentClassId) {
       // Load current classes
       const data = await window.BSTApi.getClasses();
-      allClasses = data.classes || [];
+      allClasses = normalizeClassesData(data);
       
       // Find and update the class
       const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
@@ -1087,7 +1261,7 @@ async function loadDocument() {
     if (currentClassId) {
       // Load class data
       const data = await window.BSTApi.getClasses();
-      allClasses = data.classes || [];
+      allClasses = normalizeClassesData(data);
 
       // Find class by id or classNumber (backward compatibility)
       const cls = allClasses.find(c => c.id === currentClassId || c.classNumber == currentClassId);
@@ -1108,8 +1282,11 @@ async function loadDocument() {
           generatedOutline = cls.generatedOutline;
           console.log('[Editor] Loaded generatedOutline:', generatedOutline);
         }
+
+        renderEditorMediaSidebar(cls);
       } else {
         editor.commands.setContent('<p>Class not found. Creating new content...</p>');
+        renderEditorMediaSidebar(null);
       }
     } else {
       // No class ID - load from localStorage or show sample
@@ -1121,6 +1298,8 @@ async function loadDocument() {
       } else {
         editor.commands.setContent(getSampleContent());
       }
+
+      renderEditorMediaSidebar(null);
     }
 
     // Update outline navigator - use generatedOutline if available
@@ -1133,6 +1312,7 @@ async function loadDocument() {
   } catch (error) {
     console.error('Load failed:', error);
     editor.commands.setContent('<p>Failed to load content. Start editing here...</p>');
+    renderEditorMediaSidebar(null);
   }
 }
 

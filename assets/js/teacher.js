@@ -19,6 +19,10 @@ let fileInput = null;
 let questionFields = [];
 let displayWindow = null;
 let displayWindowCheckInterval = null;
+const PREVIEW_THUMB_WIDTH = 400;
+const PREVIEW_THUMB_HEIGHT = 225;
+const DEFAULT_DISPLAY_WIDTH = 1280;
+const DEFAULT_DISPLAY_HEIGHT = 720;
 
 async function loadClassConfig() {
   try {
@@ -785,6 +789,8 @@ function renderGeneratedOutline() {
     });
   });
 
+  setupEditorMediaTiles(displayContainer);
+
   // Add Q&A break markers if generatedOutline exists
   if (classConfig.generatedOutline && classConfig.generatedOutline.length > 0) {
     insertQABreakMarkers(displayContainer, classConfig.generatedOutline);
@@ -796,6 +802,14 @@ function renderGeneratedOutline() {
   // Add click handlers to external links - require Alt key to open
   const links = displayContainer.querySelectorAll('a[href]');
   links.forEach(link => {
+    if (link.classList.contains('editor-media-tile')) {
+      return;
+    }
+
+    if ((link.getAttribute('href') || '').startsWith('bst-media:')) {
+      return;
+    }
+
     link.addEventListener('click', (e) => {
       // Only allow opening if Alt key is held
       if (!e.altKey) {
@@ -814,6 +828,91 @@ function renderGeneratedOutline() {
 
   // Set up click handlers for Q&A pause markers (from TipTap editor)
   setupQAPauseMarkerHandlers();
+}
+
+function decodeEditorMediaPayload(encodedPayload) {
+  if (!encodedPayload) return null;
+
+  try {
+    const decoded = decodeURIComponent(encodedPayload);
+    const parsed = JSON.parse(decoded);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (err) {
+    console.warn('[Teacher] Failed to decode editor media payload:', err);
+    return null;
+  }
+}
+
+function collectTeacherMediaItems() {
+  const orderedMedia = [];
+  const classMedia = Array.isArray(classConfig?.media) ? classConfig.media : [];
+
+  orderedMedia.push(...classMedia.filter(m => m?.primary));
+
+  if (Array.isArray(classConfig?.outline)) {
+    classConfig.outline.forEach((section) => {
+      if (!Array.isArray(section?.media)) return;
+      section.media.forEach((media) => {
+        orderedMedia.push({
+          ...media,
+          sectionTitle: section.summary || ''
+        });
+      });
+    });
+  }
+
+  orderedMedia.push(...classMedia.filter(m => !m?.primary));
+  return orderedMedia.filter(Boolean);
+}
+
+function findMediaByTileText(tileText) {
+  const normalizedText = String(tileText || '').trim().toLowerCase();
+  if (!normalizedText) return null;
+
+  const items = collectTeacherMediaItems();
+  return items.find((media) => {
+    const mediaTitle = String(media?.title || media?.reference || media?.prompt || '').trim().toLowerCase();
+    return mediaTitle && mediaTitle === normalizedText;
+  }) || null;
+}
+
+function setupEditorMediaTiles(container) {
+  const mediaTiles = container.querySelectorAll('.editor-media-tile');
+
+  mediaTiles.forEach((tile) => {
+    tile.setAttribute('role', 'button');
+    tile.setAttribute('tabindex', '0');
+    tile.title = 'Click to display this media on student screen';
+
+    if (tile.tagName === 'A') {
+      tile.setAttribute('href', tile.getAttribute('href') || '#');
+    }
+
+    const activateTile = (event) => {
+      if (event) {
+        event.preventDefault();
+      }
+
+      const dataPayload = tile.getAttribute('data-media-json');
+      const href = tile.getAttribute('href') || '';
+      const hrefPayload = href.startsWith('bst-media:') ? href.slice('bst-media:'.length) : '';
+      const media = decodeEditorMediaPayload(dataPayload || hrefPayload) || findMediaByTileText(tile.textContent);
+      if (!media) {
+        return;
+      }
+
+      sendSectionMediaToStudent(media);
+      tile.classList.add('mark-active');
+      setTimeout(() => tile.classList.remove('mark-active'), 500);
+    };
+
+    tile.addEventListener('click', activateTile);
+    tile.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        activateTile(event);
+      }
+    });
+  });
 }
 
 // Insert Q&A break markers into the editor content display
@@ -927,23 +1026,60 @@ function openDisplayWindow() {
   }
 
   // Show the preview iframe
-  const previewIframe = document.getElementById('student-preview');
-  if (previewIframe) {
-    previewIframe.style.display = 'block';
+  const previewShell = document.getElementById('student-preview-shell');
+  if (previewShell) {
+    previewShell.style.display = 'block';
+    syncPreviewViewport();
   }
 
   // Start checking if the window is closed
   if (displayWindowCheckInterval) clearInterval(displayWindowCheckInterval);
   displayWindowCheckInterval = setInterval(() => {
+    syncPreviewViewport();
+
     if (displayWindow && displayWindow.closed) {
-      const previewIframe = document.getElementById('student-preview');
-      if (previewIframe) {
-        previewIframe.style.display = 'none';
+      const previewShell = document.getElementById('student-preview-shell');
+      if (previewShell) {
+        previewShell.style.display = 'none';
       }
       clearInterval(displayWindowCheckInterval);
       displayWindowCheckInterval = null;
     }
   }, 1000);
+}
+
+function getDisplayViewportSize() {
+  if (!displayWindow || displayWindow.closed) {
+    return { width: DEFAULT_DISPLAY_WIDTH, height: DEFAULT_DISPLAY_HEIGHT };
+  }
+
+  const width = Number(displayWindow.innerWidth || displayWindow.outerWidth || DEFAULT_DISPLAY_WIDTH);
+  const height = Number(displayWindow.innerHeight || displayWindow.outerHeight || DEFAULT_DISPLAY_HEIGHT);
+
+  return {
+    width: Math.max(320, width),
+    height: Math.max(180, height)
+  };
+}
+
+function syncPreviewViewport() {
+  const previewShell = document.getElementById('student-preview-shell');
+  const previewIframe = document.getElementById('student-preview');
+  if (!previewShell || !previewIframe) return;
+
+  const { width, height } = getDisplayViewportSize();
+  const shellWidth = previewShell.clientWidth || PREVIEW_THUMB_WIDTH;
+  const shellHeight = previewShell.clientHeight || PREVIEW_THUMB_HEIGHT;
+
+  // Fill the thumbnail box and center-crop if aspect ratios differ.
+  const scale = Math.max(shellWidth / width, shellHeight / height);
+  const offsetX = (shellWidth - (width * scale)) / 2;
+  const offsetY = (shellHeight - (height * scale)) / 2;
+
+  previewIframe.style.width = `${width}px`;
+  previewIframe.style.height = `${height}px`;
+  previewIframe.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  previewIframe.style.transformOrigin = 'top left';
 }
 
 function sendMediaToStudent(index) {
@@ -1526,7 +1662,7 @@ function sanitizeRichTextHtml(html) {
   ]);
   const allowedAttributes = new Set([
     'alt', 'aria-hidden', 'class', 'colspan', 'data-section-id', 'data-verse', 'href', 'rel', 'rowspan',
-    'src', 'style', 'target', 'title'
+    'src', 'style', 'target', 'title', 'data-media-json'
   ]);
   const allowedStyleProperties = new Set(['background-color', 'color', 'text-align']);
   const parser = new DOMParser();
@@ -1628,6 +1764,10 @@ function sanitizeTeacherUrl(url) {
   const trimmed = url.trim();
   if (!trimmed) {
     return '';
+  }
+
+  if (trimmed.startsWith('bst-media:')) {
+    return trimmed;
   }
 
   try {

@@ -680,6 +680,26 @@ body.page--teacher .editor-line-content {
 body.page--teacher .editor-line-content a {
   color: var(--accent-color);
 }
+body.page--teacher .editor-line-content .editor-media-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px 2px 0;
+  padding: 2px 9px;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: rgba(59, 130, 246, 0.14);
+  cursor: pointer;
+}
+body.page--teacher .editor-line-content .editor-media-tile .material-symbols-outlined {
+  font-size: 15px;
+}
+body.page--teacher .editor-line-content .editor-media-tile:hover,
+body.page--teacher .editor-line-content .editor-media-tile.mark-active {
+  background: rgba(59, 130, 246, 0.24);
+}
 body.page--teacher .editor-content-display ul.editor-line-content,
 body.page--teacher .editor-content-display ol.editor-line-content,
 body.page--teacher .editor-content-display .editor-line-content ul,

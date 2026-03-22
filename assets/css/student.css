@@ -615,20 +615,36 @@ body.page--student.fullscreen-mode .layout,
 body.page--student.fullscreen-mode .video-card {
   margin: 0;
   padding: 0;
-  width: 100vw;
+  width: 100%;
   max-width: none;
   grid-template-columns: 1fr;
+  height: 100vh;
+  min-height: 100vh;
 }
 body.page--student.fullscreen-mode .app {
   width: 100%;
   padding: 0;
+  height: 100vh;
+  min-height: 100vh;
 }
-body.page--student.fullscreen-mode .video-card,
-body.page--student.fullscreen-mode .player-shell {
+body.page--student.fullscreen-mode .video-card {
   border: 0;
   border-radius: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+}
+body.page--student.fullscreen-mode .player-shell {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  position: relative;
+}
+body.page--student.fullscreen-mode.iframe-preview,
+body.page--student.fullscreen-mode.iframe-preview .app,
+body.page--student.fullscreen-mode.iframe-preview .layout,
+body.page--student.fullscreen-mode.iframe-preview .video-card {
+  height: 100%;
+  min-height: 100%;
 }
 @media (max-width: 1024px) {
   body.page--student .layout {

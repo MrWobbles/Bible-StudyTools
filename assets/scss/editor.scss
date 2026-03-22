@@ -88,6 +88,72 @@ body.page--editor {
     min-height: 0;
   }
 
+  .sidebar-media {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(55, 65, 81, 0.55);
+  }
+
+  .sidebar-media-help {
+    margin: 4px 0 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  .editor-media-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .editor-media-item {
+    width: 100%;
+    min-height: 44px;
+    justify-content: flex-start;
+    text-transform: none;
+    letter-spacing: 0;
+    padding: 8px 10px;
+    gap: 10px;
+    border-radius: 8px;
+  }
+
+  .editor-media-item .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--accent-color);
+    flex: 0 0 auto;
+  }
+
+  .editor-media-item-text {
+    display: grid;
+    gap: 2px;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .editor-media-item-text strong {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .editor-media-item-text em,
+  .editor-media-item-text small {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-style: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .editor-media-empty {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
   .outline-list {
     margin: 0;
     padding: 0;
@@ -348,6 +414,30 @@ body.page--editor {
 
   .qa-pause-marker:hover {
     background: rgba(59, 130, 246, 0.2);
+  }
+
+  .editor-media-tile {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 4px 2px 0;
+    padding: 3px 9px;
+    border: 1px solid var(--glass-border-strong);
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.14);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 0.9em;
+    line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .editor-media-tile .material-symbols-outlined {
+    font-size: 16px;
+  }
+
+  .editor-media-tile:hover {
+    background: rgba(59, 130, 246, 0.24);
   }
 
   .modal-body {
