@@ -21,6 +21,8 @@ const {
   deleteClassRecord,
   upsertLessonPlanRecord,
   deleteLessonPlanRecord,
+  upsertNoteRecord,
+  deleteNoteRecord,
   closeDB
 } = require('./db');
 const { exec } = require('child_process');
@@ -53,6 +55,7 @@ const AUDIT_LOG_FILE = process.env.BST_AUDIT_LOG_FILE
   : path.join(__dirname, 'logs', 'api-audit.log');
 const MAX_CLASSES_PER_PAYLOAD = getBoundedPositiveInt(process.env.BST_MAX_CLASSES_PER_PAYLOAD, 500, 5000);
 const MAX_LESSON_PLANS_PER_PAYLOAD = getBoundedPositiveInt(process.env.BST_MAX_LESSON_PLANS_PER_PAYLOAD, 500, 5000);
+const MAX_NOTES_PER_PAYLOAD = getBoundedPositiveInt(process.env.BST_MAX_NOTES_PER_PAYLOAD, 500, 5000);
 const MAX_ITEMS_PER_CLASS_OUTLINE = getBoundedPositiveInt(process.env.BST_MAX_CLASS_OUTLINE_ITEMS, 2000, 10000);
 const MAX_ITEMS_PER_CLASS_MEDIA = getBoundedPositiveInt(process.env.BST_MAX_CLASS_MEDIA_ITEMS, 1000, 10000);
 const MAX_CLASSES_PER_LESSON_PLAN = getBoundedPositiveInt(process.env.BST_MAX_CLASSES_PER_LESSON_PLAN, 300, 2000);
@@ -89,6 +92,17 @@ const lessonPlansSaveSchema = z.object({
   lessonPlans: z.array(lessonPlanRecordSchema).max(MAX_LESSON_PLANS_PER_PAYLOAD)
 }).passthrough();
 
+const noteRecordSchema = z.object({
+  id: boundedIdSchema.optional(),
+  noteId: boundedIdSchema.optional(),
+  title: boundedTitleSchema.optional(),
+  content: z.any().optional()
+}).passthrough();
+
+const notesSaveSchema = z.object({
+  notes: z.array(noteRecordSchema).max(MAX_NOTES_PER_PAYLOAD)
+}).passthrough();
+
 // Middleware - JSON parsing first
 // classes.json can exceed the default 100kb when outlines/content are expanded
 app.use(express.json({ limit: '10mb' }));
@@ -106,11 +120,12 @@ const VIDEO_DIR = process.env.BST_VIDEO_DIR
 const BACKUP_DIR = process.env.BST_BACKUP_DIR
   ? path.resolve(process.env.BST_BACKUP_DIR)
   : path.join(__dirname, 'backups');
-const BACKUP_FILE_PATTERN = /^(classes|lessonPlans)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d{3}Z)?\.json$/;
+const BACKUP_FILE_PATTERN = /^(classes|lessonPlans|notes)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d{3}Z)?\.json$/;
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const DATA_FILE_MAP = {
   classes: 'classes.json',
-  lessonplans: 'lessonPlans.json'
+  lessonplans: 'lessonPlans.json',
+  notes: 'notes.json'
 };
 const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'editor.html', 'student.html', 'teacher.html'];
 const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
@@ -136,7 +151,7 @@ function resolveDataFilePath(fileKey) {
   const normalizedKey = String(fileKey || '').toLowerCase();
   const fileName = DATA_FILE_MAP[normalizedKey];
   if (!fileName) {
-    const error = new Error('Invalid file name. Use "classes" or "lessonPlans"');
+    const error = new Error('Invalid file name. Use "classes", "lessonPlans", or "notes"');
     error.status = 400;
     throw error;
   }
@@ -781,8 +796,63 @@ app.post([
 });
 
 /**
+ * POST /api/save/notes
+ * Save notes.json with automatic backup
+ */
+app.post('/api/save/notes', requireAdminAccess, async (req, res) => {
+  try {
+    const filePath = path.join(DATA_DIR, 'notes.json');
+    const parsed = parseBodyWithSchema(
+      notesSaveSchema,
+      req.body,
+      'Invalid notes payload'
+    );
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({
+        error: parsed.error,
+        details: parsed.details
+      });
+    }
+
+    const data = parsed.data;
+
+    const { backupFile } = await withFileLock('notes.json', async () => {
+      let backupFileName = null;
+
+      try {
+        const currentContent = await fs.readFile(filePath, 'utf8');
+        const currentData = JSON.parse(currentContent);
+        if (dataHasChanged(currentData, data)) {
+          backupFileName = await createBackup('notes.json', currentData);
+        } else {
+          console.log('[Backup] No changes detected in notes.json, skipping backup');
+        }
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          console.warn('[Backup] Could not capture pre-save notes.json backup:', err.message);
+        }
+      }
+
+      await writeJsonFileAtomic(filePath, data);
+      console.log('[✓] Saved notes.json (atomic write)');
+
+      return { backupFile: backupFileName };
+    });
+
+    res.json({
+      success: true,
+      message: 'Notes saved successfully',
+      backup: backupFile
+    });
+  } catch (err) {
+    console.error('Error saving notes:', err);
+    sendApiError(res, err, 'Failed to save notes');
+  }
+});
+
+/**
  * GET /api/backups/:fileName
- * List all backups for a specific file (classes or lessonPlans)
+ * List all backups for a specific file (classes, lessonPlans, or notes)
  */
 app.get('/api/backups/:fileName', requireAdminAccess, async (req, res) => {
   try {
@@ -1060,6 +1130,72 @@ app.delete([
 });
 
 /**
+ * PUT /api/mongo/notes/:noteId
+ * Upsert a single note record directly in MongoDB normalized storage
+ */
+app.put('/api/mongo/notes/:noteId', requireAdminAccess, async (req, res) => {
+  try {
+    if (!requireMongoConnection(res)) {
+      return;
+    }
+
+    const noteId = String(req.params.noteId || '').trim();
+    const noteData = req.body?.note && typeof req.body.note === 'object'
+      ? req.body.note
+      : req.body;
+
+    if (!noteId || !noteData || typeof noteData !== 'object' || Array.isArray(noteData)) {
+      return res.status(400).json({ error: 'Invalid note payload' });
+    }
+
+    const saved = await upsertNoteRecord(noteId, noteData, 'api-partial-upsert');
+    if (!saved) {
+      return res.status(400).json({ error: 'Unable to upsert note record' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Note upserted in MongoDB',
+      noteId,
+      note: saved,
+      mongodb: 'connected'
+    });
+  } catch (err) {
+    console.error('Error upserting Mongo note:', err);
+    sendApiError(res, err, 'Failed to upsert Mongo note');
+  }
+});
+
+/**
+ * DELETE /api/mongo/notes/:noteId
+ * Delete a single note record directly in MongoDB normalized storage
+ */
+app.delete('/api/mongo/notes/:noteId', requireAdminAccess, async (req, res) => {
+  try {
+    if (!requireMongoConnection(res)) {
+      return;
+    }
+
+    const noteId = String(req.params.noteId || '').trim();
+    if (!noteId) {
+      return res.status(400).json({ error: 'noteId is required' });
+    }
+
+    const deleted = await deleteNoteRecord(noteId, 'api-partial-delete');
+    return res.json({
+      success: true,
+      message: deleted ? 'Note deleted from MongoDB' : 'Note not found in MongoDB',
+      noteId,
+      deleted,
+      mongodb: 'connected'
+    });
+  } catch (err) {
+    console.error('Error deleting Mongo note:', err);
+    sendApiError(res, err, 'Failed to delete Mongo note');
+  }
+});
+
+/**
  * POST /api/download/youtube
  * Download YouTube video
  * Body: { videoUrl: "https://www.youtube.com/watch?v=..." }
@@ -1294,7 +1430,8 @@ Open in browser:
 API Endpoints:
   - POST /api/save/classes       - Save classes.json (auto-backup)
   - POST /api/save/lessonPlans   - Save lessonPlans.json (auto-backup)
-  - GET  /api/backups/:fileName  - List backups (classes/lessonPlans)
+  - POST /api/save/notes         - Save notes.json (auto-backup)
+  - GET  /api/backups/:fileName  - List backups (classes/lessonPlans/notes)
   - POST /api/backups/restore    - Restore from backup
   - POST /api/backups/create     - Create manual backup
   - DELETE /api/backups/:file    - Delete a backup
@@ -1303,6 +1440,8 @@ API Endpoints:
   - DELETE /api/mongo/classes/:id - Delete one class in MongoDB
   - PUT  /api/mongo/lessonPlans/:id - Upsert one lesson plan in MongoDB
   - DELETE /api/mongo/lessonPlans/:id - Delete one lesson plan in MongoDB
+  - PUT  /api/mongo/notes/:id    - Upsert one note in MongoDB
+  - DELETE /api/mongo/notes/:id  - Delete one note in MongoDB
 
 Press Ctrl+C to stop
   `);

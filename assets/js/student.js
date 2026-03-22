@@ -74,6 +74,36 @@ window.addEventListener('load', () => {
 // Check if we're in an iframe (preview mode)
 const isInIframe = window.self !== window.top;
 
+// Send display state to opener (teacher page) for preview mirroring
+function sendDisplayPreview() {
+  // Only send if we're the display window (not iframe) and have an opener
+  if (isInIframe || !window.opener) return;
+  
+  try {
+    const playerShell = document.querySelector('.player-shell');
+    if (!playerShell) return;
+    
+    // Clone the content and send it
+    const previewHTML = playerShell.innerHTML;
+    const styles = document.querySelector('style')?.outerHTML || '';
+    
+    window.opener.postMessage({
+      type: 'displayPreviewUpdate',
+      html: previewHTML,
+      styles: styles
+    }, '*');
+  } catch (err) {
+    // Opener might be closed or cross-origin
+  }
+}
+
+// Debounced version for frequent updates
+let previewDebounceTimer = null;
+function sendDisplayPreviewDebounced() {
+  if (previewDebounceTimer) clearTimeout(previewDebounceTimer);
+  previewDebounceTimer = setTimeout(sendDisplayPreview, 100);
+}
+
 function onYouTubeIframeAPIReady() {
   try {
     player = new YT.Player('player', {
@@ -111,6 +141,35 @@ function onPlayerReady() {
   resetNextPause();
   bindControls();
   handlePendingMedia();
+  
+  // Set up preview mirroring for display window
+  setupDisplayPreviewMirror();
+}
+
+// Set up MutationObserver to send display updates to teacher preview
+function setupDisplayPreviewMirror() {
+  // Only for display window, not iframe
+  if (isInIframe || !window.opener) return;
+  
+  const playerShell = document.querySelector('.player-shell');
+  if (!playerShell) return;
+  
+  // Send initial state
+  setTimeout(sendDisplayPreview, 500);
+  
+  // Watch for changes to player-shell
+  const observer = new MutationObserver(() => {
+    sendDisplayPreviewDebounced();
+  });
+  
+  observer.observe(playerShell, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true
+  });
+  
+  console.log('[Student] Display preview mirror set up');
 }
 
 function setupControlChannel() {

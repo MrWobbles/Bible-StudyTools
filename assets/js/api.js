@@ -98,6 +98,10 @@
     return fetchJson('/api/data/lessonPlans');
   }
 
+  async function getNotes() {
+    return fetchJson('/api/data/notes');
+  }
+
   async function upsertMongoClass(classId, classPayload) {
     return fetchJson(`/api/mongo/classes/${encodeURIComponent(classId)}`, {
       method: 'PUT',
@@ -138,15 +142,38 @@
     });
   }
 
+  async function upsertMongoNote(noteId, notePayload) {
+    return fetchJson(`/api/mongo/notes/${encodeURIComponent(noteId)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(notePayload)
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function deleteMongoNote(noteId) {
+    return fetchJson(`/api/mongo/notes/${encodeURIComponent(noteId)}`, {
+      method: 'DELETE'
+    }, {
+      requireAdmin: true
+    });
+  }
+
   window.BSTApi = {
     fetch: fetchWithSecurity,
     fetchJson,
     getClasses,
     getLessonPlans,
+    getNotes,
     upsertMongoClass,
     deleteMongoClass,
     upsertMongoLessonPlan,
     deleteMongoLessonPlan,
+    upsertMongoNote,
+    deleteMongoNote,
     getAdminToken,
     setAdminToken,
     clearAdminToken: () => setAdminToken(''),

@@ -92,14 +92,19 @@ let currentDocument = null;
 let autoSaveTimer = null;
 let isDirty = false;
 let currentClassId = null; // Can be either GUID or legacy classNumber
+let currentNoteId = null; // Note ID when editing notes
 let allClasses = [];
+let allNotes = [];
 let generatedOutline = null; // Stores the generated outline from the outline generator
+let isNoteMode = false; // Flag to track if we're editing a note
 
 // Initialize editor on page load
 window.addEventListener('DOMContentLoaded', () => {
-  // Get class ID from URL (supports both new GUID and legacy classNumber)
+  // Get class ID or note ID from URL
   const urlParams = new URLSearchParams(window.location.search);
   currentClassId = urlParams.get('class');
+  currentNoteId = urlParams.get('note');
+  isNoteMode = !!currentNoteId;
 
   document.querySelectorAll('.modal').forEach(modal => {
     modal.classList.remove('is-open');
@@ -161,6 +166,9 @@ function initializeEditor() {
       startAutoSave();
       updateOutlineNavigator();
     },
+    onSelectionUpdate: ({ editor }) => {
+      updateToolbarActiveStates(editor);
+    },
   });
 
   console.log('Editor initialized:', editor);
@@ -213,6 +221,43 @@ function showQAQuestions(section) {
   ).join('\n\n');
 
   alert(`Questions for: ${section.summary}\n\n${textContent}`);
+}
+
+// Update toolbar button active states based on current selection
+function updateToolbarActiveStates(ed) {
+  if (!ed) return;
+
+  // Define which actions map to which editor checks
+  const actionChecks = {
+    bold: () => ed.isActive('bold'),
+    italic: () => ed.isActive('italic'),
+    underline: () => ed.isActive('underline'),
+    strike: () => ed.isActive('strike'),
+    bulletList: () => ed.isActive('bulletList'),
+    orderedList: () => ed.isActive('orderedList'),
+    blockquote: () => ed.isActive('blockquote'),
+    codeBlock: () => ed.isActive('codeBlock'),
+  };
+
+  // Update all toolbar buttons with data-action
+  document.querySelectorAll('.toolbar-btn[data-action]').forEach(btn => {
+    const action = btn.dataset.action;
+    if (actionChecks[action]) {
+      btn.classList.toggle('is-active', actionChecks[action]());
+    }
+  });
+
+  // Update heading selects
+  let headingLevel = 'paragraph';
+  for (let level = 1; level <= 6; level++) {
+    if (ed.isActive('heading', { level })) {
+      headingLevel = `h${level}`;
+      break;
+    }
+  }
+
+  const mainSelect = document.getElementById('heading-select');
+  if (mainSelect) mainSelect.value = headingLevel;
 }
 
 // Setup Event Listeners
@@ -369,20 +414,114 @@ function handleToolbarAction(action) {
   }
 }
 
+// Fetch verse data from Bible APIs
+async function fetchVerseFromLabs(reference, translation) {
+  const version = String(translation || 'nkjv').toUpperCase();
+  const url = `https://labs.bible.org/api/?passage=${encodeURIComponent(reference)}&version=${encodeURIComponent(version)}&type=json`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const lines = data.map(item => {
+      // Strip HTML tags from text
+      const cleanText = item.text.replace(/<[^>]*>/g, '');
+      return `<sup>${item.verse}</sup> ${cleanText}`;
+    });
+    return { title: reference, text: lines.join(' '), translation: version };
+  } catch (err) {
+    console.warn('labs.bible.org fetch failed:', err);
+    return null;
+  }
+}
+
+async function fetchVerseFromBibleApi(reference, translation) {
+  const version = String(translation || 'web').toLowerCase();
+  const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(version)}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = (data.text || '').trim();
+    if (!text) return null;
+
+    // Clean up newlines and extra spaces
+    const cleanText = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    return { 
+      title: data.reference || reference, 
+      text: cleanText, 
+      translation: (data.translation_name || version).toUpperCase() 
+    };
+  } catch (err) {
+    console.warn('bible-api.com fetch failed:', err);
+    return null;
+  }
+}
+
+async function fetchVerseText(reference, translation) {
+  // Try labs.bible.org first (better formatting)
+  const labs = await fetchVerseFromLabs(reference, translation);
+  if (labs) return labs;
+
+  // Fallback to bible-api.com
+  const bibleApi = await fetchVerseFromBibleApi(reference, translation);
+  if (bibleApi) return bibleApi;
+
+  return null;
+}
+
 // Insert Bible Verse Reference
-function insertVerseReference() {
+async function insertVerseReference() {
   const verseInput = document.getElementById('verse-input').value.trim();
+  const insertText = document.getElementById('insert-verse-text')?.checked || false;
+  const translation = document.getElementById('bible-translation-select')?.value || 'nkjv';
 
   if (!verseInput) {
     alert('Please enter a verse reference');
     return;
   }
 
-  // Create a link with special class for verse references
+  // Insert the verse reference link first
   editor.chain()
     .focus()
     .insertContent(`<a href="#" class="verse-reference" data-verse="${verseInput}">${verseInput}</a> `)
     .run();
+
+  // If user wants verse text inserted as well
+  if (insertText) {
+    // Show loading indicator
+    const insertBtn = document.getElementById('btn-insert-verse');
+    const originalText = insertBtn.innerHTML;
+    insertBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span>Loading...';
+    insertBtn.disabled = true;
+
+    try {
+      const verseData = await fetchVerseText(verseInput, translation);
+      
+      if (verseData && verseData.text) {
+        // Insert blockquote with verse text
+        editor.chain()
+          .focus()
+          .insertContent(`<blockquote><p><em>${verseData.text}</em></p><p style="text-align: right; font-size: 0.9em; color: #666;">— ${verseData.title} (${verseData.translation})</p></blockquote>`)
+          .run();
+      } else {
+        console.warn('Could not fetch verse text for:', verseInput);
+        // Insert a placeholder blockquote
+        editor.chain()
+          .focus()
+          .insertContent(`<blockquote><p><em>[Verse text not available - please add manually]</em></p></blockquote>`)
+          .run();
+      }
+    } catch (err) {
+      console.error('Error fetching verse:', err);
+    } finally {
+      insertBtn.innerHTML = originalText;
+      insertBtn.disabled = false;
+    }
+  }
 
   closeModal('verse-modal');
   document.getElementById('verse-input').value = '';
@@ -996,7 +1135,56 @@ async function saveDocument() {
   };
 
   try {
-    if (currentClassId) {
+    if (isNoteMode && currentNoteId) {
+      // Load current notes
+      const response = await window.BSTApi.fetch('/api/data/notes');
+      if (!response.ok) {
+        throw new Error(`Failed to load notes data: ${response.status}`);
+      }
+      const data = await response.json();
+      allNotes = data.notes || [];
+
+      // Find and update the note
+      const noteIndex = allNotes.findIndex(n => n.id === currentNoteId);
+      if (noteIndex !== -1) {
+        allNotes[noteIndex].content = content;
+        allNotes[noteIndex].lastModified = new Date().toISOString();
+
+        // Sync to MongoDB first (delta sync)
+        let cloudWarning = '';
+        try {
+          await window.BSTApi.upsertMongoNote(currentNoteId, { note: allNotes[noteIndex] });
+        } catch (err) {
+          console.warn('MongoDB sync failed for note:', err);
+          cloudWarning = err?.message || 'Cloud sync failed';
+        }
+
+        console.log('Saving note to server...');
+        const saveResponse = await window.BSTApi.fetch('/api/save/notes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-bst-skip-cloud-sync': '1'
+          },
+          body: JSON.stringify({ notes: allNotes })
+        }, { requireAdmin: true });
+
+        if (!saveResponse.ok) {
+          const errorData = await saveResponse.json().catch(() => ({}));
+          throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
+        }
+
+        isDirty = false;
+        if (cloudWarning) {
+          updateSaveStatus('Warning: Saved locally only (cloud sync failed)');
+        } else {
+          updateSaveStatus('Saved');
+        }
+        console.log('Note content saved:', content);
+      } else {
+        throw new Error('Note not found');
+      }
+    } else if (currentClassId) {
       // Load current classes
       const response = await window.BSTApi.fetch('/api/data/classes');
       if (!response.ok) {
@@ -1029,7 +1217,7 @@ async function saveDocument() {
         throw new Error('Class not found');
       }
     } else {
-      // Fallback to localStorage if no class number
+      // Fallback to localStorage if no class number or note ID
       currentDocument = {
         id: currentDocument?.id || 'general-content',
         title: document.getElementById('document-title').textContent,
@@ -1084,7 +1272,28 @@ function updateSaveStatus(status) {
 // Load Document
 async function loadDocument() {
   try {
-    if (currentClassId) {
+    if (isNoteMode && currentNoteId) {
+      // Load note data
+      const data = await window.BSTApi.getNotes();
+      allNotes = data.notes || [];
+
+      // Find note by id
+      const note = allNotes.find(n => n.id === currentNoteId);
+      if (note) {
+        // Update document title
+        document.getElementById('document-title').textContent = note.title || 'Note';
+
+        // Load content
+        if (note.content && (note.content.json || note.content.html)) {
+          editor.commands.setContent(note.content.json || note.content.html);
+        } else {
+          // No content yet, show a starter template for notes
+          editor.commands.setContent(getNoteStarterTemplate(note));
+        }
+      } else {
+        editor.commands.setContent('<p>Note not found. Creating new content...</p>');
+      }
+    } else if (currentClassId) {
       // Load class data
       const data = await window.BSTApi.getClasses();
       allClasses = data.classes || [];
@@ -1112,7 +1321,7 @@ async function loadDocument() {
         editor.commands.setContent('<p>Class not found. Creating new content...</p>');
       }
     } else {
-      // No class ID - load from localStorage or show sample
+      // No class ID or note ID - load from localStorage or show sample
       const saved = localStorage.getItem('bible-study-content');
 
       if (saved) {
@@ -1123,17 +1332,26 @@ async function loadDocument() {
       }
     }
 
-    // Update outline navigator - use generatedOutline if available
-    if (generatedOutline && generatedOutline.length > 0) {
+    // Update outline navigator - use generatedOutline if available (only for classes)
+    if (!isNoteMode && generatedOutline && generatedOutline.length > 0) {
       updateOutlineNavigatorFromGenerated(generatedOutline);
     } else {
       updateOutlineNavigator();
     }
     updateSaveStatus('Saved');
+    updateToolbarActiveStates(editor);
   } catch (error) {
     console.error('Load failed:', error);
     editor.commands.setContent('<p>Failed to load content. Start editing here...</p>');
   }
+}
+
+// Get starter template for notes
+function getNoteStarterTemplate(note) {
+  return `
+    <h1>${note.title || 'Untitled Note'}</h1>
+    <p>Start writing your notes here...</p>
+  `;
 }
 
 // Get Sample Content (from existing markdown)

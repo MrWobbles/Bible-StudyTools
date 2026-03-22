@@ -60,11 +60,28 @@
     <div id="lessonplan-view" class="layout-admin app__layout app__layout--admin">
       <section class="panel" id="lessonplan-list-panel" style="grid-column: 1 / -1;">
         <div class="panel-header">
-          <h2>Lesson Plans</h2>
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <h2>Lesson Plans</h2>
+            <button id="switch-to-notes-btn" class="btn-secondary" style="font-size: 13px; padding: 6px 12px;"><span class="material-symbols-outlined" style="font-size: 18px;">sticky_note_2</span>Notes</button>
+          </div>
             <button id="new-lessonplan-btn" class="btn-primary"><span class="material-symbols-outlined"
               >add</span>New Lesson Plan</button>
         </div>
         <div id="lessonplans-list" class="lessonplans-list"></div>
+      </section>
+    </div>
+
+    <!-- Notes List View -->
+    <div id="notes-view" class="layout-admin app__layout app__layout--admin" style="display: none;">
+      <section class="panel" id="notes-list-panel" style="grid-column: 1 / -1;">
+        <div class="panel-header">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <h2>Notes</h2>
+            <button id="switch-to-lessonplans-btn" class="btn-secondary" style="font-size: 13px; padding: 6px 12px;"><span class="material-symbols-outlined" style="font-size: 18px;">library_books</span>Lesson Plans</button>
+          </div>
+          <button id="new-note-btn" class="btn-primary"><span class="material-symbols-outlined">add</span>New Note</button>
+        </div>
+        <div id="notes-list" class="lessonplans-list"></div>
       </section>
     </div>
 
@@ -258,6 +275,32 @@
     </div>
   </div>
 
+  <!-- Note Modal -->
+  <div id="note-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="note-modal-title">New Note</h3>
+        <button class="modal-close" onclick="closeModal('note-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="note-title">Title</label>
+          <input type="text" id="note-title" placeholder="e.g., Study Notes - March 2026" />
+        </div>
+        <div class="form-group">
+          <label for="note-description">Description (optional)</label>
+          <textarea id="note-description" rows="3" placeholder="Brief description of this note"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('note-modal')"><span class="material-symbols-outlined"
+          >close</span>Cancel</button>
+        <button class="btn-primary" onclick="saveNoteMetadata()"><span class="material-symbols-outlined"
+          >add</span>Create Note</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Class to Lesson Plan Modal -->
   <div id="class-add-modal" class="modal" style="display: none;">
     <div class="modal-content">
@@ -282,24 +325,31 @@
         <button class="modal-close" onclick="closeModal('backup-modal')">&times;</button>
       </div>
       <div class="modal-body">
-        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-          <button onclick="createManualBackup('classes')" class="btn-secondary" style="flex: 1;">
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button onclick="createManualBackup('classes')" class="btn-secondary" style="flex: 1; min-width: 150px;">
             <span class="material-icons"
               >assignment</span> Backup Classes Now
           </button>
-          <button onclick="createManualBackup('lessonPlans')" class="btn-secondary" style="flex: 1;">
+          <button onclick="createManualBackup('lessonPlans')" class="btn-secondary" style="flex: 1; min-width: 150px;">
             <span class="material-icons"
               >library_books</span> Backup Lesson
             Plans Now
           </button>
+          <button onclick="createManualBackup('notes')" class="btn-secondary" style="flex: 1; min-width: 150px;">
+            <span class="material-icons"
+              >sticky_note_2</span> Backup Notes Now
+          </button>
         </div>
 
-        <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+        <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
           <button onclick="showBackupList('classes')" class="backup-tab active" id="tab-classes">
             Classes Backups
           </button>
           <button onclick="showBackupList('lessonPlans')" class="backup-tab" id="tab-lessonPlans">
             Lesson Plans Backups
+          </button>
+          <button onclick="showBackupList('notes')" class="backup-tab" id="tab-notes">
+            Notes Backups
           </button>
         </div>
 

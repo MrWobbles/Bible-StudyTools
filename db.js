@@ -23,6 +23,7 @@ const DB_NAME        = process.env.MONGODB_DB_NAME || 'bible-study';
 const LEGACY_COLLECTION = 'appData';
 const CLASSES_COLLECTION = 'classes';
 const LESSON_PLANS_COLLECTION = 'lessonPlans';
+const NOTES_COLLECTION = 'notes';
 const HISTORY_COLLECTION = 'appDataHistory';
 const SCHEMA_VERSION = 2;
 
@@ -40,6 +41,9 @@ function normalizeDocId(docId) {
   }
   if (normalized === 'lessonplans') {
     return 'lessonPlans';
+  }
+  if (normalized === 'notes') {
+    return 'notes';
   }
   return null;
 }
@@ -60,6 +64,13 @@ function normalizeLessonPlansPayload(data) {
     return null;
   }
   return data.lessonPlans.map((item) => (isPlainObject(item) ? cloneJson(item) : { value: item }));
+}
+
+function normalizeNotesPayload(data) {
+  if (!isPlainObject(data) || !Array.isArray(data.notes)) {
+    return null;
+  }
+  return data.notes.map((item) => (isPlainObject(item) ? cloneJson(item) : { value: item }));
 }
 
 function buildRecordId(prefix, index) {
@@ -92,6 +103,19 @@ function getPlanIdFromValue(value) {
   return candidates.length > 0 ? candidates[0].trim() : null;
 }
 
+function getNoteIdFromValue(value) {
+  if (!isPlainObject(value)) return null;
+  const candidates = [value.id, value.noteId, value.slug, value.title]
+    .filter(item => typeof item === 'string' && item.trim());
+  return candidates.length > 0 ? candidates[0].trim() : null;
+}
+
+function getNoteRecordIdentity(record, index) {
+  const candidates = [record.id, record.noteId, record.slug, record.title]
+    .filter(value => typeof value === 'string' && value.trim());
+  return candidates.length > 0 ? candidates[0].trim() : buildRecordId('note', index);
+}
+
 function toStoredClassRecord(record, index) {
   const classId = getClassRecordIdentity(record, index);
   return {
@@ -109,6 +133,16 @@ function toStoredLessonPlanRecord(record, index) {
     classIds: Array.isArray(record.classes)
       ? record.classes.filter(value => typeof value === 'string' && value.trim()).map(value => value.trim())
       : [],
+    order: index,
+    updatedAt: new Date(),
+    data: cloneJson(record)
+  };
+}
+
+function toStoredNoteRecord(record, index) {
+  const noteId = getNoteRecordIdentity(record, index);
+  return {
+    noteId,
     order: index,
     updatedAt: new Date(),
     data: cloneJson(record)
@@ -322,6 +356,57 @@ async function deleteLessonPlanRecord(planId, reason = 'partial-delete') {
   return deletion.deletedCount > 0;
 }
 
+async function upsertNoteRecord(noteId, noteData, reason = 'partial-upsert') {
+  if (!isConnected()) return null;
+  if (!isPlainObject(noteData)) return null;
+
+  const normalizedNoteId = String(noteId || '').trim() || getNoteIdFromValue(noteData);
+  if (!normalizedNoteId) return null;
+
+  const collection = db.collection(NOTES_COLLECTION);
+  const existing = await collection.findOne({ noteId: normalizedNoteId });
+  const order = Number.isInteger(existing?.order)
+    ? existing.order
+    : await getNextOrderValue(NOTES_COLLECTION);
+
+  const normalizedData = cloneJson(noteData);
+  if (!normalizedData.id && typeof normalizedNoteId === 'string') {
+    normalizedData.id = normalizedNoteId;
+  }
+
+  const record = {
+    noteId: normalizedNoteId,
+    order,
+    updatedAt: new Date(),
+    data: normalizedData
+  };
+
+  await collection.replaceOne({ noteId: normalizedNoteId }, record, { upsert: true });
+  await appendHistoryRecord('notes', {
+    op: 'upsert',
+    noteId: normalizedNoteId,
+    item: normalizedData
+  }, reason);
+
+  return normalizedData;
+}
+
+async function deleteNoteRecord(noteId, reason = 'partial-delete') {
+  if (!isConnected()) return false;
+
+  const normalizedNoteId = String(noteId || '').trim();
+  if (!normalizedNoteId) return false;
+
+  const deletion = await db.collection(NOTES_COLLECTION).deleteOne({ noteId: normalizedNoteId });
+  await appendHistoryRecord('notes', {
+    op: 'delete',
+    noteId: normalizedNoteId,
+    deleted: deletion.deletedCount > 0
+  }, reason);
+
+  return deletion.deletedCount > 0;
+}
+
 async function loadFromLegacyDoc(docId) {
   const doc = await db.collection(LEGACY_COLLECTION).findOne({ _id: docId });
   if (!doc) return null;
@@ -384,7 +469,12 @@ async function connectDB() {
   if (client) return true; // already connected
 
   try {
-    client = new MongoClient(MONGODB_URI);
+    // Note: Node.js 17+ uses OpenSSL 3 which has stricter TLS defaults
+    // The tlsAllowInvalidCertificates option may be needed for some MongoDB Atlas configurations
+    client = new MongoClient(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    });
     await client.connect();
     db = client.db(DB_NAME);
 
@@ -397,6 +487,8 @@ async function connectDB() {
       db.collection(LESSON_PLANS_COLLECTION).createIndex({ planId: 1 }, { unique: true }),
       db.collection(LESSON_PLANS_COLLECTION).createIndex({ classIds: 1 }),
       db.collection(LESSON_PLANS_COLLECTION).createIndex({ order: 1 }),
+      db.collection(NOTES_COLLECTION).createIndex({ noteId: 1 }, { unique: true }),
+      db.collection(NOTES_COLLECTION).createIndex({ order: 1 }),
       db.collection(HISTORY_COLLECTION).createIndex({ docId: 1, recordedAt: -1 })
     ]);
 
@@ -424,7 +516,7 @@ function isConnected() {
 /**
  * Load app data in legacy-compatible shape.
  *
- * @param   {string} docId  'classes' or 'lessonPlans'
+ * @param   {string} docId  'classes', 'lessonPlans', or 'notes'
  * @returns {object|null}   The stored plain-JS object, or null if not found / not connected
  */
 async function loadDoc(docId) {
@@ -456,6 +548,17 @@ async function loadDoc(docId) {
       return await loadFromLegacyDoc('lessonPlans');
     }
 
+    if (normalizedDocId === 'notes') {
+      const records = await db.collection(NOTES_COLLECTION).find({}).sort({ order: 1, noteId: 1 }).toArray();
+      if (records.length > 0) {
+        return {
+          notes: records.map(record => cloneJson(record.data))
+        };
+      }
+
+      return { notes: [] };
+    }
+
     return null;
   } catch (err) {
     console.error(`[MongoDB] loadDoc("${docId}") failed:`, err.message);
@@ -466,7 +569,7 @@ async function loadDoc(docId) {
 /**
  * Save app data using normalized collections.
  *
- * @param  {string} docId  'classes' or 'lessonPlans'
+ * @param  {string} docId  'classes', 'lessonPlans', or 'notes'
  * @param  {object} data   Plain JS object to store
  * @returns {boolean}      true on success
  */
@@ -494,6 +597,16 @@ async function saveDoc(docId, data) {
       const records = lessonPlans.map((record, index) => toStoredLessonPlanRecord(record, index));
       await upsertNormalizedRecords(LESSON_PLANS_COLLECTION, 'planId', records, 'save');
       console.log(`[MongoDB] Saved "${docId}" to normalized lessonPlans collection (${records.length} records)`);
+      return true;
+    }
+
+    if (normalizedDocId === 'notes') {
+      const notes = normalizeNotesPayload(data);
+      if (!notes) return false;
+
+      const records = notes.map((record, index) => toStoredNoteRecord(record, index));
+      await upsertNormalizedRecords(NOTES_COLLECTION, 'noteId', records, 'save');
+      console.log(`[MongoDB] Saved "${docId}" to normalized notes collection (${records.length} records)`);
       return true;
     }
 
@@ -525,5 +638,7 @@ module.exports = {
   deleteClassRecord,
   upsertLessonPlanRecord,
   deleteLessonPlanRecord,
+  upsertNoteRecord,
+  deleteNoteRecord,
   closeDB
 };

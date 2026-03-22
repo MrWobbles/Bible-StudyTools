@@ -1,8 +1,10 @@
 // Admin Interface for Lesson Plans and Class Management
 let allLessonPlans = [];
 let allClasses = [];
+let allNotes = [];
 let currentLessonPlan = null;
 let currentClass = null;
+let currentNote = null;
 let currentMediaIndex = null;
 let currentSectionIndex = null;
 
@@ -13,6 +15,11 @@ const ADMIN_AUTOSAVE_DELAY_MS = 3000; // debounce: save 3 s after last keystroke
 // Generate GUID for class IDs
 function generateGUID() {
   return 'class-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+// Generate GUID for note IDs
+function generateNoteGUID() {
+  return 'note-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 function getCloudSyncWarning(result) {
   if (!result || typeof result !== 'object') {
@@ -140,6 +147,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   console.log('Lesson plans loaded:', allLessonPlans);
   await loadClasses();
   console.log('Classes loaded:', allClasses);
+  await loadNotes();
+  console.log('Notes loaded:', allNotes);
   setupEventListeners();
   console.log('Event listeners set up');
   renderLessonPlansList();
@@ -394,6 +403,254 @@ async function saveLessonPlansToFile(options = {}) {
     link.click();
     URL.revokeObjectURL(url);
     console.log('Lesson plans downloaded - please replace assets/data/lessonPlans.json with the downloaded file.');
+  }
+}
+
+// ===== NOTES MANAGEMENT =====
+
+// Load notes from JSON
+async function loadNotes() {
+  try {
+    console.log('Fetching notes from API');
+    const data = await window.BSTApi.getNotes();
+    console.log('Parsed notes JSON data:', data);
+    allNotes = data.notes || [];
+    console.log('Set allNotes to:', allNotes);
+  } catch (error) {
+    console.error('Failed to load notes:', error);
+    allNotes = [];
+  }
+}
+
+// Render notes list
+function renderNotesList() {
+  const list = document.getElementById('notes-list');
+  console.log('Rendering notes, count:', allNotes.length);
+  list.innerHTML = '';
+
+  if (allNotes.length === 0) {
+    list.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 40px;">No notes yet. Create one to get started!</p>';
+    return;
+  }
+
+  allNotes.forEach((note, index) => {
+    const card = document.createElement('div');
+    card.className = 'lessonplan-card';
+    card.innerHTML = `
+      <div class="lessonplan-card-header">
+        <div class="lessonplan-card-title">${escapeHtml(note.title)}</div>
+        <div class="lessonplan-card-actions">
+          <button class="btn-icon" onclick="editNoteMetadata(${index})" title="Edit"><span class="material-symbols-outlined">edit</span></button>
+          <button class="btn-icon" onclick="deleteNote(${index})" title="Delete"><span class="material-symbols-outlined">delete</span></button>
+        </div>
+      </div>
+      <div class="lessonplan-card-description">${escapeHtml(note.description || '')}</div>
+      <div class="lessonplan-card-footer">
+        <div style="font-size: 11px;">Created: ${new Date(note.createdDate).toLocaleDateString()}</div>
+        ${note.lastModified ? `<div style="font-size: 11px;">Modified: ${new Date(note.lastModified).toLocaleDateString()}</div>` : ''}
+      </div>
+      <button class="btn-primary" onclick="openNoteEditor(${index})" style="margin-top: 12px; width: 100%;"><span class="material-symbols-outlined">edit_note</span>Edit Note</button>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Switch to notes view
+function switchToNotesView() {
+  document.getElementById('lessonplan-view').style.display = 'none';
+  document.getElementById('notes-view').style.display = 'grid';
+  document.getElementById('header-title').textContent = 'Notes';
+  document.getElementById('header-subtitle').textContent = 'Create and manage personal notes';
+  renderNotesList();
+}
+
+// Switch to lesson plans view
+function switchToLessonPlansView() {
+  document.getElementById('notes-view').style.display = 'none';
+  document.getElementById('lessonplan-view').style.display = 'grid';
+  document.getElementById('header-title').textContent = 'Lesson Plans';
+  document.getElementById('header-subtitle').textContent = 'Create and manage Bible study lesson plans';
+  renderLessonPlansList();
+}
+
+// Create new note
+function createNewNote() {
+  document.getElementById('note-modal-title').textContent = 'New Note';
+  document.getElementById('note-title').value = '';
+  document.getElementById('note-description').value = '';
+  currentNote = null;
+  document.getElementById('note-modal').style.display = 'flex';
+}
+
+// Edit note metadata
+function editNoteMetadata(index) {
+  currentNote = index;
+  const note = allNotes[index];
+
+  document.getElementById('note-modal-title').textContent = 'Edit Note';
+  document.getElementById('note-title').value = note.title;
+  document.getElementById('note-description').value = note.description || '';
+
+  document.getElementById('note-modal').style.display = 'flex';
+}
+
+// Save note metadata (title, description)
+function saveNoteMetadata() {
+  const title = document.getElementById('note-title').value;
+  const description = document.getElementById('note-description').value;
+
+  if (!title.trim()) {
+    alert('Please enter a note title');
+    return;
+  }
+
+  let changedNoteId = null;
+
+  if (currentNote !== null) {
+    // Update existing - only change title and description
+    allNotes[currentNote].title = title.trim();
+    allNotes[currentNote].description = description.trim();
+    allNotes[currentNote].lastModified = new Date().toISOString();
+    changedNoteId = getNoteIdentifier(allNotes[currentNote]);
+  } else {
+    // Add new
+    const note = {
+      id: generateNoteGUID(),
+      title: title.trim(),
+      description: description.trim(),
+      createdDate: new Date().toISOString(),
+      lastModified: new Date().toISOString(),
+      content: null
+    };
+    allNotes.push(note);
+    changedNoteId = note.id;
+  }
+
+  saveNotesToFile({ changedNoteId });
+  closeModal('note-modal');
+  renderNotesList();
+}
+
+// Delete note
+function deleteNote(index) {
+  if (confirm('Delete this note? This action cannot be undone.')) {
+    const deletedNoteId = getNoteIdentifier(allNotes[index]);
+    allNotes.splice(index, 1);
+    saveNotesToFile({ deletedNoteId });
+    renderNotesList();
+  }
+}
+
+// Open note in editor
+function openNoteEditor(index) {
+  const note = allNotes[index];
+  // Open editor with note ID
+  window.location.href = `editor.html?note=${encodeURIComponent(note.id)}`;
+}
+
+// Get note identifier
+function getNoteIdentifier(note) {
+  if (!note || typeof note !== 'object') {
+    return '';
+  }
+  return String(note.id || note.noteId || '').trim();
+}
+
+async function syncNoteDeltaToMongo(options = {}) {
+  const { changedNoteId = null, deletedNoteId = null } = options;
+
+  if (!window.BSTApi) {
+    return '';
+  }
+
+  try {
+    if (deletedNoteId) {
+      await window.BSTApi.deleteMongoNote(String(deletedNoteId));
+      return '';
+    }
+
+    const normalizedNoteId = String(changedNoteId || '').trim();
+    if (!normalizedNoteId) {
+      return '';
+    }
+
+    const note = allNotes.find((item) => getNoteIdentifier(item) === normalizedNoteId);
+    if (!note) {
+      return '';
+    }
+
+    await window.BSTApi.upsertMongoNote(normalizedNoteId, { note: note });
+    return '';
+  } catch (err) {
+    const message = err?.message || 'Cloud sync failed for note record.';
+    return shouldIgnorePartialSyncFailure(message) ? '' : message;
+  }
+}
+
+// Save notes to file
+async function saveNotesToFile(options = {}) {
+  const { changedNoteId = null, deletedNoteId = null } = options;
+  console.log('saveNotesToFile called with', allNotes.length, 'notes');
+  const jsonData = { notes: allNotes };
+
+  // If running in Electron, save directly to file system
+  if (window.bst && window.bst.saveFile) {
+    try {
+      await window.bst.saveFile('notes.json', JSON.stringify(jsonData, null, 2));
+      console.log('[OK] Notes saved via Electron');
+      return;
+    } catch (err) {
+      console.error('Failed to save notes via Electron:', err);
+      alert('Failed to save notes: ' + err.message);
+      return;
+    }
+  }
+
+  // Try API endpoint (web server mode)
+  try {
+    const partialSyncWarning = await syncNoteDeltaToMongo({ changedNoteId, deletedNoteId });
+
+    console.log('Attempting API save to /api/save/notes...');
+    const response = await window.BSTApi.fetch('/api/save/notes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bst-skip-cloud-sync': '1'
+      },
+      body: JSON.stringify(jsonData),
+    }, { requireAdmin: true });
+
+    console.log('API response status:', response.status, response.statusText);
+
+    if (response.ok) {
+      const result = await response.json().catch(() => ({}));
+      const saveWarning = getCloudSyncWarning(result);
+      const combinedWarning = combineWarnings(partialSyncWarning, saveWarning);
+
+      if (combinedWarning) {
+        result.partialSuccess = true;
+        result.warning = combinedWarning;
+      }
+
+      console.log('[OK] Notes saved successfully:', result);
+      showAdminSaveResult('Notes', result);
+      return;
+    } else {
+      const errorText = await response.text();
+      console.error('API error response:', errorText);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
+    }
+  } catch (err) {
+    console.warn('API save failed, falling back to download:', err);
+    // Fallback: download file
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'notes.json';
+    link.click();
+    URL.revokeObjectURL(url);
+    console.log('Notes downloaded - please replace assets/data/notes.json with the downloaded file.');
   }
 }
 
@@ -1329,6 +1586,11 @@ function setupEventListeners() {
   document.getElementById('save-class-btn-bottom')?.addEventListener('click', saveClass);
   document.getElementById('edit-content-btn')?.addEventListener('click', openContentEditor);
 
+  // Notes event listeners
+  document.getElementById('switch-to-notes-btn')?.addEventListener('click', switchToNotesView);
+  document.getElementById('switch-to-lessonplans-btn')?.addEventListener('click', switchToLessonPlansView);
+  document.getElementById('new-note-btn')?.addEventListener('click', createNewNote);
+
   // Auto-save class form fields after 3 s of inactivity
   ['classTitle', 'classSubtitle', 'classInstructor', 'classChannel'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', scheduleClassAutoSave);
@@ -1603,9 +1865,16 @@ async function showBackupList(fileType) {
   // Update tab styling
   document.getElementById('tab-classes').classList.toggle('active', fileType === 'classes');
   document.getElementById('tab-lessonPlans').classList.toggle('active', fileType === 'lessonPlans');
+  document.getElementById('tab-notes')?.classList.toggle('active', fileType === 'notes');
 
   const container = document.getElementById('backup-list');
   container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Loading backups...</p>';
+
+  const fileTypeLabels = {
+    classes: 'Classes',
+    lessonPlans: 'Lesson Plans',
+    notes: 'Notes'
+  };
 
   try {
     const response = await window.BSTApi.fetch(`/api/backups/${fileType}`, {}, { requireAdmin: true });
@@ -1617,7 +1886,7 @@ async function showBackupList(fileType) {
     if (backups.length === 0) {
       container.innerHTML = `
         <div style="text-align: center; padding: 40px; color: var(--muted);">
-          <p>No backups found for ${fileType === 'classes' ? 'Classes' : 'Lesson Plans'}.</p>
+          <p>No backups found for ${fileTypeLabels[fileType] || fileType}.</p>
           <p style="font-size: 13px; margin-top: 8px;">Backups are created automatically when you save changes.</p>
         </div>
       `;

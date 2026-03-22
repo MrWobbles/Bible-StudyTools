@@ -100,8 +100,8 @@ function initializePage() {
   const subtitle = document.querySelector('.subtitle');
   if (subtitle) subtitle.textContent = `${classConfig.subtitle || ''} · Keep this on your laptop while casting the main screen.`;
 
-  const previewIframe = document.getElementById('student-preview');
-  if (previewIframe) previewIframe.src = `${window.location.origin}/student.html?class=${classId}`;
+  // Preview iframe now receives content from display window via postMessage
+  // No need to load student.html directly
 
   const guideTitle = document.querySelector('h3');
   if (guideTitle) guideTitle.textContent = `${classConfig.title} guide with notes`;
@@ -128,6 +128,9 @@ function initializePage() {
 
   bindControls();
   hydrateNotes();
+  
+  // Set up preview mirror listener
+  setupPreviewMirrorListener();
 
   // Set up open display button
   const openDisplayBtn = document.getElementById('open-display-btn');
@@ -918,6 +921,102 @@ function insertQABreakMarkers(container, generatedOutline) {
   });
 }
 
+// Set up listener for preview mirror updates from display window
+function setupPreviewMirrorListener() {
+  window.addEventListener('message', (event) => {
+    // Only accept messages from our origin
+    if (event.origin !== window.location.origin) return;
+    
+    const data = event.data;
+    if (!data || data.type !== 'displayPreviewUpdate') return;
+    
+    const previewIframe = document.getElementById('student-preview');
+    if (!previewIframe) return;
+    
+    try {
+      const iframeDoc = previewIframe.contentDocument || previewIframe.contentWindow?.document;
+      if (!iframeDoc) return;
+      
+      // Create/update the preview content
+      const studentStyles = `
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { 
+            background: #000; 
+            font-family: 'Source Sans Pro', sans-serif;
+            overflow: hidden;
+          }
+          .player-shell {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+          }
+          .verse-frame {
+            background: white !important;
+            padding: 20px !important;
+            margin: 10px !important;
+            width: calc(100% - 20px) !important;
+            height: calc(100% - 20px) !important;
+          }
+          .verse-content {
+            font-size: 14px !important;
+            line-height: 1.4 !important;
+          }
+          .verse-title {
+            font-size: 12px !important;
+          }
+          .verse-source {
+            font-size: 10px !important;
+          }
+          .verse-meta {
+            position: absolute !important;
+            bottom: 10px !important;
+            right: 10px !important;
+          }
+          img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+          }
+          iframe {
+            width: 100%;
+            height: 100%;
+          }
+          .question-display {
+            padding: 20px !important;
+          }
+          .question-display h2 {
+            font-size: 16px !important;
+          }
+          .question-display p {
+            font-size: 14px !important;
+          }
+        </style>
+      `;
+      
+      iframeDoc.open();
+      iframeDoc.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          ${studentStyles}
+        </head>
+        <body>
+          <div class="player-shell">${data.html || ''}</div>
+        </body>
+        </html>
+      `);
+      iframeDoc.close();
+    } catch (err) {
+      console.warn('[Teacher] Could not update preview:', err);
+    }
+  });
+}
+
 function openDisplayWindow() {
   if (displayWindow && !displayWindow.closed) {
     displayWindow.location.href = `${window.location.origin}/student.html?class=${classId}`;
@@ -926,10 +1025,27 @@ function openDisplayWindow() {
     displayWindow = window.open(`${window.location.origin}/student.html?class=${classId}`, 'display-screen', 'width=1280,height=720');
   }
 
-  // Show the preview iframe
+  // Show the preview iframe with a loading placeholder
   const previewIframe = document.getElementById('student-preview');
   if (previewIframe) {
     previewIframe.style.display = 'block';
+    // Set initial placeholder content
+    try {
+      const iframeDoc = previewIframe.contentDocument || previewIframe.contentWindow?.document;
+      if (iframeDoc) {
+        iframeDoc.open();
+        iframeDoc.write(`
+          <!DOCTYPE html>
+          <html>
+          <head><meta charset="UTF-8"></head>
+          <body style="background:#000;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+            <p style="color:#666;font-family:sans-serif;font-size:12px;">Waiting for display...</p>
+          </body>
+          </html>
+        `);
+        iframeDoc.close();
+      }
+    } catch (err) { /* ignore */ }
   }
 
   // Start checking if the window is closed

@@ -196,7 +196,14 @@
                 <input type="text" id="verse-input" placeholder="John 3:16">
                 <div id="verse-suggestions" class="suggestions"></div>
                 
-                <label for="bible-translation-select" style="margin-top: 16px;">Default Bible Translation:</label>
+                <div style="margin-top: 16px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="insert-verse-text" style="width: 18px; height: 18px;">
+                        <span>Also insert verse text below reference</span>
+                    </label>
+                </div>
+                
+                <label for="bible-translation-select" style="margin-top: 16px;">Bible Translation:</label>
                 <select id="bible-translation-select" class="toolbar-select">
                     <option value="nkjv">NKJV (New King James Version)</option>
                     <option value="kjv">KJV (King James Version)</option>
@@ -207,7 +214,7 @@
                     <option value="amp">AMP (Amplified Bible)</option>
                 </select>
                 <small style="color: #6c757d; display: block; margin-top: 4px;">
-                    This translation will be used when clicking verse links in teacher view
+                    Used for verse text insertion and when clicking verse links in teacher view
                 </small>
             </div>
             <div class="modal-footer">
