@@ -10,6 +10,9 @@ let pendingMedia = null;
 let verseScrollContainer = null;
 let versePages = [];
 let currentVersePageIndex = 0;
+const DEFAULT_VERSE_FONT_SIZE = 120;
+const VERSE_STAGE_WIDTH = 1280;
+const VERSE_STAGE_HEIGHT = 720;
 let verseFontSize = 120;
 let verseLineHeight = 1.6;
 let currentVerseLines = [];
@@ -50,15 +53,6 @@ window.addEventListener('load', () => {
     initConfig();
     setupControlChannel();
 
-    if (window.self !== window.top) {
-      const scale = 400 / 1280;
-      document.body.style.transform = `scale(${scale})`;
-      document.body.style.transformOrigin = 'top left';
-      document.body.style.width = '1280px';
-      document.body.style.height = '720px';
-      document.body.style.overflow = 'hidden';
-    }
-
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(tag);
@@ -74,34 +68,10 @@ window.addEventListener('load', () => {
 // Check if we're in an iframe (preview mode)
 const isInIframe = window.self !== window.top;
 
-// Send display state to opener (teacher page) for preview mirroring
-function sendDisplayPreview() {
-  // Only send if we're the display window (not iframe) and have an opener
-  if (isInIframe || !window.opener) return;
-  
-  try {
-    const playerShell = document.querySelector('.player-shell');
-    if (!playerShell) return;
-    
-    // Clone the content and send it
-    const previewHTML = playerShell.innerHTML;
-    const styles = document.querySelector('style')?.outerHTML || '';
-    
-    window.opener.postMessage({
-      type: 'displayPreviewUpdate',
-      html: previewHTML,
-      styles: styles
-    }, '*');
-  } catch (err) {
-    // Opener might be closed or cross-origin
-  }
-}
-
-// Debounced version for frequent updates
-let previewDebounceTimer = null;
-function sendDisplayPreviewDebounced() {
-  if (previewDebounceTimer) clearTimeout(previewDebounceTimer);
-  previewDebounceTimer = setTimeout(sendDisplayPreview, 100);
+if (isInIframe) {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.classList.add('iframe-preview');
+  });
 }
 
 function onYouTubeIframeAPIReady() {
@@ -141,35 +111,6 @@ function onPlayerReady() {
   resetNextPause();
   bindControls();
   handlePendingMedia();
-  
-  // Set up preview mirroring for display window
-  setupDisplayPreviewMirror();
-}
-
-// Set up MutationObserver to send display updates to teacher preview
-function setupDisplayPreviewMirror() {
-  // Only for display window, not iframe
-  if (isInIframe || !window.opener) return;
-  
-  const playerShell = document.querySelector('.player-shell');
-  if (!playerShell) return;
-  
-  // Send initial state
-  setTimeout(sendDisplayPreview, 500);
-  
-  // Watch for changes to player-shell
-  const observer = new MutationObserver(() => {
-    sendDisplayPreviewDebounced();
-  });
-  
-  observer.observe(playerShell, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-    attributes: true
-  });
-  
-  console.log('[Student] Display preview mirror set up');
 }
 
 function setupControlChannel() {
@@ -248,7 +189,9 @@ function handleRemoteCommand(event) {
         console.log('[Student] Executing fullscreen command');
         goFullscreen();
       } else {
-        console.log('[Student] Ignoring fullscreen command in iframe');
+        // Simulate fullscreen in iframe preview by toggling the CSS class
+        document.body.classList.toggle('fullscreen-mode');
+        console.log('[Student] Simulated fullscreen in iframe preview:', document.body.classList.contains('fullscreen-mode'));
       }
       break;
     case 'displayMedia':
@@ -530,6 +473,10 @@ function syncFullscreenClass() {
     document.body.classList.remove('fullscreen-mode');
   }
   console.log('[Fullscreen] State synced:', isFullscreen);
+
+  setTimeout(() => {
+    fitVerseStage();
+  }, 60);
 }
 
 function bindControls() {
@@ -537,6 +484,41 @@ function bindControls() {
   document.getElementById('restart').onclick = restartVideo;
   document.getElementById('next-pause').onclick = skipToNextPause;
   document.getElementById('fullscreen').onclick = goFullscreen;
+}
+
+function fitVerseStage() {
+  const stageWrap = document.getElementById('verse-stage-wrap');
+  const stage = document.getElementById('verse-stage');
+  if (!stageWrap || !stage) return;
+
+  const wrapWidth = stageWrap.clientWidth;
+  const wrapHeight = stageWrap.clientHeight;
+  if (!wrapWidth || !wrapHeight) return;
+
+  const scale = Math.min(
+    wrapWidth / VERSE_STAGE_WIDTH,
+    wrapHeight / VERSE_STAGE_HEIGHT
+  );
+
+  if (!Number.isFinite(scale) || scale <= 0) return;
+  const offsetX = (wrapWidth - (VERSE_STAGE_WIDTH * scale)) / 2;
+  const offsetY = (wrapHeight - (VERSE_STAGE_HEIGHT * scale)) / 2;
+  stage.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+}
+
+async function waitForVerseFonts(timeoutMs = 1500) {
+  if (!document.fonts || typeof document.fonts.ready === 'undefined') {
+    return;
+  }
+
+  try {
+    await Promise.race([
+      document.fonts.ready,
+      new Promise(resolve => setTimeout(resolve, timeoutMs))
+    ]);
+  } catch (_) {
+    // Ignore font-loading errors and continue rendering.
+  }
 }
 
 function handlePendingMedia() {
@@ -763,6 +745,9 @@ async function renderVerseMedia(media) {
   `;
 
   try {
+    // Start each new verse render from a stable baseline so both windows paginate similarly.
+    verseFontSize = DEFAULT_VERSE_FONT_SIZE;
+
     const preferredTranslations = media.translation
       ? [media.translation]
       : ['nkjv', 'kjv'];
@@ -775,16 +760,35 @@ async function renderVerseMedia(media) {
     currentVerseLines = Array.isArray(verseData.lines) ? verseData.lines : [];
 
     playerDiv.innerHTML = `
-      <div class="verse-frame" style="padding:40px;display:flex;flex-direction:column;gap:0;height:100%;overflow:hidden;background: white;margin: 20px;width: calc(100% - 80px);height: calc(100% - 40px);position:relative;">
-        <div id="verse-content" class="verse-content" style="font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:hidden; flex:1; padding-bottom:80px; color: #000;"></div>
-        <div class="verse-meta" style="position:absolute;bottom:40px;right:40px;text-align:right;height:75px;top:auto;">
-          <h2 class="verse-title" style="color: #000;font-size:24px;margin:0 0 8px 0;">${escapeHtml(title)}</h2>
-          <div class="verse-source" style="color: #666;font-size:18px;">${escapeHtml(sourceLabel)}</div>
+      <div id="verse-stage-wrap" style="height:100%; width:100%; position:relative; overflow:hidden; background:#fff;">
+        <div id="verse-stage" style="width:${VERSE_STAGE_WIDTH}px; height:${VERSE_STAGE_HEIGHT}px; position:absolute; top:0; left:0; background:#fff; transform-origin: top left;">
+          <div id="verse-content" class="verse-content" style="position:absolute; left:40px; right:40px; top:40px; bottom:120px; font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:hidden; color:#000; font-family:'Source Sans Pro','Segoe UI',Arial,sans-serif;"></div>
+          <div class="verse-meta" style="position:absolute;bottom:30px;right:40px;text-align:right;">
+            <h2 class="verse-title" style="color:#000;font-size:24px;margin:0 0 8px 0;">${escapeHtml(title)}</h2>
+            <div class="verse-source" style="color:#666;font-size:18px;">${escapeHtml(sourceLabel)}</div>
+          </div>
         </div>
       </div>
     `;
 
     verseScrollContainer = document.getElementById('verse-content');
+    fitVerseStage();
+    buildVersePages(currentVerseLines);
+    ensureVersePagesFit();
+    // Re-run after layout settles; first paint timing can differ between windows.
+    setTimeout(() => {
+      fitVerseStage();
+      buildVersePages(currentVerseLines);
+      ensureVersePagesFit();
+    }, 120);
+    setTimeout(() => {
+      fitVerseStage();
+      buildVersePages(currentVerseLines);
+      ensureVersePagesFit();
+    }, 320);
+
+    await waitForVerseFonts();
+    fitVerseStage();
     buildVersePages(currentVerseLines);
     ensureVersePagesFit();
   } catch (err) {
@@ -1071,6 +1075,11 @@ function ensureVersePagesFit() {
   const container = verseScrollContainer || document.getElementById('verse-content');
   if (!container || !versePages.length) return;
 
+  // Skip fitting until we have a real rendered box size; prevents accidental over-shrinking.
+  if (container.clientWidth < 200 || container.clientHeight < 200) {
+    return;
+  }
+
   const maxIterations = 10;
   let iterations = 0;
 
@@ -1155,3 +1164,7 @@ function extractVideoId(url) {
   const match = input.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|shorts\/|embed\/))([^&\?\/]+)/);
   return match ? match[1] : '';
 }
+
+window.addEventListener('resize', () => {
+  fitVerseStage();
+});

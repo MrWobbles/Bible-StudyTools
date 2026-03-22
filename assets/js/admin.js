@@ -1510,17 +1510,17 @@ function showAdminSaveStatus(msg, isError = false, iconName = '') {
     toast = document.createElement('div');
     toast.id = 'admin-save-toast';
     Object.assign(toast.style, {
-      position:      'fixed',
-      bottom:        '24px',
-      right:         '24px',
-      padding:       '10px 18px',
-      borderRadius:  '6px',
-      fontSize:      '13px',
-      fontWeight:    '600',
-      color:         '#fff',
-      zIndex:        '9999',
-      opacity:       '0',
-      transition:    'opacity 0.3s ease',
+      position: 'fixed',
+      bottom: '24px',
+      right: '24px',
+      padding: '10px 18px',
+      borderRadius: '6px',
+      fontSize: '13px',
+      fontWeight: '600',
+      color: '#fff',
+      zIndex: '9999',
+      opacity: '0',
+      transition: 'opacity 0.3s ease',
       pointerEvents: 'none',
     });
     document.body.appendChild(toast);
@@ -1546,14 +1546,14 @@ function scheduleClassAutoSave() {
     // Read the live form values into memory before saving
     const cls = allClasses[currentClass];
     if (!cls) return;
-    const titleEl      = document.getElementById('classTitle');
-    const subtitleEl   = document.getElementById('classSubtitle');
+    const titleEl = document.getElementById('classTitle');
+    const subtitleEl = document.getElementById('classSubtitle');
     const instructorEl = document.getElementById('classInstructor');
-    const channelEl    = document.getElementById('classChannel');
-    if (titleEl)      cls.title       = titleEl.value;
-    if (subtitleEl)   cls.subtitle    = subtitleEl.value;
-    if (instructorEl) cls.instructor  = instructorEl.value;
-    if (channelEl)    cls.channelName = channelEl.value;
+    const channelEl = document.getElementById('classChannel');
+    if (titleEl) cls.title = titleEl.value;
+    if (subtitleEl) cls.subtitle = subtitleEl.value;
+    if (instructorEl) cls.instructor = instructorEl.value;
+    if (channelEl) cls.channelName = channelEl.value;
     saveClassToFile();
   }, ADMIN_AUTOSAVE_DELAY_MS);
 }

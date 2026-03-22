@@ -18,8 +18,8 @@
 
 const { MongoClient } = require('mongodb');
 
-const MONGODB_URI    = process.env.MONGODB_URI;
-const DB_NAME        = process.env.MONGODB_DB_NAME || 'bible-study';
+const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = process.env.MONGODB_DB_NAME || 'bible-study';
 const LEGACY_COLLECTION = 'appData';
 const CLASSES_COLLECTION = 'classes';
 const LESSON_PLANS_COLLECTION = 'lessonPlans';
@@ -28,7 +28,7 @@ const HISTORY_COLLECTION = 'appDataHistory';
 const SCHEMA_VERSION = 2;
 
 let client = null;
-let db     = null;
+let db = null;
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
@@ -499,7 +499,7 @@ async function connectDB() {
   } catch (err) {
     console.error('[MongoDB] Connection failed:', err.message);
     client = null;
-    db     = null;
+    db = null;
     return false;
   }
 }
@@ -624,7 +624,7 @@ async function closeDB() {
   if (client) {
     await client.close();
     client = null;
-    db     = null;
+    db = null;
     console.log('[MongoDB] Connection closed.');
   }
 }

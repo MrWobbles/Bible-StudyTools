@@ -18,11 +18,13 @@
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap"
+    rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700"
+    rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/admin.css" />
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="apple-touch-icon" href="assets/images/icon.png" />
@@ -36,7 +38,8 @@
         <p class="subtitle app__subtitle" id="header-subtitle">Create and manage Bible study lesson plans</p>
       </div>
       <div class="app__actions" style="display: flex; gap: 10px;">
-        <button id="theme-toggle-admin" class="pill-link" data-theme-toggle aria-label="Switch to light mode" title="Switch to light mode">
+        <button id="theme-toggle-admin" class="pill-link" data-theme-toggle aria-label="Switch to light mode"
+          title="Switch to light mode">
           <span class="material-symbols-outlined theme-toggle__icon">light_mode</span>
           <span class="theme-toggle__label">Light mode</span>
         </button>
@@ -44,15 +47,12 @@
           style="background: rgba(76, 175, 80, 0.15); border-color: rgba(76, 175, 80, 0.4);"><span
             class="material-icons">save</span>
           Backups</button>
-        <button id="back-btn" class="pill-link"
-          style="display: none;"><span
+        <button id="back-btn" class="pill-link" style="display: none;"><span
             class="material-symbols-outlined">arrow_back</span>Back</button>
         <a id="view-student-link" href="student.html" class="pill-link" target="_blank" rel="noopener"
-          style="display: none;"><span class="material-symbols-outlined"
-            >cast</span>View Student</a>
+          style="display: none;"><span class="material-symbols-outlined">cast</span>View Student</a>
         <a id="view-teacher-link" href="teacher.html" class="pill-link" target="_blank" rel="noopener"
-          style="display: none;"><span class="material-symbols-outlined"
-            >co_present</span>View Teacher</a>
+          style="display: none;"><span class="material-symbols-outlined">co_present</span>View Teacher</a>
       </div>
     </header>
 
@@ -62,10 +62,11 @@
         <div class="panel-header">
           <div style="display: flex; align-items: center; gap: 16px;">
             <h2>Lesson Plans</h2>
-            <button id="switch-to-notes-btn" class="btn-secondary" style="font-size: 13px; padding: 6px 12px;"><span class="material-symbols-outlined" style="font-size: 18px;">sticky_note_2</span>Notes</button>
+            <button id="switch-to-notes-btn" class="btn-secondary" style="font-size: 13px; padding: 6px 12px;"><span
+                class="material-symbols-outlined" style="font-size: 18px;">sticky_note_2</span>Notes</button>
           </div>
-            <button id="new-lessonplan-btn" class="btn-primary"><span class="material-symbols-outlined"
-              >add</span>New Lesson Plan</button>
+          <button id="new-lessonplan-btn" class="btn-primary"><span class="material-symbols-outlined">add</span>New
+            Lesson Plan</button>
         </div>
         <div id="lessonplans-list" class="lessonplans-list"></div>
       </section>
@@ -77,9 +78,12 @@
         <div class="panel-header">
           <div style="display: flex; align-items: center; gap: 16px;">
             <h2>Notes</h2>
-            <button id="switch-to-lessonplans-btn" class="btn-secondary" style="font-size: 13px; padding: 6px 12px;"><span class="material-symbols-outlined" style="font-size: 18px;">library_books</span>Lesson Plans</button>
+            <button id="switch-to-lessonplans-btn" class="btn-secondary"
+              style="font-size: 13px; padding: 6px 12px;"><span class="material-symbols-outlined"
+                style="font-size: 18px;">library_books</span>Lesson Plans</button>
           </div>
-          <button id="new-note-btn" class="btn-primary"><span class="material-symbols-outlined">add</span>New Note</button>
+          <button id="new-note-btn" class="btn-primary"><span class="material-symbols-outlined">add</span>New
+            Note</button>
         </div>
         <div id="notes-list" class="lessonplans-list"></div>
       </section>
@@ -91,8 +95,8 @@
       <section class="panel" id="class-list-panel">
         <div class="panel-header">
           <h2 id="class-list-title">Classes</h2>
-            <button id="new-class-btn" class="btn-primary"><span class="material-symbols-outlined"
-              >add</span>New Class</button>
+          <button id="new-class-btn" class="btn-primary"><span class="material-symbols-outlined">add</span>New
+            Class</button>
         </div>
         <div id="classes-list" class="classes-list"></div>
       </section>
@@ -102,10 +106,10 @@
         <div class="panel-header">
           <h2 id="edit-title">Select a class to edit</h2>
           <div style="display: flex; gap: 8px;">
-            <button id="edit-content-btn" class="btn-secondary" style="display: none;"><span class="material-symbols-outlined"
-                >edit</span>Edit Content</button>
-            <button id="save-class-btn" class="btn-primary" style="display: none;"><span class="material-symbols-outlined"
-              >save</span>Save Changes</button>
+            <button id="edit-content-btn" class="btn-secondary" style="display: none;"><span
+                class="material-symbols-outlined">edit</span>Edit Content</button>
+            <button id="save-class-btn" class="btn-primary" style="display: none;"><span
+                class="material-symbols-outlined">save</span>Save Changes</button>
           </div>
         </div>
 
@@ -135,27 +139,27 @@
           <div class="form-section">
             <h3>Media</h3>
             <div id="media-list"></div>
-            <button id="add-media-btn" class="btn-secondary"><span class="material-symbols-outlined"
-              >videocam</span>Add Media</button>
+            <button id="add-media-btn" class="btn-secondary"><span class="material-symbols-outlined">videocam</span>Add
+              Media</button>
           </div>
 
           <!-- Outline Management -->
           <div class="form-section">
             <h3>Outline Sections</h3>
             <div id="outline-list"></div>
-            <button id="add-section-btn" class="btn-secondary"><span class="material-symbols-outlined"
-              >add</span>Add Section</button>
+            <button id="add-section-btn" class="btn-secondary"><span class="material-symbols-outlined">add</span>Add
+              Section</button>
           </div>
 
           <!-- Actions -->
           <div class="form-section">
             <div style="display: flex; gap: 10px;">
-              <button id="save-class-btn-bottom" class="btn-primary"><span class="material-symbols-outlined"
-                >save</span>Save Class</button>
-                <button id="delete-class-btn" class="btn-danger"><span class="material-symbols-outlined"
-                  >delete</span>Delete Class</button>
-                <button id="export-class-btn" class="btn-secondary"><span class="material-symbols-outlined"
-                  >download</span>Export JSON</button>
+              <button id="save-class-btn-bottom" class="btn-primary"><span
+                  class="material-symbols-outlined">save</span>Save Class</button>
+              <button id="delete-class-btn" class="btn-danger"><span
+                  class="material-symbols-outlined">delete</span>Delete Class</button>
+              <button id="export-class-btn" class="btn-secondary"><span
+                  class="material-symbols-outlined">download</span>Export JSON</button>
             </div>
           </div>
         </div>
@@ -203,10 +207,10 @@
         <div id="media-fields"></div>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal('media-modal')"><span class="material-symbols-outlined"
-          >close</span>Cancel</button>
-        <button class="btn-primary" onclick="saveMedia()"><span class="material-symbols-outlined"
-          >save</span>Save Media</button>
+        <button class="btn-secondary" onclick="closeModal('media-modal')"><span
+            class="material-symbols-outlined">close</span>Cancel</button>
+        <button class="btn-primary" onclick="saveMedia()"><span class="material-symbols-outlined">save</span>Save
+          Media</button>
       </div>
     </div>
   </div>
@@ -237,14 +241,14 @@
           <textarea id="section-points" rows="6" placeholder="Point 1&#10;Point 2&#10;Point 3"></textarea>
         </div>
         <div id="section-questions-container"></div>
-        <button id="add-question-btn" class="btn-secondary" onclick="addQuestionField()"><span class="material-symbols-outlined"
-          >add</span>Add Question</button>
+        <button id="add-question-btn" class="btn-secondary" onclick="addQuestionField()"><span
+            class="material-symbols-outlined">add</span>Add Question</button>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal('section-modal')"><span class="material-symbols-outlined"
-          >close</span>Cancel</button>
-        <button class="btn-primary" onclick="saveSection()"><span class="material-symbols-outlined"
-          >save</span>Save Section</button>
+        <button class="btn-secondary" onclick="closeModal('section-modal')"><span
+            class="material-symbols-outlined">close</span>Cancel</button>
+        <button class="btn-primary" onclick="saveSection()"><span class="material-symbols-outlined">save</span>Save
+          Section</button>
       </div>
     </div>
   </div>
@@ -267,10 +271,10 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal('lessonplan-modal')"><span class="material-symbols-outlined"
-          >close</span>Cancel</button>
-        <button class="btn-primary" onclick="saveLessonPlan()"><span class="material-symbols-outlined"
-          >add</span>Create Lesson Plan</button>
+        <button class="btn-secondary" onclick="closeModal('lessonplan-modal')"><span
+            class="material-symbols-outlined">close</span>Cancel</button>
+        <button class="btn-primary" onclick="saveLessonPlan()"><span class="material-symbols-outlined">add</span>Create
+          Lesson Plan</button>
       </div>
     </div>
   </div>
@@ -293,10 +297,10 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal('note-modal')"><span class="material-symbols-outlined"
-          >close</span>Cancel</button>
-        <button class="btn-primary" onclick="saveNoteMetadata()"><span class="material-symbols-outlined"
-          >add</span>Create Note</button>
+        <button class="btn-secondary" onclick="closeModal('note-modal')"><span
+            class="material-symbols-outlined">close</span>Cancel</button>
+        <button class="btn-primary" onclick="saveNoteMetadata()"><span
+            class="material-symbols-outlined">add</span>Create Note</button>
       </div>
     </div>
   </div>
@@ -310,8 +314,8 @@
       </div>
       <div class="modal-body" id="class-add-modal-content"></div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal('class-add-modal')"><span class="material-symbols-outlined"
-            >close</span>Cancel</button>
+        <button class="btn-secondary" onclick="closeModal('class-add-modal')"><span
+            class="material-symbols-outlined">close</span>Cancel</button>
       </div>
     </div>
   </div>
@@ -327,17 +331,14 @@
       <div class="modal-body">
         <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
           <button onclick="createManualBackup('classes')" class="btn-secondary" style="flex: 1; min-width: 150px;">
-            <span class="material-icons"
-              >assignment</span> Backup Classes Now
+            <span class="material-icons">assignment</span> Backup Classes Now
           </button>
           <button onclick="createManualBackup('lessonPlans')" class="btn-secondary" style="flex: 1; min-width: 150px;">
-            <span class="material-icons"
-              >library_books</span> Backup Lesson
+            <span class="material-icons">library_books</span> Backup Lesson
             Plans Now
           </button>
           <button onclick="createManualBackup('notes')" class="btn-secondary" style="flex: 1; min-width: 150px;">
-            <span class="material-icons"
-              >sticky_note_2</span> Backup Notes Now
+            <span class="material-icons">sticky_note_2</span> Backup Notes Now
           </button>
         </div>
 
@@ -364,8 +365,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal('backup-modal')"><span class="material-symbols-outlined"
-            >close</span>Close</button>
+        <button class="btn-secondary" onclick="closeModal('backup-modal')"><span
+            class="material-symbols-outlined">close</span>Close</button>
       </div>
     </div>
   </div>
