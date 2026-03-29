@@ -131,3 +131,64 @@ This project now uses a two-tier test strategy:
 ## Browser Compatibility
 
 Works best in modern browsers with BroadcastChannel API support (Chrome, Firefox, Safari, Edge). Falls back to localStorage for cross-window communication if needed.
+
+## Installation & Setup
+
+### Prerequisites
+- **Node.js** and **npm** (for running the local server and scripts)
+- **Python** (for the dev server)
+- **Ollama** (for AI-powered verse lookup and LLM features)
+
+### 1. Clone the Repository
+```bash
+git clone <your-repo-url>
+cd Bible-Study-Tools
+```
+
+### 2. Install Dependencies
+```bash
+npm install
+```
+
+### 3. (Optional) Set Up Python Dev Server
+For local development and testing:
+```bash
+python docs/serve.py
+```
+Then open `http://localhost:8000` in your browser.
+
+### 4. Set Up Ollama for AI Features
+Ollama enables advanced Bible verse lookup by thought or topic.
+
+#### a. Install Ollama
+- Download and install from [https://ollama.com/download](https://ollama.com/download)
+- Follow the instructions for your operating system
+
+#### b. Start Ollama
+```bash
+ollama serve
+```
+
+#### c. Pull a Model
+```bash
+ollama pull llama3
+```
+(You can use other models; see `assets/js/llmService.js` for supported options.)
+
+#### d. Verify Ollama is Running
+- The app expects Ollama at `http://localhost:11434` (default)
+- Test by visiting [http://localhost:11434](http://localhost:11434) in your browser
+
+### 5. Start the App
+- Open `index.html` (student view) and `teacher.html` (teacher view) in your browser
+- For desktop app, download from the releases page and run the executable
+
+### 6. Using AI Features
+- Highlight a phrase in the editor, then use the "Verse Lookup by Thought" button or press `Alt+T`
+- Select verses from the modal and click "Insert Selected"
+
+### Troubleshooting
+- If you see errors about connecting to Ollama, ensure the server is running and the model is pulled
+- For more help, see the [Ollama documentation](https://ollama.com/docs)
+
+---

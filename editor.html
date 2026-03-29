@@ -189,6 +189,9 @@
             <button class="toolbar-btn" id="btn-ai-assistant" title="AI Assistant">
               <span class="material-symbols-outlined">psychology</span>
             </button>
+            <button class="toolbar-btn" id="btn-verse-lookup-thought" title="Verse Lookup by Thought">
+              <span class="material-symbols-outlined">lightbulb</span>
+            </button>
           </div>
         </div>
 
@@ -201,6 +204,24 @@
   </div>
 
   <!-- Modals -->
+    <!-- Verse Lookup by Thought Modal -->
+    <div id="verse-lookup-thought-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Verse Lookup by Thought</h3>
+          <button class="modal-close" data-modal="verse-lookup-thought-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="verse-lookup-thought-query" style="margin-bottom: 12px;"></div>
+          <div id="verse-lookup-thought-loading" style="display:none; margin-bottom: 12px;">Searching for verses...</div>
+          <div id="verse-lookup-thought-results"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-insert-selected-verses" class="btn btn-primary" type="button"><span class="material-symbols-outlined">add</span>Insert Selected</button>
+          <button class="btn btn-secondary modal-close" data-modal="verse-lookup-thought-modal">Cancel</button>
+        </div>
+      </div>
+    </div>
   <!-- Verse Reference Modal -->
   <div id="verse-modal" class="modal">
     <div class="modal-content">

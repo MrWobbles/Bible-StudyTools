@@ -271,6 +271,99 @@ function updateToolbarActiveStates(ed) {
 
 // Setup Event Listeners
 function setupEventListeners() {
+    // Verse Lookup by Thought button
+    document.getElementById('btn-verse-lookup-thought').addEventListener('click', async () => {
+      await handleVerseLookupByThought();
+    });
+
+  // Handle Verse Lookup by Thought
+  async function handleVerseLookupByThought() {
+    const selection = editor.state.selection;
+    if (!selection || selection.empty) {
+      alert('Highlight a phrase or thought to look up related verses.');
+      return;
+    }
+    const from = selection.from;
+    const to = selection.to;
+    const thought = editor.state.doc.textBetween(from, to, ' ').trim();
+    if (!thought) {
+      alert('Highlight a phrase or thought to look up related verses.');
+      return;
+    }
+    // Show modal and loading
+    document.getElementById('verse-lookup-thought-query').textContent = `Searching for: "${thought}"`;
+    document.getElementById('verse-lookup-thought-loading').style.display = '';
+    document.getElementById('verse-lookup-thought-results').innerHTML = '';
+    openModal('verse-lookup-thought-modal');
+
+    // Query LLM for relevant verses
+    let verses = [];
+    try {
+      const prompt = `Find 3-5 Bible verses that match or relate to the following thought or topic. For each, return the reference and the verse text.\n\nThought: "${thought}"\n\nFormat:\nReference: <book chapter:verse>\nText: <verse text>\n---`;
+      const response = await window.generateCompletion(prompt, { model: undefined, temperature: 0.2 });
+      // Parse response into array of { reference, text }
+      verses = parseLLMVerseResults(response);
+    } catch (err) {
+      document.getElementById('verse-lookup-thought-results').innerHTML = '<div style="color:red;">Error searching for verses.</div>';
+      document.getElementById('verse-lookup-thought-loading').style.display = 'none';
+      return;
+    }
+    document.getElementById('verse-lookup-thought-loading').style.display = 'none';
+    if (!verses.length) {
+      document.getElementById('verse-lookup-thought-results').innerHTML = '<div>No verses found.</div>';
+      return;
+    }
+    document.getElementById('verse-lookup-thought-results').innerHTML = verses.map((v, i) =>
+      `<div class="verse-result" style="margin-bottom:6px; padding:4px 0; display:flex; align-items:flex-start; gap:6px;">
+        <input type="checkbox" class="verse-select-checkbox" id="verse-select-${i}" data-index="${i}" style="margin-top:2px;width:15px;">
+        <label for="verse-select-${i}" style="flex:1; cursor:pointer; font-size: 0.98em;"><strong>${v.reference}</strong>: <span>${v.text}</span></label>
+      </div>`
+    ).join('');
+    // Store verses for later use
+    window._verseLookupThoughtResults = { from, to, verses };
+
+    // Insert selected verses from modal
+    document.getElementById('btn-insert-selected-verses').onclick = function() {
+      const data = window._verseLookupThoughtResults;
+      if (!data || !data.verses) return;
+      const checkboxes = document.querySelectorAll('.verse-select-checkbox:checked');
+      if (!checkboxes.length) {
+        alert('Select at least one verse to insert.');
+        return;
+      }
+      const selected = Array.from(checkboxes).map(cb => data.verses[parseInt(cb.dataset.index, 10)]);
+      if (!selected.length) return;
+      // Combine selected verses into a single string with line breaks
+      const insertText = selected.map(v => `${v.reference}: ${v.text}`).join('<br>');
+      editor.chain().focus().insertContentAt({ from: data.from, to: data.to }, insertText + '<br>').run();
+      closeModal('verse-lookup-thought-modal');
+    };
+    // Click to replace
+    document.querySelectorAll('.verse-result').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.index, 10);
+        if (verses[idx]) {
+          editor.chain().focus().insertContentAt({ from, to }, `${verses[idx].reference}: ${verses[idx].text} `).run();
+          closeModal('verse-lookup-thought-modal');
+        }
+      });
+    });
+  }
+
+  // Parse LLM response for verses
+  function parseLLMVerseResults(response) {
+    const results = [];
+    // Split on each Reference: line (handles both --- and missing separators)
+    const blocks = response.split(/\n(?=Reference: )|\n(?=\d+\. Reference: )|---/g);
+    for (const block of blocks) {
+      const refMatch = block.match(/Reference:\s*([^\n]+)/i);
+      const textMatch = block.match(/Text:\s*([\s\S]+)/i);
+      if (refMatch && textMatch) {
+        results.push({ reference: refMatch[1].trim(), text: textMatch[1].trim().replace(/\n/g, ' ') });
+      }
+    }
+    return results;
+  }
   // Toolbar buttons
   document.querySelectorAll('.toolbar-btn[data-action]').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -374,7 +467,8 @@ function setupEventListeners() {
   });
 
   // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
+
+  document.addEventListener('keydown', async (e) => {
     // Ctrl+S to save
     if (e.ctrlKey && e.key === 's') {
       e.preventDefault();
@@ -384,6 +478,36 @@ function setupEventListeners() {
     if (e.ctrlKey && e.key === 'f') {
       e.preventDefault();
       openModal('search-modal');
+    }
+
+    // Alt+B to insert verse text after highlighted address
+    if (e.altKey && !e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'b') {
+      const selection = editor.state.selection;
+      if (selection && !selection.empty) {
+        const from = selection.from;
+        const to = selection.to;
+        const verseAddress = editor.state.doc.textBetween(from, to, ' ');
+        if (verseAddress && verseAddress.trim().length > 0) {
+          // Use current translation or default
+          let translation = 'nkjv';
+          const select = document.getElementById('bible-translation-select');
+          if (select) translation = select.value;
+          // Fetch verse text
+          const verseData = await fetchVerseText(verseAddress.trim(), translation);
+          if (verseData && verseData.text) {
+            // Insert verse text after the selection
+            editor.chain().focus().insertContentAt(to, ` <em>${verseData.text}</em> `).run();
+          } else {
+            editor.chain().focus().insertContentAt(to, ' [Verse text not available] ').run();
+          }
+        }
+      }
+    }
+
+    // Alt+T to trigger verse lookup by thought
+    if (e.altKey && !e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 't') {
+      e.preventDefault();
+      await handleVerseLookupByThought();
     }
 
     if (e.key === 'Escape') {
