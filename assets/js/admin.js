@@ -345,18 +345,7 @@ async function saveLessonPlansToFile(options = {}) {
   const jsonData = { lessonPlans: allLessonPlans };
   const { changedPlanId = null, deletedPlanId = null } = options;
 
-  // If running in Electron, save directly to file system
-  if (window.bst && window.bst.saveFile) {
-    try {
-      await window.bst.saveFile('lessonPlans.json', JSON.stringify(jsonData, null, 2));
-      console.log('[OK] Lesson plans saved via Electron');
-      return;
-    } catch (err) {
-      console.error('Failed to save lesson plans via Electron:', err);
-      alert('Failed to save lesson plans: ' + err.message);
-      return;
-    }
-  }
+  // Local file save removed. Always use API/cloud.
 
   // Try API endpoint (web server mode)
   try {
@@ -593,18 +582,7 @@ async function saveNotesToFile(options = {}) {
   console.log('saveNotesToFile called with', allNotes.length, 'notes');
   const jsonData = { notes: allNotes };
 
-  // If running in Electron, save directly to file system
-  if (window.bst && window.bst.saveFile) {
-    try {
-      await window.bst.saveFile('notes.json', JSON.stringify(jsonData, null, 2));
-      console.log('[OK] Notes saved via Electron');
-      return;
-    } catch (err) {
-      console.error('Failed to save notes via Electron:', err);
-      alert('Failed to save notes: ' + err.message);
-      return;
-    }
-  }
+  // Local file save removed. Always use API/cloud.
 
   // Try API endpoint (web server mode)
   try {
@@ -1437,18 +1415,7 @@ async function saveClassToFile(options = {}) {
   const deletedClassId = String(options?.deletedClassId || '').trim();
 
   // If running in Electron, save directly to file system
-  if (window.bst && window.bst.saveFile) {
-    try {
-      await window.bst.saveFile('classes.json', JSON.stringify(jsonData, null, 2));
-      console.log('[OK] Saved via Electron');
-      showAdminSaveStatus('Classes saved', false, 'check_circle');
-      return;
-    } catch (err) {
-      console.error('Failed to save class via Electron:', err);
-      showAdminSaveStatus('Save failed: ' + err.message, true, 'error');
-      return;
-    }
-  }
+  // Local file save removed. Always use API/cloud.
 
   // Try API endpoint (web server mode)
   try {

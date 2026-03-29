@@ -149,21 +149,7 @@ ipcMain.on('toggle-fullscreen', (event) => {
   }
 });
 
-// Handle file save requests
-ipcMain.handle('save-file', async (event, filename, data) => {
-  try {
-    const siteRoot = path.join(process.resourcesPath, 'site');
-    const exists = require('fs').existsSync(siteRoot);
-    const staticRoot = exists ? siteRoot : path.join(__dirname, '..');
-
-    const filePath = path.join(staticRoot, 'assets', 'data', filename);
-    await fs.writeFile(filePath, data, 'utf8');
-    return { success: true };
-  } catch (err) {
-    console.error('Failed to save file:', err);
-    throw new Error('Failed to save file: ' + err.message);
-  }
-});
+// File save requests are disabled. Local JSON file writes are not supported.
 
 // Handle media upload requests
 ipcMain.handle('upload-media', async (event, mediaType, filename, arrayBuffer) => {
