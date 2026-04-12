@@ -142,6 +142,84 @@ function initializePage() {
   if (statusEl) statusEl.textContent = 'Ready. Open the display page on the TV (student.html).';
 }
 
+function formatStoppedMarkerTimestamp(timestamp) {
+  if (!timestamp) return '';
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleString([], {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+}
+
+function getStoppedMarkerHoverLabel() {
+  const formattedTimestamp = formatStoppedMarkerTimestamp(classConfig.stoppedMarkerUpdatedAt);
+  if (!formattedTimestamp) return '';
+
+  if (classConfig.stoppedMarkerAction === 'added') {
+    return `Added ${formattedTimestamp}`;
+  }
+
+  if (classConfig.stoppedMarkerAction === 'modified') {
+    return `Modified ${formattedTimestamp}`;
+  }
+
+  return `Marked ${formattedTimestamp}`;
+}
+
+function getStoppedMarkerButtonTitle(isStoppedHere) {
+  if (!isStoppedHere) {
+    return 'Mark where you stopped';
+  }
+
+  const markerHoverLabel = getStoppedMarkerHoverLabel();
+  return markerHoverLabel
+    ? `Click to remove marker\n${markerHoverLabel}`
+    : 'Click to remove marker';
+}
+
+function updateStoppedMarkerState({ sectionId = null, headingId = null, lineId = null }) {
+  const hadExistingMarker = Boolean(
+    classConfig.stoppedAtSection ||
+    classConfig.stoppedAtEditorHeading ||
+    classConfig.stoppedAtEditorLine
+  );
+  const hasNextMarker = Boolean(sectionId || headingId || lineId);
+  const stoppedMarkerUpdatedAt = hasNextMarker ? new Date().toISOString() : null;
+  const stoppedMarkerAction = hasNextMarker
+    ? (hadExistingMarker ? 'modified' : 'added')
+    : null;
+
+  classConfig.stoppedAtSection = sectionId;
+  classConfig.stoppedAtEditorHeading = headingId;
+  classConfig.stoppedAtEditorLine = lineId;
+  classConfig.stoppedMarkerUpdatedAt = stoppedMarkerUpdatedAt;
+  classConfig.stoppedMarkerAction = stoppedMarkerAction;
+
+  if (allClassesData && allClassesData.classes) {
+    const classIndex = allClassesData.classes.findIndex(c =>
+      c.id === classConfig.id || c.classNumber === classConfig.classNumber
+    );
+
+    if (classIndex !== -1) {
+      allClassesData.classes[classIndex].stoppedAtSection = sectionId;
+      allClassesData.classes[classIndex].stoppedAtEditorHeading = headingId;
+      allClassesData.classes[classIndex].stoppedAtEditorLine = lineId;
+      allClassesData.classes[classIndex].stoppedMarkerUpdatedAt = stoppedMarkerUpdatedAt;
+      allClassesData.classes[classIndex].stoppedMarkerAction = stoppedMarkerAction;
+    } else {
+      console.warn('Could not find class in allClassesData to update marker', {
+        classConfigId: classConfig.id,
+        classConfigNumber: classConfig.classNumber
+      });
+    }
+  } else {
+    console.warn('allClassesData or allClassesData.classes not available for marker update');
+  }
+}
+
 function renderOutlineWithQuestions() {
   if (!classConfig.outline) return;
 
@@ -183,7 +261,7 @@ function renderOutlineWithQuestions() {
     const stopMarkerBtn = document.createElement('button');
     stopMarkerBtn.className = 'stop-marker-btn' + (isStoppedHere ? ' active' : '');
     stopMarkerBtn.innerHTML = isStoppedHere ? '<span class="material-icons">check</span> Marked' : '<span class="material-icons">location_on</span>';
-    stopMarkerBtn.title = isStoppedHere ? 'Click to remove marker' : 'Mark where you stopped';
+    stopMarkerBtn.title = getStoppedMarkerButtonTitle(isStoppedHere);
     stopMarkerBtn.onclick = (e) => {
       e.stopPropagation();
       e.preventDefault();
@@ -1466,7 +1544,7 @@ function addStoppedMarkersToEditorContent(container) {
     markerBtn.className = `stop-marker-btn editor-line-marker${isStoppedHere ? ' active' : ''}`;
     markerBtn.setAttribute('type', 'button');
     markerBtn.setAttribute('aria-label', isStoppedHere ? `Remove stop marker from line ${index + 1}` : `Set stop marker at line ${index + 1}`);
-    markerBtn.title = isStoppedHere ? 'Click to remove marker' : 'Mark where you stopped';
+    markerBtn.title = getStoppedMarkerButtonTitle(isStoppedHere);
     markerBtn.innerHTML = `<span class="line-number-text">${index + 1}</span>`;
     markerBtn.onclick = (e) => {
       e.stopPropagation();
@@ -1491,24 +1569,7 @@ function addStoppedMarkersToEditorContent(container) {
  * @param {string|null} lineId - Line ID to mark, or null to clear
  */
 async function setStoppedMarkerEditorLine(lineId) {
-  classConfig.stoppedAtSection = null;
-  classConfig.stoppedAtEditorHeading = null;
-  classConfig.stoppedAtEditorLine = lineId;
-
-  if (allClassesData && allClassesData.classes) {
-    const classIndex = allClassesData.classes.findIndex(c =>
-      c.id === classConfig.id || c.classNumber === classConfig.classNumber
-    );
-    if (classIndex !== -1) {
-      allClassesData.classes[classIndex].stoppedAtSection = null;
-      allClassesData.classes[classIndex].stoppedAtEditorHeading = null;
-      allClassesData.classes[classIndex].stoppedAtEditorLine = lineId;
-    } else {
-      console.warn('Could not find class in allClassesData to update marker');
-    }
-  } else {
-    console.warn('allClassesData or allClassesData.classes not available for marker update');
-  }
+  updateStoppedMarkerState({ lineId });
 
   const cloudWarning = await saveStoppedMarker();
 
@@ -1531,26 +1592,7 @@ async function setStoppedMarkerEditorLine(lineId) {
  * @param {string|null} headingId - Heading ID to mark, or null to clear
  */
 async function setStoppedMarkerEditor(headingId) {
-  // Clear any outline section marker (only one marker per class)
-  classConfig.stoppedAtSection = null;
-  classConfig.stoppedAtEditorHeading = headingId;
-  classConfig.stoppedAtEditorLine = null;
-
-  // Update the allClassesData
-  if (allClassesData && allClassesData.classes) {
-    const classIndex = allClassesData.classes.findIndex(c =>
-      c.id === classConfig.id || c.classNumber === classConfig.classNumber
-    );
-    if (classIndex !== -1) {
-      allClassesData.classes[classIndex].stoppedAtSection = null;
-      allClassesData.classes[classIndex].stoppedAtEditorHeading = headingId;
-      allClassesData.classes[classIndex].stoppedAtEditorLine = null;
-    } else {
-      console.warn('Could not find class in allClassesData to update marker');
-    }
-  } else {
-    console.warn('allClassesData or allClassesData.classes not available for marker update');
-  }
+  updateStoppedMarkerState({ headingId });
 
   // Save to server
   const cloudWarning = await saveStoppedMarker();
@@ -1574,29 +1616,7 @@ async function setStoppedMarkerEditor(headingId) {
  * @param {string|null} sectionId - Section ID to mark, or null to clear
  */
 async function setStoppedMarker(sectionId) {
-  // Clear any editor heading marker (only one marker per class)
-  classConfig.stoppedAtEditorHeading = null;
-  classConfig.stoppedAtEditorLine = null;
-  classConfig.stoppedAtSection = sectionId;
-
-  // Update the allClassesData with the new marker
-  if (allClassesData && allClassesData.classes) {
-    const classIndex = allClassesData.classes.findIndex(c =>
-      c.id === classConfig.id || c.classNumber === classConfig.classNumber
-    );
-    if (classIndex !== -1) {
-      allClassesData.classes[classIndex].stoppedAtEditorHeading = null;
-      allClassesData.classes[classIndex].stoppedAtEditorLine = null;
-      allClassesData.classes[classIndex].stoppedAtSection = sectionId;
-    } else {
-      console.warn('Could not find class in allClassesData to update marker', {
-        classConfigId: classConfig.id,
-        classConfigNumber: classConfig.classNumber
-      });
-    }
-  } else {
-    console.warn('allClassesData or allClassesData.classes not available for marker update');
-  }
+  updateStoppedMarkerState({ sectionId });
 
   // Save to server
   const cloudWarning = await saveStoppedMarker();

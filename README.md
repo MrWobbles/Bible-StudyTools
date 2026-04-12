@@ -179,11 +179,40 @@ ollama pull llama3
 - The app expects Ollama at `http://localhost:11434` (default)
 - Test by visiting [http://localhost:11434](http://localhost:11434) in your browser
 
-### 5. Start the App
+### 5. Set Up Your Own MongoDB Database
+
+This app requires you to provide your own MongoDB database for cloud storage and syncing.
+
+#### a. Create a MongoDB Atlas Account (Recommended)
+- Go to [https://www.mongodb.com/atlas/database](https://www.mongodb.com/atlas/database) and sign up for a free account
+- Create a new project and cluster (the free tier is sufficient for most use cases)
+- In your cluster, click "Connect" and choose "Connect your application"
+- Copy the provided connection string (it will look like `mongodb+srv://<user>:<password>@cluster0.mongodb.net/<dbname>?retryWrites=true&w=majority`)
+
+#### b. Set the `MONGODB_URI` Environment Variable
+- In your environment (or in a `.env` file), set:
+  ```bash
+  export MONGODB_URI="<your-connection-string>"
+  ```
+- Replace `<user>`, `<password>`, and `<dbname>` with your actual credentials
+- If running on Windows, use `set` instead of `export`:
+  ```cmd
+  set MONGODB_URI="<your-connection-string>"
+  ```
+
+#### c. (Optional) Local MongoDB
+- You can also run a local MongoDB server if you prefer. See [MongoDB Community Edition](https://www.mongodb.com/try/download/community) for installation instructions.
+- Update `MONGODB_URI` to point to your local instance (e.g., `mongodb://localhost:27017/biblestudy`)
+
+#### d. Start the Node Server
+- The app will automatically use your MongoDB database for all cloud storage features.
+- If `MONGODB_URI` is not set, cloud features will be disabled and saving will not work.
+
+### 6. Start the App
 - Open `index.html` (student view) and `teacher.html` (teacher view) in your browser
 - For desktop app, download from the releases page and run the executable
 
-### 6. Using AI Features
+### 7. Using AI Features
 - Highlight a phrase in the editor, then use the "Verse Lookup by Thought" button or press `Alt+T`
 - Select verses from the modal and click "Insert Selected"
 

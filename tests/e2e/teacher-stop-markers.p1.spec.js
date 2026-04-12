@@ -13,6 +13,8 @@ test.describe('teacher stopping point markers P1', () => {
         stoppedAtSection,
         stoppedAtEditorLine,
         stoppedAtEditorHeading: null,
+        stoppedMarkerUpdatedAt: null,
+        stoppedMarkerAction: null,
         media: [
           {
             id: 'primary-video',
@@ -98,10 +100,13 @@ test.describe('teacher stopping point markers P1', () => {
 
     // Verify the saved payload contains the marker
     expect(lastSavedPayload?.classes?.[0]?.stoppedAtSection).toBe('section-prayer');
+    expect(lastSavedPayload?.classes?.[0]?.stoppedMarkerAction).toBe('added');
+    expect(lastSavedPayload?.classes?.[0]?.stoppedMarkerUpdatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     // Verify UI shows the marker is active
     await expect(firstAccordion).toHaveClass(/stopped-here/);
     await expect(stopMarkerBtn).toHaveClass(/active/);
+    await expect(stopMarkerBtn).toHaveAttribute('title', /Click to remove marker\nAdded /);
   });
 
   test('clicking active marker removes it', async ({ page }) => {
@@ -215,6 +220,8 @@ test.describe('teacher stopping point markers P1', () => {
 
   test('only one marker can be active at a time', async ({ page }) => {
     let currentState = mockClassData('section-prayer');
+    currentState.classes[0].stoppedMarkerUpdatedAt = '2026-04-10T10:15:00.000Z';
+    currentState.classes[0].stoppedMarkerAction = 'added';
 
     await page.route('**/api/data/classes', async (route) => {
       await route.fulfill({
@@ -249,10 +256,13 @@ test.describe('teacher stopping point markers P1', () => {
 
     // Wait for save
     await expect.poll(() => currentState?.classes?.[0]?.stoppedAtSection, { timeout: 5000 }).toBe('section-discussion');
+    expect(currentState?.classes?.[0]?.stoppedMarkerAction).toBe('modified');
+    expect(currentState?.classes?.[0]?.stoppedMarkerUpdatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     // Now only second should be marked
     await expect(firstAccordion).not.toHaveClass(/stopped-here/);
     await expect(secondAccordion).toHaveClass(/stopped-here/);
+    await expect(secondAccordion.locator('summary .stop-marker-btn')).toHaveAttribute('title', /Click to remove marker\nModified /);
   });
 
   test('editor line markers work in Editor Notes tab', async ({ page }) => {
@@ -295,6 +305,8 @@ test.describe('teacher stopping point markers P1', () => {
 
     // Verify save was called with editor line marker
     await expect.poll(() => lastSavedPayload?.classes?.[0]?.stoppedAtEditorLine, { timeout: 5000 }).toMatch(/^editor-line-/);
+    expect(lastSavedPayload?.classes?.[0]?.stoppedMarkerAction).toBe('added');
+    expect(lastSavedPayload?.classes?.[0]?.stoppedMarkerUpdatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     // Verify outline section marker was cleared
     expect(lastSavedPayload?.classes?.[0]?.stoppedAtSection).toBeNull();
@@ -302,5 +314,6 @@ test.describe('teacher stopping point markers P1', () => {
     // Verify UI shows the marker
     const lineRow = page.locator('.editor-line-row.stopped-here');
     await expect(lineRow).toBeVisible();
+    await expect(firstLineMarker).toHaveAttribute('title', /Click to remove marker\nAdded /);
   });
 });
