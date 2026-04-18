@@ -11,6 +11,7 @@ let verseScrollContainer = null;
 let versePages = [];
 let currentVersePageIndex = 0;
 const DEFAULT_VERSE_FONT_SIZE = 120;
+const DEFAULT_VERSE_SCALE = 0.62;
 const VERSE_STAGE_WIDTH = 1280;
 const VERSE_STAGE_HEIGHT = 720;
 let verseFontSize = 120;
@@ -498,7 +499,7 @@ function fitVerseStage() {
   const scale = Math.min(
     wrapWidth / VERSE_STAGE_WIDTH,
     wrapHeight / VERSE_STAGE_HEIGHT
-  );
+  ) * DEFAULT_VERSE_SCALE;
 
   if (!Number.isFinite(scale) || scale <= 0) return;
   const offsetX = (wrapWidth - (VERSE_STAGE_WIDTH * scale)) / 2;
