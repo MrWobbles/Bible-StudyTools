@@ -32,7 +32,7 @@ $listArgs += @("-ssh", "-pw", $pass, "$user@$deployHost", "cd '$root' ; ls -1d s
 & $plink @listArgs
 
 # Remove only deployment release folders under DEPLOY_ROOT
-$removeCmd = "cd '$root' ; for d in site-*; do if [ -d '$root/'\"\$d\" ]; then rm -rf '$root/'\"\$d\"; fi; done ; ls -1d site-* 2>/dev/null || echo 'REMOVED_ALL_SITE_RELEASES'"
+$removeCmd = "cd '$root' ; rm -rf -- site-* ; ls -1d site-* 2>/dev/null || echo 'REMOVED_ALL_SITE_RELEASES'"
 $removeArgs = @("-batch")
 if ($hostKey) { $removeArgs += @("-hostkey", $hostKey) }
 $removeArgs += @("-ssh", "-pw", $pass, "$user@$deployHost", $removeCmd)
