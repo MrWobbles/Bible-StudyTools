@@ -1,0 +1,45 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Archives
+*.zip
+*.tar
+*.gz
+
+# User-generated exports (keep local only)
+exports/
+class1-notes.json
+class1-notes.html
+*-notes-*.json
+*-notes-*.html
+
+# Environment secrets
+.env
+
+# Node modules
+node_modules/
+playwright-report/
+test-results/
+.playwright/
+
+# Backups
+backups/*
+
+# Large media files (download manually, not tracked)
+assets/video/*
+!assets/video/README.md
+assets/audio/*
+!assets/audio/README.md
+
+# Track documents and images (they're not too large)
+# assets/documents/ - TRACKED
+# assets/images/ - TRACKED
+
+# Electron build artifacts
+desktop/dist/
+desktop/build/
+assets/data/Can-I-Trust-the-Bible-Episode-1.mp4
