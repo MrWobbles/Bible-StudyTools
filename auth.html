@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In - Bible Study Tools</title>
+  <link rel="icon" href="assets/images/icon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/auth.css" />
+</head>
+
+<body>
+  <main class="auth-card">
+    <header class="auth-header">
+      <h1>Bible Study Tools</h1>
+      <p>Sign in is required. New accounts are invitation-only.</p>
+    </header>
+
+    <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+      <button class="auth-tab is-active" type="button" data-auth-tab="signin" role="tab">Sign In</button>
+      <button class="auth-tab" type="button" data-auth-tab="signup" role="tab">Sign Up (Invite)</button>
+      <button class="auth-tab" type="button" data-auth-tab="request" role="tab">Request Invite</button>
+    </div>
+
+    <section class="auth-body">
+      <form id="signin-form" class="auth-panel" data-auth-panel="signin">
+        <div class="auth-field">
+          <label for="login-identifier">Username or Email</label>
+          <input id="login-identifier" name="identifier" autocomplete="username" required />
+        </div>
+        <div class="auth-field">
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="auth-button" type="submit">Sign In</button>
+      </form>
+
+      <form id="signup-form" class="auth-panel" data-auth-panel="signup" hidden>
+        <div class="auth-field">
+          <label for="signup-username">Username</label>
+          <input id="signup-username" name="username" pattern="[A-Za-z0-9._-]{3,30}" required />
+        </div>
+        <div class="auth-field">
+          <label for="signup-email">Email</label>
+          <input id="signup-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="auth-field">
+          <label for="signup-password">Password</label>
+          <input id="signup-password" name="password" type="password" autocomplete="new-password" required />
+        </div>
+        <div class="auth-field">
+          <label for="signup-invite">Invitation Code</label>
+          <input id="signup-invite" name="inviteCode" required />
+        </div>
+        <button class="auth-button" type="submit">Create Account</button>
+      </form>
+
+      <form id="request-form" class="auth-panel" data-auth-panel="request" hidden>
+        <div class="auth-field">
+          <label for="request-name">Name (optional)</label>
+          <input id="request-name" name="displayName" autocomplete="name" />
+        </div>
+        <div class="auth-field">
+          <label for="request-username">Requested Username</label>
+          <input id="request-username" name="username" pattern="[A-Za-z0-9._-]{3,30}" required />
+        </div>
+        <div class="auth-field">
+          <label for="request-email">Email</label>
+          <input id="request-email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="auth-field">
+          <label for="request-message">Why do you need access? (optional)</label>
+          <textarea id="request-message" name="message"></textarea>
+        </div>
+        <button class="auth-button" type="submit">Submit Request</button>
+      </form>
+
+      <p id="auth-status" class="auth-status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      try {
+        var theme = localStorage.getItem('bst-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+      } catch (err) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <title>User Admin — Bible Study Tools</title>
+  <link rel="icon" href="assets/images/icon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/admin.css" />
+  <link rel="stylesheet" href="assets/css/user-admin.css" />
+</head>
+
+<body class="page page--user-admin">
+  <div class="app app--user-admin">
+    <header class="app__header">
+      <div class="title-group app__title-group">
+        <h1>User Admin</h1>
+        <p class="subtitle app__subtitle">Manage signup requests and active user accounts from one place.</p>
+      </div>
+      <div class="app__actions admin-requests-actions">
+        <a href="admin.html" class="pill-link"><span class="material-symbols-outlined">arrow_back</span>Lesson Plans</a>
+        <button id="refresh-requests-btn" class="pill-link" type="button"><span class="material-symbols-outlined">refresh</span>Refresh</button>
+        <button id="logout-btn" class="pill-link" type="button"><span class="material-symbols-outlined">logout</span>Sign Out</button>
+      </div>
+    </header>
+
+    <main class="app__layout admin-requests-layout">
+      <section class="panel admin-requests-panel">
+        <div class="panel-header admin-requests-panel__header">
+          <div>
+            <h2>Pending</h2>
+            <p class="admin-requests-panel__meta">Approve a request to create an email-bound invite code immediately.</p>
+          </div>
+        </div>
+        <p id="requests-status" class="admin-requests-status" aria-live="polite"></p>
+        <div id="pending-requests-list" class="admin-requests-list"></div>
+      </section>
+
+      <section class="panel admin-requests-panel">
+        <div class="panel-header admin-requests-panel__header">
+          <div>
+            <h2>Recent Decisions</h2>
+            <p class="admin-requests-panel__meta">Approved requests retain the generated invite code for follow-up.</p>
+          </div>
+        </div>
+        <div id="resolved-requests-list" class="admin-requests-list"></div>
+      </section>
+
+      <section class="panel admin-requests-panel">
+        <div class="panel-header admin-requests-panel__header">
+          <div>
+            <h2>Active Accounts</h2>
+            <p class="admin-requests-panel__meta">All active accounts currently stored in user profiles.</p>
+          </div>
+        </div>
+        <div id="active-accounts-list" class="admin-requests-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="account-password-modal" class="modal" aria-hidden="true">
+    <div class="modal-content account-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-password-modal-title">
+      <div class="modal-header">
+        <h2 id="account-password-modal-title">Reset Account Password</h2>
+        <button type="button" class="modal-close" data-close-modal="account-password-modal" aria-label="Close">&times;</button>
+      </div>
+      <form id="account-password-form" class="modal-body account-modal-body">
+        <p class="account-modal-note">
+          Update password for <strong id="account-password-target">this account</strong>.
+        </p>
+        <input id="account-password-identifier" name="identifier" type="hidden" />
+        <label>
+          New Password
+          <input id="account-password-value" name="newPassword" type="password" required minlength="8" placeholder="At least 8 characters" />
+        </label>
+        <div class="modal-footer account-modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="account-password-modal">Cancel</button>
+          <button id="account-password-submit" type="submit" class="btn-primary">Reset Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="account-delete-modal" class="modal" aria-hidden="true">
+    <div class="modal-content account-modal-content" role="dialog" aria-modal="true" aria-labelledby="account-delete-modal-title">
+      <div class="modal-header">
+        <h2 id="account-delete-modal-title">Delete Account</h2>
+        <button type="button" class="modal-close" data-close-modal="account-delete-modal" aria-label="Close">&times;</button>
+      </div>
+      <form id="account-delete-form" class="modal-body account-modal-body">
+        <p class="account-modal-note">
+          You are about to permanently delete <strong id="account-delete-target">this account</strong>.
+        </p>
+        <p class="account-modal-warning">This action cannot be undone.</p>
+        <input id="account-delete-identifier" name="identifier" type="hidden" />
+        <div class="modal-footer account-modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="account-delete-modal">Cancel</button>
+          <button id="account-delete-submit" type="submit" class="btn-danger">Delete Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/user-admin.js"></script>
+</body>
+
+</html>
