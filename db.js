@@ -1,50 +1,64 @@
 /**
- * db.js - MongoDB Atlas connection and helper functions
+ * db.js - Supabase data helpers
  *
- * Storage layout:
- *   Database : process.env.MONGODB_DB_NAME  (default: "bible-study")
- *   Collections:
- *     - classes:      one document per class
- *     - lessonPlans:  one document per lesson plan
- *     - appDataHistory: append-only snapshots/version records
+ * Storage layout (default tables):
+ *   - bst_classes
+ *   - bst_lesson_plans
+ *   - bst_notes
+ *   - bst_app_data_history
  *
- * Legacy compatibility:
- *   If old "appData" docs exist ({ _id: "classes" }, { _id: "lessonPlans" })
- *   and normalized collections are empty, we auto-migrate on startup.
- *
- * If MONGODB_URI is not set the module degrades gracefully and every
- * function is a no-op so the server still works with local files only.
+ * If Supabase is not configured, all functions degrade gracefully so
+ * local JSON save flows continue to work.
  */
 
-const { MongoClient } = require('mongodb');
+const { createClient } = require('@supabase/supabase-js');
 
-const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.MONGODB_DB_NAME || 'bible-study';
-const LEGACY_COLLECTION = 'appData';
-const CLASSES_COLLECTION = 'classes';
-const LESSON_PLANS_COLLECTION = 'lessonPlans';
-const NOTES_COLLECTION = 'notes';
-const HISTORY_COLLECTION = 'appDataHistory';
-const SCHEMA_VERSION = 2;
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
+const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const SUPABASE_SCHEMA = String(process.env.SUPABASE_DB_SCHEMA || 'public').trim() || 'public';
 
-let client = null;
-let db = null;
+const TABLE_CLASSES = String(process.env.SUPABASE_CLASSES_TABLE || 'bst_classes').trim();
+const TABLE_LESSON_PLANS = String(process.env.SUPABASE_LESSON_PLANS_TABLE || 'bst_lesson_plans').trim();
+const TABLE_NOTES = String(process.env.SUPABASE_NOTES_TABLE || 'bst_notes').trim();
+const TABLE_HISTORY = String(process.env.SUPABASE_HISTORY_TABLE || 'bst_app_data_history').trim();
+const SCHEMA_VERSION = 1;
+const OWNER_SCOPE_SEPARATOR = '::';
+
+let supabaseAdmin = null;
+let connected = false;
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function normalizeOwnerUserId(ownerUserId) {
+  return String(ownerUserId || '').trim();
+}
+
+function toScopedRecordId(ownerUserId, recordId) {
+  const normalizedRecordId = String(recordId || '').trim();
+  const normalizedOwnerId = normalizeOwnerUserId(ownerUserId);
+  if (!normalizedRecordId || !normalizedOwnerId) {
+    return normalizedRecordId;
+  }
+
+  return `${normalizedOwnerId}${OWNER_SCOPE_SEPARATOR}${normalizedRecordId}`;
+}
+
+function getOwnerPrefix(ownerUserId) {
+  const normalizedOwnerId = normalizeOwnerUserId(ownerUserId);
+  if (!normalizedOwnerId) {
+    return '';
+  }
+
+  return `${normalizedOwnerId}${OWNER_SCOPE_SEPARATOR}`;
+}
+
 function normalizeDocId(docId) {
   const normalized = String(docId || '').trim().toLowerCase();
-  if (normalized === 'classes') {
-    return 'classes';
-  }
-  if (normalized === 'lessonplans') {
-    return 'lessonPlans';
-  }
-  if (normalized === 'notes') {
-    return 'notes';
-  }
+  if (normalized === 'classes') return 'classes';
+  if (normalized === 'lessonplans') return 'lessonPlans';
+  if (normalized === 'notes') return 'notes';
   return null;
 }
 
@@ -89,6 +103,12 @@ function getLessonPlanRecordIdentity(record, index) {
   return candidates.length > 0 ? candidates[0].trim() : buildRecordId('lesson-plan', index);
 }
 
+function getNoteRecordIdentity(record, index) {
+  const candidates = [record.id, record.noteId, record.slug, record.title]
+    .filter(value => typeof value === 'string' && value.trim());
+  return candidates.length > 0 ? candidates[0].trim() : buildRecordId('note', index);
+}
+
 function getClassIdFromValue(value) {
   if (!isPlainObject(value)) return null;
   const candidates = [value.id, value.classId, value.slug, value.title]
@@ -110,211 +130,308 @@ function getNoteIdFromValue(value) {
   return candidates.length > 0 ? candidates[0].trim() : null;
 }
 
-function getNoteRecordIdentity(record, index) {
-  const candidates = [record.id, record.noteId, record.slug, record.title]
-    .filter(value => typeof value === 'string' && value.trim());
-  return candidates.length > 0 ? candidates[0].trim() : buildRecordId('note', index);
-}
-
-function toStoredClassRecord(record, index) {
+function toStoredClassRecord(record, index, ownerUserId) {
   const classId = getClassRecordIdentity(record, index);
   return {
-    classId,
-    order: index,
-    updatedAt: new Date(),
+    class_id: toScopedRecordId(ownerUserId, classId),
+    sort_order: index,
+    updated_at: new Date().toISOString(),
     data: cloneJson(record)
   };
 }
 
-function toStoredLessonPlanRecord(record, index) {
+function toStoredLessonPlanRecord(record, index, ownerUserId) {
   const planId = getLessonPlanRecordIdentity(record, index);
   return {
-    planId,
-    classIds: Array.isArray(record.classes)
+    plan_id: toScopedRecordId(ownerUserId, planId),
+    class_ids: Array.isArray(record.classes)
       ? record.classes.filter(value => typeof value === 'string' && value.trim()).map(value => value.trim())
       : [],
-    order: index,
-    updatedAt: new Date(),
+    sort_order: index,
+    updated_at: new Date().toISOString(),
     data: cloneJson(record)
   };
 }
 
-function toStoredNoteRecord(record, index) {
+function toStoredNoteRecord(record, index, ownerUserId) {
   const noteId = getNoteRecordIdentity(record, index);
   return {
-    noteId,
-    order: index,
-    updatedAt: new Date(),
+    note_id: toScopedRecordId(ownerUserId, noteId),
+    sort_order: index,
+    updated_at: new Date().toISOString(),
     data: cloneJson(record)
   };
 }
 
-async function appendHistoryRecord(docId, payload, reason = 'save') {
+function getTableForDocId(docId) {
+  if (docId === 'classes') return TABLE_CLASSES;
+  if (docId === 'lessonPlans') return TABLE_LESSON_PLANS;
+  if (docId === 'notes') return TABLE_NOTES;
+  return null;
+}
+
+async function appendHistoryRecord(docId, payload, reason = 'save', ownerUserId = null) {
   if (!isConnected()) return;
 
-  try {
-    await db.collection(HISTORY_COLLECTION).insertOne({
-      docId,
+  const effectivePayload = isPlainObject(payload)
+    ? { ...payload }
+    : { value: payload };
+  if (ownerUserId) {
+    effectivePayload.ownerUserId = ownerUserId;
+  }
+
+  const { error } = await supabaseAdmin
+    .from(TABLE_HISTORY)
+    .insert({
+      doc_id: docId,
       reason,
-      schemaVersion: SCHEMA_VERSION,
-      recordedAt: new Date(),
-      payload: cloneJson(payload)
+      schema_version: SCHEMA_VERSION,
+      recorded_at: new Date().toISOString(),
+      payload: cloneJson(effectivePayload)
     });
-  } catch (err) {
-    console.warn(`[MongoDB] appendHistoryRecord("${docId}") failed:`, err.message);
+
+  if (error) {
+    console.warn(`[Supabase] appendHistoryRecord("${docId}") failed:`, error.message);
   }
 }
 
-async function upsertNormalizedRecords(collectionName, keyField, records, reason) {
-  const collection = db.collection(collectionName);
-  const ids = [];
-  const operations = [];
+async function getCurrentIds(tableName, keyField, ownerUserId = null) {
+  let query = supabaseAdmin
+    .from(tableName)
+    .select(keyField);
 
-  for (const record of records) {
-    const keyValue = record[keyField];
-    if (!keyValue) {
-      continue;
+  const ownerPrefix = getOwnerPrefix(ownerUserId);
+  if (ownerPrefix) {
+    query = query.like(keyField, `${ownerPrefix}%`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return new Set((data || []).map(row => String(row[keyField] || '').trim()).filter(Boolean));
+}
+
+async function deleteMissingIds(tableName, keyField, targetIds, ownerUserId = null) {
+  const existingIds = await getCurrentIds(tableName, keyField, ownerUserId);
+  const toDelete = [...existingIds].filter(id => !targetIds.has(id));
+
+  if (toDelete.length === 0) {
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from(tableName)
+    .delete()
+    .in(keyField, toDelete);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function upsertNormalizedRecords(tableName, keyField, records, reason, ownerUserId = null) {
+  if (records.length > 0) {
+    const { error } = await supabaseAdmin
+      .from(tableName)
+      .upsert(records, { onConflict: keyField });
+
+    if (error) {
+      throw new Error(error.message);
     }
-
-    ids.push(keyValue);
-    operations.push({
-      replaceOne: {
-        filter: { [keyField]: keyValue },
-        replacement: record,
-        upsert: true
-      }
-    });
   }
 
-  if (operations.length > 0) {
-    await collection.bulkWrite(operations, { ordered: false });
-  }
-
-  await collection.deleteMany({ [keyField]: { $nin: ids } });
-  await appendHistoryRecord(collectionName, { count: records.length, items: records.map(record => record.data) }, reason);
+  const targetIds = new Set(records.map(record => String(record[keyField] || '').trim()).filter(Boolean));
+  await deleteMissingIds(tableName, keyField, targetIds, ownerUserId);
+  await appendHistoryRecord(tableName, { count: records.length, items: records.map(record => record.data) }, reason, ownerUserId);
 }
 
-async function getNextOrderValue(collectionName) {
-  const latest = await db.collection(collectionName)
-    .find({})
-    .sort({ order: -1 })
-    .limit(1)
-    .toArray();
+async function getNextOrderValue(tableName, keyField, ownerUserId = null) {
+  let query = supabaseAdmin
+    .from(tableName)
+    .select(`sort_order,${keyField}`)
+    .order('sort_order', { ascending: false })
+    .limit(1);
 
-  if (latest.length === 0 || !Number.isInteger(latest[0].order)) {
+  const ownerPrefix = getOwnerPrefix(ownerUserId);
+  if (ownerPrefix) {
+    query = query.like(keyField, `${ownerPrefix}%`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const latest = data && data.length > 0 ? data[0] : null;
+  if (!Number.isInteger(latest?.sort_order)) {
     return 0;
   }
 
-  return latest[0].order + 1;
+  return latest.sort_order + 1;
 }
 
-async function upsertClassRecord(classId, classData, reason = 'partial-upsert') {
+async function upsertClassRecord(classId, classData, reason = 'partial-upsert', options = {}) {
   if (!isConnected()) return null;
   if (!isPlainObject(classData)) return null;
 
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
+
   const normalizedClassId = String(classId || '').trim() || getClassIdFromValue(classData);
   if (!normalizedClassId) return null;
+  const scopedClassId = toScopedRecordId(ownerUserId, normalizedClassId);
 
-  const collection = db.collection(CLASSES_COLLECTION);
-  const existing = await collection.findOne({ classId: normalizedClassId });
-  const order = Number.isInteger(existing?.order)
-    ? existing.order
-    : await getNextOrderValue(CLASSES_COLLECTION);
+  const { data: existingRows, error: existingError } = await supabaseAdmin
+    .from(TABLE_CLASSES)
+    .select('sort_order')
+    .eq('class_id', scopedClassId)
+    .limit(1);
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null;
+  const order = Number.isInteger(existing?.sort_order)
+    ? existing.sort_order
+    : await getNextOrderValue(TABLE_CLASSES, 'class_id', ownerUserId);
 
   const normalizedData = cloneJson(classData);
-  if (!normalizedData.id && typeof normalizedClassId === 'string') {
+  if (!normalizedData.id) {
     normalizedData.id = normalizedClassId;
   }
 
   const record = {
-    classId: normalizedClassId,
-    order,
-    updatedAt: new Date(),
+    class_id: scopedClassId,
+    sort_order: order,
+    updated_at: new Date().toISOString(),
     data: normalizedData
   };
 
-  await collection.replaceOne({ classId: normalizedClassId }, record, { upsert: true });
+  const { error } = await supabaseAdmin
+    .from(TABLE_CLASSES)
+    .upsert(record, { onConflict: 'class_id' });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   await appendHistoryRecord('classes', {
     op: 'upsert',
     classId: normalizedClassId,
     item: normalizedData
-  }, reason);
+  }, reason, ownerUserId);
 
   return normalizedData;
 }
 
-async function deleteClassRecord(classId, reason = 'partial-delete') {
+async function deleteClassRecord(classId, reason = 'partial-delete', options = {}) {
   if (!isConnected()) return false;
+
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
 
   const normalizedClassId = String(classId || '').trim();
   if (!normalizedClassId) return false;
+  const scopedClassId = toScopedRecordId(ownerUserId, normalizedClassId);
 
-  const classDelete = await db.collection(CLASSES_COLLECTION).deleteOne({ classId: normalizedClassId });
+  const { error: classDeleteError, count: deletedCount } = await supabaseAdmin
+    .from(TABLE_CLASSES)
+    .delete({ count: 'exact' })
+    .eq('class_id', scopedClassId);
 
-  const lessonPlanCollection = db.collection(LESSON_PLANS_COLLECTION);
-  const linkedPlans = await lessonPlanCollection.find({ classIds: normalizedClassId }).toArray();
-  if (linkedPlans.length > 0) {
-    const operations = [];
-    const affectedPlanIds = [];
+  if (classDeleteError) {
+    throw new Error(classDeleteError.message);
+  }
 
-    for (const record of linkedPlans) {
-      const updatedClassIds = Array.isArray(record.classIds)
-        ? record.classIds.filter(value => value !== normalizedClassId)
+  let linkedPlansQuery = supabaseAdmin
+    .from(TABLE_LESSON_PLANS)
+    .select('plan_id,class_ids,data')
+    .contains('class_ids', [normalizedClassId]);
+
+  const ownerPrefix = getOwnerPrefix(ownerUserId);
+  if (ownerPrefix) {
+    linkedPlansQuery = linkedPlansQuery.like('plan_id', `${ownerPrefix}%`);
+  }
+
+  const { data: linkedPlans, error: plansError } = await linkedPlansQuery;
+
+  if (plansError) {
+    throw new Error(plansError.message);
+  }
+
+  if (Array.isArray(linkedPlans) && linkedPlans.length > 0) {
+    const updates = linkedPlans.map((row) => {
+      const updatedClassIds = Array.isArray(row.class_ids)
+        ? row.class_ids.filter(value => value !== normalizedClassId)
         : [];
 
-      const updatedData = cloneJson(record.data || {});
+      const updatedData = cloneJson(row.data || {});
       if (Array.isArray(updatedData.classes)) {
         updatedData.classes = updatedData.classes.filter(value => value !== normalizedClassId);
       }
 
-      operations.push({
-        replaceOne: {
-          filter: { planId: record.planId },
-          replacement: {
-            ...record,
-            classIds: updatedClassIds,
-            updatedAt: new Date(),
-            data: updatedData
-          }
-        }
-      });
-      affectedPlanIds.push(record.planId);
+      return {
+        plan_id: row.plan_id,
+        class_ids: updatedClassIds,
+        updated_at: new Date().toISOString(),
+        data: updatedData
+      };
+    });
+
+    const { error: updateError } = await supabaseAdmin
+      .from(TABLE_LESSON_PLANS)
+      .upsert(updates, { onConflict: 'plan_id' });
+
+    if (updateError) {
+      throw new Error(updateError.message);
     }
 
-    if (operations.length > 0) {
-      await lessonPlanCollection.bulkWrite(operations, { ordered: false });
-      await appendHistoryRecord('lessonPlans', {
-        op: 'detach-class',
-        classId: normalizedClassId,
-        affectedPlanIds
-      }, reason);
-    }
+    await appendHistoryRecord('lessonPlans', {
+      op: 'detach-class',
+      classId: normalizedClassId,
+      affectedPlanIds: updates.map(update => update.plan_id)
+    }, reason, ownerUserId);
   }
 
   await appendHistoryRecord('classes', {
     op: 'delete',
     classId: normalizedClassId,
-    deleted: classDelete.deletedCount > 0
-  }, reason);
+    deleted: Number(deletedCount || 0) > 0
+  }, reason, ownerUserId);
 
-  return classDelete.deletedCount > 0;
+  return Number(deletedCount || 0) > 0;
 }
 
-async function upsertLessonPlanRecord(planId, lessonPlanData, reason = 'partial-upsert') {
+async function upsertLessonPlanRecord(planId, lessonPlanData, reason = 'partial-upsert', options = {}) {
   if (!isConnected()) return null;
   if (!isPlainObject(lessonPlanData)) return null;
 
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
+
   const normalizedPlanId = String(planId || '').trim() || getPlanIdFromValue(lessonPlanData);
   if (!normalizedPlanId) return null;
+  const scopedPlanId = toScopedRecordId(ownerUserId, normalizedPlanId);
 
-  const collection = db.collection(LESSON_PLANS_COLLECTION);
-  const existing = await collection.findOne({ planId: normalizedPlanId });
-  const order = Number.isInteger(existing?.order)
-    ? existing.order
-    : await getNextOrderValue(LESSON_PLANS_COLLECTION);
+  const { data: existingRows, error: existingError } = await supabaseAdmin
+    .from(TABLE_LESSON_PLANS)
+    .select('sort_order')
+    .eq('plan_id', scopedPlanId)
+    .limit(1);
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null;
+  const order = Number.isInteger(existing?.sort_order)
+    ? existing.sort_order
+    : await getNextOrderValue(TABLE_LESSON_PLANS, 'plan_id', ownerUserId);
 
   const normalizedData = cloneJson(lessonPlanData);
-  if (!normalizedData.id && typeof normalizedPlanId === 'string') {
+  if (!normalizedData.id) {
     normalizedData.id = normalizedPlanId;
   }
 
@@ -323,258 +440,233 @@ async function upsertLessonPlanRecord(planId, lessonPlanData, reason = 'partial-
     : [];
 
   const record = {
-    planId: normalizedPlanId,
-    classIds,
-    order,
-    updatedAt: new Date(),
+    plan_id: scopedPlanId,
+    class_ids: classIds,
+    sort_order: order,
+    updated_at: new Date().toISOString(),
     data: normalizedData
   };
 
-  await collection.replaceOne({ planId: normalizedPlanId }, record, { upsert: true });
+  const { error } = await supabaseAdmin
+    .from(TABLE_LESSON_PLANS)
+    .upsert(record, { onConflict: 'plan_id' });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   await appendHistoryRecord('lessonPlans', {
     op: 'upsert',
     planId: normalizedPlanId,
     item: normalizedData
-  }, reason);
+  }, reason, ownerUserId);
 
   return normalizedData;
 }
 
-async function deleteLessonPlanRecord(planId, reason = 'partial-delete') {
+async function deleteLessonPlanRecord(planId, reason = 'partial-delete', options = {}) {
   if (!isConnected()) return false;
+
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
 
   const normalizedPlanId = String(planId || '').trim();
   if (!normalizedPlanId) return false;
+  const scopedPlanId = toScopedRecordId(ownerUserId, normalizedPlanId);
 
-  const deletion = await db.collection(LESSON_PLANS_COLLECTION).deleteOne({ planId: normalizedPlanId });
+  const { error, count } = await supabaseAdmin
+    .from(TABLE_LESSON_PLANS)
+    .delete({ count: 'exact' })
+    .eq('plan_id', scopedPlanId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   await appendHistoryRecord('lessonPlans', {
     op: 'delete',
     planId: normalizedPlanId,
-    deleted: deletion.deletedCount > 0
-  }, reason);
+    deleted: Number(count || 0) > 0
+  }, reason, ownerUserId);
 
-  return deletion.deletedCount > 0;
+  return Number(count || 0) > 0;
 }
 
-async function upsertNoteRecord(noteId, noteData, reason = 'partial-upsert') {
+async function upsertNoteRecord(noteId, noteData, reason = 'partial-upsert', options = {}) {
   if (!isConnected()) return null;
   if (!isPlainObject(noteData)) return null;
 
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
+
   const normalizedNoteId = String(noteId || '').trim() || getNoteIdFromValue(noteData);
   if (!normalizedNoteId) return null;
+  const scopedNoteId = toScopedRecordId(ownerUserId, normalizedNoteId);
 
-  const collection = db.collection(NOTES_COLLECTION);
-  const existing = await collection.findOne({ noteId: normalizedNoteId });
-  const order = Number.isInteger(existing?.order)
-    ? existing.order
-    : await getNextOrderValue(NOTES_COLLECTION);
+  const { data: existingRows, error: existingError } = await supabaseAdmin
+    .from(TABLE_NOTES)
+    .select('sort_order')
+    .eq('note_id', scopedNoteId)
+    .limit(1);
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null;
+  const order = Number.isInteger(existing?.sort_order)
+    ? existing.sort_order
+    : await getNextOrderValue(TABLE_NOTES, 'note_id', ownerUserId);
 
   const normalizedData = cloneJson(noteData);
-  if (!normalizedData.id && typeof normalizedNoteId === 'string') {
+  if (!normalizedData.id) {
     normalizedData.id = normalizedNoteId;
   }
 
   const record = {
-    noteId: normalizedNoteId,
-    order,
-    updatedAt: new Date(),
+    note_id: scopedNoteId,
+    sort_order: order,
+    updated_at: new Date().toISOString(),
     data: normalizedData
   };
 
-  await collection.replaceOne({ noteId: normalizedNoteId }, record, { upsert: true });
+  const { error } = await supabaseAdmin
+    .from(TABLE_NOTES)
+    .upsert(record, { onConflict: 'note_id' });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   await appendHistoryRecord('notes', {
     op: 'upsert',
     noteId: normalizedNoteId,
     item: normalizedData
-  }, reason);
+  }, reason, ownerUserId);
 
   return normalizedData;
 }
 
-async function deleteNoteRecord(noteId, reason = 'partial-delete') {
+async function deleteNoteRecord(noteId, reason = 'partial-delete', options = {}) {
   if (!isConnected()) return false;
+
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
 
   const normalizedNoteId = String(noteId || '').trim();
   if (!normalizedNoteId) return false;
+  const scopedNoteId = toScopedRecordId(ownerUserId, normalizedNoteId);
 
-  const deletion = await db.collection(NOTES_COLLECTION).deleteOne({ noteId: normalizedNoteId });
+  const { error, count } = await supabaseAdmin
+    .from(TABLE_NOTES)
+    .delete({ count: 'exact' })
+    .eq('note_id', scopedNoteId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   await appendHistoryRecord('notes', {
     op: 'delete',
     noteId: normalizedNoteId,
-    deleted: deletion.deletedCount > 0
-  }, reason);
+    deleted: Number(count || 0) > 0
+  }, reason, ownerUserId);
 
-  return deletion.deletedCount > 0;
+  return Number(count || 0) > 0;
 }
 
-async function loadFromLegacyDoc(docId) {
-  const doc = await db.collection(LEGACY_COLLECTION).findOne({ _id: docId });
-  if (!doc) return null;
-  const { _id, ...data } = doc;
-  return data;
-}
-
-async function migrateLegacyDataIfNeeded() {
-  if (!isConnected()) return;
-
-  try {
-    const [classesCount, lessonPlansCount] = await Promise.all([
-      db.collection(CLASSES_COLLECTION).countDocuments(),
-      db.collection(LESSON_PLANS_COLLECTION).countDocuments()
-    ]);
-
-    if (classesCount > 0 || lessonPlansCount > 0) {
-      return;
-    }
-
-    const [legacyClasses, legacyLessonPlans] = await Promise.all([
-      loadFromLegacyDoc('classes'),
-      loadFromLegacyDoc('lessonPlans')
-    ]);
-
-    const classRecords = normalizeClassesPayload(legacyClasses);
-    if (classRecords && classRecords.length > 0) {
-      const records = classRecords.map((record, index) => toStoredClassRecord(record, index));
-      await upsertNormalizedRecords(CLASSES_COLLECTION, 'classId', records, 'legacy-migration');
-      console.log(`[MongoDB] Migrated ${records.length} class records from legacy appData.`);
-    }
-
-    const lessonPlanRecords = normalizeLessonPlansPayload(legacyLessonPlans);
-    if (lessonPlanRecords && lessonPlanRecords.length > 0) {
-      const records = lessonPlanRecords.map((record, index) => toStoredLessonPlanRecord(record, index));
-      await upsertNormalizedRecords(LESSON_PLANS_COLLECTION, 'planId', records, 'legacy-migration');
-      console.log(`[MongoDB] Migrated ${records.length} lesson plan records from legacy appData.`);
-    }
-  } catch (err) {
-    console.warn('[MongoDB] Legacy migration skipped due to error:', err.message);
-  }
-}
-
-// ── Connection ────────────────────────────────────────────────────────────────
-
-/**
- * Connect to MongoDB Atlas.
- * Call once on server startup.  Safe to call multiple times (no-op if already
- * connected or if MONGODB_URI is missing).
- *
- * @returns {boolean} true if the connection succeeded
- */
 async function connectDB() {
-  if (!MONGODB_URI || MONGODB_URI.includes('username:password')) {
-    console.warn('[MongoDB] MONGODB_URI not configured — running in local-file-only mode.');
-    console.warn('[MongoDB] Edit .env and restart to enable cloud sync.');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || SUPABASE_URL.includes('your-project-ref')) {
+    console.warn('[Supabase] SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are not configured. Running in local-file-only mode.');
+    connected = false;
     return false;
   }
 
-  if (client) return true; // already connected
+  if (supabaseAdmin && connected) {
+    return true;
+  }
 
   try {
-    // Note: Node.js 17+ uses OpenSSL 3 which has stricter TLS defaults
-    // The tlsAllowInvalidCertificates option may be needed for some MongoDB Atlas configurations
-    client = new MongoClient(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000,
+    supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      },
+      db: {
+        schema: SUPABASE_SCHEMA
+      }
     });
-    await client.connect();
-    db = client.db(DB_NAME);
 
-    // Lightweight ping to verify credentials
-    await db.command({ ping: 1 });
+    const { error } = await supabaseAdmin
+      .from(TABLE_CLASSES)
+      .select('class_id', { head: true, count: 'exact' });
 
-    await Promise.all([
-      db.collection(CLASSES_COLLECTION).createIndex({ classId: 1 }, { unique: true }),
-      db.collection(CLASSES_COLLECTION).createIndex({ order: 1 }),
-      db.collection(LESSON_PLANS_COLLECTION).createIndex({ planId: 1 }, { unique: true }),
-      db.collection(LESSON_PLANS_COLLECTION).createIndex({ classIds: 1 }),
-      db.collection(LESSON_PLANS_COLLECTION).createIndex({ order: 1 }),
-      db.collection(NOTES_COLLECTION).createIndex({ noteId: 1 }, { unique: true }),
-      db.collection(NOTES_COLLECTION).createIndex({ order: 1 }),
-      db.collection(HISTORY_COLLECTION).createIndex({ docId: 1, recordedAt: -1 })
-    ]);
+    if (error) {
+      throw new Error(error.message);
+    }
 
-    await migrateLegacyDataIfNeeded();
-
-    console.log(`[MongoDB] Connected to Atlas — database: "${DB_NAME}"`);
+    connected = true;
+    console.log(`[Supabase] Connected (${SUPABASE_SCHEMA} schema).`);
     return true;
   } catch (err) {
-    console.error('[MongoDB] Connection failed:', err.message);
-    client = null;
-    db = null;
+    console.error('[Supabase] Connection failed:', err.message);
+    supabaseAdmin = null;
+    connected = false;
     return false;
   }
 }
 
-/**
- * Returns true when an active connection exists.
- */
 function isConnected() {
-  return db !== null;
+  return connected && !!supabaseAdmin;
 }
 
-// ── Data helpers ──────────────────────────────────────────────────────────────
-
-/**
- * Load app data in legacy-compatible shape.
- *
- * @param   {string} docId  'classes', 'lessonPlans', or 'notes'
- * @returns {object|null}   The stored plain-JS object, or null if not found / not connected
- */
-async function loadDoc(docId) {
+async function loadDoc(docId, options = {}) {
   if (!isConnected()) return null;
+
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
 
   const normalizedDocId = normalizeDocId(docId);
   if (!normalizedDocId) return null;
 
-  try {
-    if (normalizedDocId === 'classes') {
-      const records = await db.collection(CLASSES_COLLECTION).find({}).sort({ order: 1, classId: 1 }).toArray();
-      if (records.length > 0) {
-        return {
-          classes: records.map(record => cloneJson(record.data))
-        };
-      }
+  const tableName = getTableForDocId(normalizedDocId);
+  if (!tableName) return null;
 
-      return await loadFromLegacyDoc('classes');
-    }
+  const keyField = normalizedDocId === 'classes'
+    ? 'class_id'
+    : normalizedDocId === 'lessonPlans'
+      ? 'plan_id'
+      : 'note_id';
 
-    if (normalizedDocId === 'lessonPlans') {
-      const records = await db.collection(LESSON_PLANS_COLLECTION).find({}).sort({ order: 1, planId: 1 }).toArray();
-      if (records.length > 0) {
-        return {
-          lessonPlans: records.map(record => cloneJson(record.data))
-        };
-      }
+  let query = supabaseAdmin
+    .from(tableName)
+    .select(`data,${keyField},sort_order`)
+    .order('sort_order', { ascending: true })
+    .order(keyField, { ascending: true });
 
-      return await loadFromLegacyDoc('lessonPlans');
-    }
+  const ownerPrefix = getOwnerPrefix(ownerUserId);
+  if (ownerPrefix) {
+    query = query.like(keyField, `${ownerPrefix}%`);
+  }
 
-    if (normalizedDocId === 'notes') {
-      const records = await db.collection(NOTES_COLLECTION).find({}).sort({ order: 1, noteId: 1 }).toArray();
-      if (records.length > 0) {
-        return {
-          notes: records.map(record => cloneJson(record.data))
-        };
-      }
+  const { data, error } = await query;
 
-      return { notes: [] };
-    }
-
-    return null;
-  } catch (err) {
-    console.error(`[MongoDB] loadDoc("${docId}") failed:`, err.message);
+  if (error) {
+    console.error(`[Supabase] loadDoc("${docId}") failed:`, error.message);
     return null;
   }
+
+  if (normalizedDocId === 'classes') {
+    return { classes: (data || []).map(record => cloneJson(record.data || {})) };
+  }
+
+  if (normalizedDocId === 'lessonPlans') {
+    return { lessonPlans: (data || []).map(record => cloneJson(record.data || {})) };
+  }
+
+  return { notes: (data || []).map(record => cloneJson(record.data || {})) };
 }
 
-/**
- * Save app data using normalized collections.
- *
- * @param  {string} docId  'classes', 'lessonPlans', or 'notes'
- * @param  {object} data   Plain JS object to store
- * @returns {boolean}      true on success
- */
-async function saveDoc(docId, data) {
+async function saveDoc(docId, data, options = {}) {
   if (!isConnected()) return false;
+
+  const ownerUserId = normalizeOwnerUserId(options.ownerUserId);
 
   const normalizedDocId = normalizeDocId(docId);
   if (!normalizedDocId) return false;
@@ -583,50 +675,37 @@ async function saveDoc(docId, data) {
     if (normalizedDocId === 'classes') {
       const classes = normalizeClassesPayload(data);
       if (!classes) return false;
-
-      const records = classes.map((record, index) => toStoredClassRecord(record, index));
-      await upsertNormalizedRecords(CLASSES_COLLECTION, 'classId', records, 'save');
-      console.log(`[MongoDB] Saved "${docId}" to normalized classes collection (${records.length} records)`);
+      const records = classes.map((record, index) => toStoredClassRecord(record, index, ownerUserId));
+      await upsertNormalizedRecords(TABLE_CLASSES, 'class_id', records, 'save', ownerUserId);
       return true;
     }
 
     if (normalizedDocId === 'lessonPlans') {
       const lessonPlans = normalizeLessonPlansPayload(data);
       if (!lessonPlans) return false;
-
-      const records = lessonPlans.map((record, index) => toStoredLessonPlanRecord(record, index));
-      await upsertNormalizedRecords(LESSON_PLANS_COLLECTION, 'planId', records, 'save');
-      console.log(`[MongoDB] Saved "${docId}" to normalized lessonPlans collection (${records.length} records)`);
+      const records = lessonPlans.map((record, index) => toStoredLessonPlanRecord(record, index, ownerUserId));
+      await upsertNormalizedRecords(TABLE_LESSON_PLANS, 'plan_id', records, 'save', ownerUserId);
       return true;
     }
 
     if (normalizedDocId === 'notes') {
       const notes = normalizeNotesPayload(data);
       if (!notes) return false;
-
-      const records = notes.map((record, index) => toStoredNoteRecord(record, index));
-      await upsertNormalizedRecords(NOTES_COLLECTION, 'noteId', records, 'save');
-      console.log(`[MongoDB] Saved "${docId}" to normalized notes collection (${records.length} records)`);
+      const records = notes.map((record, index) => toStoredNoteRecord(record, index, ownerUserId));
+      await upsertNormalizedRecords(TABLE_NOTES, 'note_id', records, 'save', ownerUserId);
       return true;
     }
 
-    return true;
+    return false;
   } catch (err) {
-    console.error(`[MongoDB] saveDoc("${docId}") failed:`, err.message);
+    console.error(`[Supabase] saveDoc("${docId}") failed:`, err.message);
     return false;
   }
 }
 
-/**
- * Close the connection (used when shutting down).
- */
 async function closeDB() {
-  if (client) {
-    await client.close();
-    client = null;
-    db = null;
-    console.log('[MongoDB] Connection closed.');
-  }
+  supabaseAdmin = null;
+  connected = false;
 }
 
 module.exports = {

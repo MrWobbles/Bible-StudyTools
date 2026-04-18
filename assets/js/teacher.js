@@ -1658,7 +1658,7 @@ async function saveStoppedMarker() {
     }
 
     const result = await response.json().catch(() => ({}));
-    if (result?.partialSuccess || result?.cloudSync?.ok === false || result?.mongoSync === false) {
+    if (result?.partialSuccess || result?.cloudSync?.ok === false || result?.supabaseSync === false) {
       return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
     }
 

@@ -30,6 +30,7 @@
   "author": "Wes Huffman",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "@tiptap/core": "^3.20.0",
     "@tiptap/extension-color": "^3.20.0",
     "@tiptap/extension-highlight": "^3.20.0",
@@ -44,7 +45,7 @@
     "@tiptap/starter-kit": "^3.20.0",
     "dotenv": "^17.3.1",
     "express": "^4.18.2",
-    "mongodb": "^7.1.0",
+    "nodemailer": "^8.0.5",
     "ytdl-core": "^4.11.5",
     "zod": "^4.3.6"
   },

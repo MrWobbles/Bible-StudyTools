@@ -1,37 +1,202 @@
 (function () {
-  const STORAGE_KEY = 'bst-admin-token';
+  const STORAGE_KEY_ADMIN = 'bst-admin-token';
+  const STORAGE_KEY_ACCESS = 'bst-supabase-access-token';
+  const STORAGE_KEY_REFRESH = 'bst-supabase-refresh-token';
   const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
   function isLoopbackHost(hostname) {
     return LOOPBACK_HOSTS.has(hostname) || hostname.endsWith('.localhost');
   }
 
+  function isAdminUser(user) {
+    if (!user || typeof user !== 'object') {
+      return false;
+    }
+
+    return Boolean(user.isAdmin || String(user.role || '').trim().toLowerCase() === 'admin');
+  }
+
   function getAdminToken() {
-    return localStorage.getItem(STORAGE_KEY)?.trim() || '';
+    return localStorage.getItem(STORAGE_KEY_ADMIN)?.trim() || '';
   }
 
   function setAdminToken(token) {
     const normalized = typeof token === 'string' ? token.trim() : '';
     if (normalized) {
-      localStorage.setItem(STORAGE_KEY, normalized);
+      localStorage.setItem(STORAGE_KEY_ADMIN, normalized);
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_ADMIN);
+    }
+  }
+
+  function getAccessToken() {
+    return localStorage.getItem(STORAGE_KEY_ACCESS)?.trim() || '';
+  }
+
+  function getRefreshToken() {
+    return localStorage.getItem(STORAGE_KEY_REFRESH)?.trim() || '';
+  }
+
+  function setAuthSession(session) {
+    const accessToken = typeof session?.accessToken === 'string' ? session.accessToken.trim() : '';
+    const refreshToken = typeof session?.refreshToken === 'string' ? session.refreshToken.trim() : '';
+
+    if (accessToken) {
+      localStorage.setItem(STORAGE_KEY_ACCESS, accessToken);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_ACCESS);
+    }
+
+    if (refreshToken) {
+      localStorage.setItem(STORAGE_KEY_REFRESH, refreshToken);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_REFRESH);
+    }
+  }
+
+  function clearAuthSession() {
+    localStorage.removeItem(STORAGE_KEY_ACCESS);
+    localStorage.removeItem(STORAGE_KEY_REFRESH);
+  }
+
+  async function loginWithPassword(identifier, password) {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ identifier, password })
+    });
+
+    if (!response.ok) {
+      const message = await getErrorMessage(response);
+      throw new Error(message || 'Login failed');
+    }
+
+    const payload = await response.json();
+    setAuthSession(payload.session);
+    return payload;
+  }
+
+  async function refreshAuthSession() {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+      return false;
+    }
+
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ refreshToken })
+    });
+
+    if (!response.ok) {
+      clearAuthSession();
+      return false;
+    }
+
+    const payload = await response.json();
+    setAuthSession(payload.session);
+    return true;
+  }
+
+  async function promptAndLogin() {
+    const promptPrefix = isLoopbackHost(window.location.hostname)
+      ? 'Sign in with Supabase credentials for admin actions on this server.'
+      : 'Sign in with Supabase credentials for this server.';
+
+    const identifier = window.prompt(`${promptPrefix}\nUsername or email:`);
+    if (!identifier || !identifier.trim()) {
+      return false;
+    }
+
+    const password = window.prompt('Password:');
+    if (!password) {
+      return false;
+    }
+
+    await loginWithPassword(identifier.trim(), password);
+    return true;
+  }
+
+  async function logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      // Ignore network failures while still clearing local state.
+    }
+
+    clearAuthSession();
+    setAdminToken('');
+  }
+
+  async function ensureAuthenticated(options = {}) {
+    const { redirectTo = '/auth.html' } = options;
+
+    try {
+      const payload = await getCurrentUser();
+      return payload?.user || null;
+    } catch (err) {
+      clearAuthSession();
+      if (redirectTo) {
+        const target = `${redirectTo}?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        window.location.replace(target);
+      }
+      return null;
+    }
+  }
+
+  async function ensureAdminAccess(options = {}) {
+    const { redirectTo = '/auth.html' } = options;
+
+    try {
+      const payload = await getCurrentUser();
+      if (isAdminUser(payload?.user)) {
+        return payload.user;
+      }
+
+      if (redirectTo) {
+        const target = `${redirectTo}?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        window.location.replace(target);
+      }
+      return null;
+    } catch (err) {
+      clearAuthSession();
+      if (redirectTo) {
+        const target = `${redirectTo}?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        window.location.replace(target);
+      }
+      return null;
     }
   }
 
   function buildHeaders(existingHeaders, requireAdmin) {
     const headers = new Headers(existingHeaders || {});
+
     if (requireAdmin) {
-      const token = getAdminToken();
-      if (token) {
-        headers.set('x-bst-admin-token', token);
+      const accessToken = getAccessToken();
+      if (accessToken) {
+        headers.set('Authorization', `Bearer ${accessToken}`);
+      } else {
+        const token = getAdminToken();
+        if (token) {
+          headers.set('x-bst-admin-token', token);
+        }
       }
     }
+
     return headers;
   }
 
   async function fetchWithSecurity(url, options = {}, config = {}) {
-    const { requireAdmin = false, retryOnUnauthorized = true } = config;
+    const {
+      requireAdmin = false,
+      retryOnUnauthorized = true,
+      tryRefreshOnUnauthorized = true,
+      tryInteractiveLoginOnUnauthorized = true
+    } = config;
 
     const runRequest = () => fetch(url, {
       ...options,
@@ -41,16 +206,44 @@
     let response = await runRequest();
 
     if (requireAdmin && retryOnUnauthorized && response.status === 401) {
-      const promptMessage = isLoopbackHost(window.location.hostname)
-        ? 'This action requires an admin token on this server. Enter it to continue.'
-        : 'Enter the admin token for this server.';
-      const enteredToken = window.prompt(promptMessage, getAdminToken());
+      if (tryRefreshOnUnauthorized) {
+        const refreshed = await refreshAuthSession();
+        if (refreshed) {
+          response = await fetchWithSecurity(url, options, {
+            ...config,
+            retryOnUnauthorized: false,
+            tryRefreshOnUnauthorized: false,
+            tryInteractiveLoginOnUnauthorized
+          });
+          return response;
+        }
+      }
 
+      if (tryInteractiveLoginOnUnauthorized) {
+        try {
+          const loggedIn = await promptAndLogin();
+          if (loggedIn) {
+            response = await fetchWithSecurity(url, options, {
+              ...config,
+              retryOnUnauthorized: false,
+              tryRefreshOnUnauthorized: false,
+              tryInteractiveLoginOnUnauthorized: false
+            });
+            return response;
+          }
+        } catch (err) {
+          // Keep original response on failed interactive login.
+        }
+      }
+
+      const enteredToken = window.prompt('Enter the admin token for this server (optional fallback):', getAdminToken());
       if (enteredToken && enteredToken.trim()) {
         setAdminToken(enteredToken);
         response = await fetchWithSecurity(url, options, {
           ...config,
-          retryOnUnauthorized: false
+          retryOnUnauthorized: false,
+          tryRefreshOnUnauthorized: false,
+          tryInteractiveLoginOnUnauthorized: false
         });
       }
     }
@@ -102,8 +295,8 @@
     return fetchJson('/api/data/notes');
   }
 
-  async function upsertMongoClass(classId, classPayload) {
-    return fetchJson(`/api/mongo/classes/${encodeURIComponent(classId)}`, {
+  async function upsertSupabaseClass(classId, classPayload) {
+    return fetchJson(`/api/supabase/classes/${encodeURIComponent(classId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -114,16 +307,16 @@
     });
   }
 
-  async function deleteMongoClass(classId) {
-    return fetchJson(`/api/mongo/classes/${encodeURIComponent(classId)}`, {
+  async function deleteSupabaseClass(classId) {
+    return fetchJson(`/api/supabase/classes/${encodeURIComponent(classId)}`, {
       method: 'DELETE'
     }, {
       requireAdmin: true
     });
   }
 
-  async function upsertMongoLessonPlan(planId, lessonPlanPayload) {
-    return fetchJson(`/api/mongo/lessonPlans/${encodeURIComponent(planId)}`, {
+  async function upsertSupabaseLessonPlan(planId, lessonPlanPayload) {
+    return fetchJson(`/api/supabase/lessonPlans/${encodeURIComponent(planId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -134,16 +327,16 @@
     });
   }
 
-  async function deleteMongoLessonPlan(planId) {
-    return fetchJson(`/api/mongo/lessonPlans/${encodeURIComponent(planId)}`, {
+  async function deleteSupabaseLessonPlan(planId) {
+    return fetchJson(`/api/supabase/lessonPlans/${encodeURIComponent(planId)}`, {
       method: 'DELETE'
     }, {
       requireAdmin: true
     });
   }
 
-  async function upsertMongoNote(noteId, notePayload) {
-    return fetchJson(`/api/mongo/notes/${encodeURIComponent(noteId)}`, {
+  async function upsertSupabaseNote(noteId, notePayload) {
+    return fetchJson(`/api/supabase/notes/${encodeURIComponent(noteId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -154,8 +347,72 @@
     });
   }
 
-  async function deleteMongoNote(noteId) {
-    return fetchJson(`/api/mongo/notes/${encodeURIComponent(noteId)}`, {
+  async function deleteSupabaseNote(noteId) {
+    return fetchJson(`/api/supabase/notes/${encodeURIComponent(noteId)}`, {
+      method: 'DELETE'
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function getCurrentUser() {
+    return fetchJson('/api/auth/me', {}, {
+      requireAdmin: true,
+      tryInteractiveLoginOnUnauthorized: false
+    });
+  }
+
+  async function listSignupRequests(status) {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
+    return fetchJson(`/api/admin/signup-requests${suffix}`, {}, {
+      requireAdmin: true
+    });
+  }
+
+  async function listUserAccounts() {
+    return fetchJson('/api/admin/accounts', {}, {
+      requireAdmin: true
+    });
+  }
+
+  async function approveSignupRequest(requestId, payload = {}) {
+    return fetchJson(`/api/admin/signup-requests/${encodeURIComponent(requestId)}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function rejectSignupRequest(requestId, payload = {}) {
+    return fetchJson(`/api/admin/signup-requests/${encodeURIComponent(requestId)}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function resetAccountPassword(identifier, newPassword) {
+    return fetchJson('/api/admin/accounts/reset-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ identifier, newPassword })
+    }, {
+      requireAdmin: true
+    });
+  }
+
+  async function removeAccount(identifier) {
+    return fetchJson(`/api/admin/accounts/${encodeURIComponent(identifier)}`, {
       method: 'DELETE'
     }, {
       requireAdmin: true
@@ -168,15 +425,32 @@
     getClasses,
     getLessonPlans,
     getNotes,
-    upsertMongoClass,
-    deleteMongoClass,
-    upsertMongoLessonPlan,
-    deleteMongoLessonPlan,
-    upsertMongoNote,
-    deleteMongoNote,
+    upsertSupabaseClass,
+    deleteSupabaseClass,
+    upsertSupabaseLessonPlan,
+    deleteSupabaseLessonPlan,
+    upsertSupabaseNote,
+    deleteSupabaseNote,
+    getCurrentUser,
+    listSignupRequests,
+    listUserAccounts,
+    approveSignupRequest,
+    rejectSignupRequest,
+    resetAccountPassword,
+    removeAccount,
+    loginWithPassword,
+    refreshAuthSession,
+    ensureAuthenticated,
+    ensureAdminAccess,
+    logout,
     getAdminToken,
     setAdminToken,
+    getAccessToken,
+    getRefreshToken,
+    setAuthSession,
+    clearAuthSession,
     clearAdminToken: () => setAdminToken(''),
-    isLoopbackHost: () => isLoopbackHost(window.location.hostname)
+    isLoopbackHost: () => isLoopbackHost(window.location.hostname),
+    isAdminUser
   };
 })();

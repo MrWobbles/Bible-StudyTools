@@ -1,10 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('admin token retry flow P1', () => {
-  test('prompts on 401, retries with token, and reuses stored token for later protected calls', async ({ page }) => {
+  test('prompts on 401 and retries protected save with token', async ({ page }) => {
     const expectedToken = 'pw-secret-token';
     const promptMessages = [];
-    const seenProtectedHeaders = [];
+    const seenSaveHeaders = [];
 
     page.on('dialog', async (dialog) => {
       if (dialog.type() === 'prompt') {
@@ -31,15 +31,23 @@ test.describe('admin token retry flow P1', () => {
       });
     });
 
-    const protectedHandler = async (route) => {
+    await page.route('**/api/data/notes', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ notes: [] })
+      });
+    });
+
+    await page.route('**/api/save/lessonPlans', async (route) => {
       const headerToken = route.request().headers()['x-bst-admin-token'] || '';
-      seenProtectedHeaders.push(headerToken);
+      seenSaveHeaders.push(headerToken);
 
       if (headerToken === expectedToken) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ backups: [] })
+          body: JSON.stringify({ success: true })
         });
         return;
       }
@@ -49,25 +57,24 @@ test.describe('admin token retry flow P1', () => {
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Unauthorized' })
       });
-    };
-
-    await page.route('**/api/backups/classes', protectedHandler);
-    await page.route('**/api/backups/lessonPlans', protectedHandler);
+    });
 
     await page.goto('/admin.html');
-    await page.locator('#backup-btn').click();
+    await page.locator('#new-lessonplan-btn').click();
+    await page.locator('#lessonplan-title').fill('Token Retry Plan');
+    await page.getByRole('button', { name: /create lesson plan/i }).click();
 
-    await expect(page.locator('#backup-modal')).toBeVisible();
     await expect.poll(() => promptMessages.length).toBe(1);
 
     const storedToken = await page.evaluate(() => localStorage.getItem('bst-admin-token'));
     expect(storedToken).toBe(expectedToken);
+    expect(seenSaveHeaders.some((value) => value === expectedToken)).toBe(true);
 
-    const callsAfterFirstProtectedFetch = seenProtectedHeaders.length;
-    await page.locator('#tab-lessonPlans').click();
-    await expect.poll(() => seenProtectedHeaders.length).toBeGreaterThan(callsAfterFirstProtectedFetch);
-
-    expect(promptMessages).toHaveLength(1);
-    expect(seenProtectedHeaders.some((value) => value === expectedToken)).toBe(true);
+    await expect
+      .poll(async () => {
+        const text = await page.locator('#admin-save-toast').textContent();
+        return text || '';
+      }, { timeout: 10_000 })
+      .toMatch(/saved/i);
   });
 });

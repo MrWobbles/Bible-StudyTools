@@ -1,224 +1,201 @@
-function deepClone(value) {
+function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function createMatcher(filter) {
-  return (doc) => {
-    const entries = Object.entries(filter || {});
-    return entries.every(([key, expected]) => {
-      const actual = doc[key];
-
-      if (expected && typeof expected === 'object' && !Array.isArray(expected) && '$nin' in expected) {
-        return !expected.$nin.includes(actual);
-      }
-
-      if (Array.isArray(actual)) {
-        return actual.includes(expected);
-      }
-
-      return actual === expected;
-    });
+function createInMemorySupabase(seed = {}) {
+  const tables = {
+    bst_classes: clone(seed.bst_classes || []),
+    bst_lesson_plans: clone(seed.bst_lesson_plans || []),
+    bst_notes: clone(seed.bst_notes || []),
+    bst_app_data_history: clone(seed.bst_app_data_history || [])
   };
-}
 
-function createInMemoryMongo(seed = {}) {
-  const collections = new Map();
+  const applyFilters = (rows, filters) => {
+    return rows.filter((row) => filters.every((filter) => {
+      if (filter.type === 'eq') {
+        return row[filter.field] === filter.value;
+      }
+      if (filter.type === 'in') {
+        return Array.isArray(filter.values) && filter.values.includes(row[filter.field]);
+      }
+      if (filter.type === 'contains') {
+        const rowValue = row[filter.field];
+        if (!Array.isArray(rowValue) || !Array.isArray(filter.values)) return false;
+        return filter.values.every((value) => rowValue.includes(value));
+      }
+      return true;
+    }));
+  };
 
-  Object.entries(seed).forEach(([name, docs]) => {
-    collections.set(name, deepClone(Array.isArray(docs) ? docs : []));
-  });
-
-  function getCollectionDocs(name) {
-    if (!collections.has(name)) {
-      collections.set(name, []);
+  class Query {
+    constructor(tableName) {
+      this.tableName = tableName;
+      this.filters = [];
+      this.orders = [];
+      this.limitValue = null;
+      this.selectFields = null;
+      this.selectOptions = {};
+      this.operation = 'select';
+      this.deleteOptions = {};
     }
-    return collections.get(name);
-  }
 
-  class Cursor {
-    constructor(docs) {
-      this.docs = docs;
+    select(fields, options = {}) {
+      this.operation = 'select';
+      this.selectFields = fields;
+      this.selectOptions = options || {};
+      return this;
     }
 
-    sort(spec = {}) {
-      const [[field, direction]] = Object.entries(spec);
-      const dir = Number(direction) >= 0 ? 1 : -1;
-      this.docs.sort((a, b) => {
-        const aVal = a[field];
-        const bVal = b[field];
-        if (aVal === bVal) return 0;
-        return aVal > bVal ? dir : -dir;
-      });
+    eq(field, value) {
+      this.filters.push({ type: 'eq', field, value });
+      return this;
+    }
+
+    in(field, values) {
+      this.filters.push({ type: 'in', field, values });
+      return this;
+    }
+
+    contains(field, values) {
+      this.filters.push({ type: 'contains', field, values });
+      return this;
+    }
+
+    order(field, options = {}) {
+      this.orders.push({ field, ascending: options.ascending !== false });
       return this;
     }
 
     limit(count) {
-      this.docs = this.docs.slice(0, count);
+      this.limitValue = count;
       return this;
     }
 
-    async toArray() {
-      return deepClone(this.docs);
-    }
-  }
-
-  class Collection {
-    constructor(name) {
-      this.name = name;
+    delete(options = {}) {
+      this.operation = 'delete';
+      this.deleteOptions = options;
+      return this;
     }
 
-    async createIndex() {
-      return undefined;
-    }
+    async upsert(payload, options = {}) {
+      const rows = tables[this.tableName] || [];
+      const next = Array.isArray(payload) ? payload : [payload];
+      const key = String(options.onConflict || '').trim();
 
-    async countDocuments(filter = {}) {
-      const docs = getCollectionDocs(this.name);
-      return docs.filter(createMatcher(filter)).length;
-    }
-
-    async findOne(filter = {}) {
-      const docs = getCollectionDocs(this.name);
-      const found = docs.find(createMatcher(filter));
-      return found ? deepClone(found) : null;
-    }
-
-    find(filter = {}) {
-      const docs = getCollectionDocs(this.name).filter(createMatcher(filter));
-      return new Cursor(deepClone(docs));
-    }
-
-    async bulkWrite(operations = []) {
-      for (const operation of operations) {
-        if (operation.replaceOne) {
-          const { filter, replacement, upsert } = operation.replaceOne;
-          await this.replaceOne(filter, replacement, { upsert: !!upsert });
-        }
-      }
-      return { ok: 1 };
-    }
-
-    async replaceOne(filter = {}, replacement = {}, options = {}) {
-      const docs = getCollectionDocs(this.name);
-      const matcher = createMatcher(filter);
-      const index = docs.findIndex(matcher);
-      const replacementClone = deepClone(replacement);
-
-      if (index >= 0) {
-        docs[index] = replacementClone;
-        return { matchedCount: 1, modifiedCount: 1, upsertedCount: 0 };
+      if (!key) {
+        next.forEach((row) => rows.push(clone(row)));
+      } else {
+        next.forEach((incoming) => {
+          const index = rows.findIndex((row) => row[key] === incoming[key]);
+          if (index >= 0) {
+            rows[index] = clone({ ...rows[index], ...incoming });
+          } else {
+            rows.push(clone(incoming));
+          }
+        });
       }
 
-      if (options.upsert) {
-        docs.push(replacementClone);
-        return { matchedCount: 0, modifiedCount: 0, upsertedCount: 1 };
+      tables[this.tableName] = rows;
+      return { data: null, error: null };
+    }
+
+    async insert(payload) {
+      const rows = tables[this.tableName] || [];
+      rows.push(clone(payload));
+      tables[this.tableName] = rows;
+      return { data: null, error: null };
+    }
+
+    async execute() {
+      const rows = tables[this.tableName] || [];
+
+      if (this.operation === 'delete') {
+        const filtered = applyFilters(rows, this.filters);
+        const deletedIds = new Set(filtered.map((row) => row));
+        const kept = rows.filter((row) => !deletedIds.has(row));
+        tables[this.tableName] = kept;
+        return {
+          data: null,
+          error: null,
+          count: this.deleteOptions?.count === 'exact' ? filtered.length : null
+        };
       }
 
-      return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
-    }
+      let selected = applyFilters(rows, this.filters).map((row) => clone(row));
 
-    async deleteMany(filter = {}) {
-      const docs = getCollectionDocs(this.name);
-      const matcher = createMatcher(filter);
-      let deletedCount = 0;
+      this.orders.forEach(({ field, ascending }) => {
+        selected.sort((a, b) => {
+          if (a[field] === b[field]) return 0;
+          if (a[field] === undefined) return 1;
+          if (b[field] === undefined) return -1;
+          return a[field] > b[field] ? (ascending ? 1 : -1) : (ascending ? -1 : 1);
+        });
+      });
 
-      for (let index = docs.length - 1; index >= 0; index -= 1) {
-        if (matcher(docs[index])) {
-          docs.splice(index, 1);
-          deletedCount += 1;
-        }
+      if (Number.isInteger(this.limitValue)) {
+        selected = selected.slice(0, this.limitValue);
       }
 
-      return { deletedCount };
-    }
+      if (typeof this.selectFields === 'string' && this.selectFields !== '*') {
+        const fields = this.selectFields
+          .split(',')
+          .map((field) => field.trim())
+          .filter(Boolean);
 
-    async deleteOne(filter = {}) {
-      const docs = getCollectionDocs(this.name);
-      const matcher = createMatcher(filter);
-      const index = docs.findIndex(matcher);
-      if (index >= 0) {
-        docs.splice(index, 1);
-        return { deletedCount: 1 };
+        selected = selected.map((row) => {
+          const next = {};
+          fields.forEach((field) => {
+            next[field] = row[field];
+          });
+          return next;
+        });
       }
-      return { deletedCount: 0 };
+
+      if (this.selectOptions?.head) {
+        return { data: null, error: null, count: selected.length };
+      }
+
+      return { data: selected, error: null };
     }
 
-    async insertOne(document = {}) {
-      const docs = getCollectionDocs(this.name);
-      docs.push(deepClone(document));
-      return { acknowledged: true };
-    }
-  }
-
-  class InMemoryDB {
-    collection(name) {
-      return new Collection(name);
-    }
-
-    async command() {
-      return { ok: 1 };
+    then(resolve, reject) {
+      return this.execute().then(resolve, reject);
     }
   }
 
   return {
-    db: new InMemoryDB(),
-    dump(name) {
-      return deepClone(getCollectionDocs(name));
+    from(tableName) {
+      if (!tables[tableName]) {
+        tables[tableName] = [];
+      }
+      return new Query(tableName);
+    },
+    dump(tableName) {
+      return clone(tables[tableName] || []);
     }
   };
 }
 
-describe('db normalized storage behavior', () => {
+describe('db Supabase normalized storage behavior', () => {
   let dbModule;
-  let mongo;
-  let mongodbPath;
   let dbPath;
 
   beforeEach(async () => {
-    process.env.MONGODB_URI = 'mongodb://unit-test-host:27017';
-    process.env.MONGODB_DB_NAME = 'bible-study-test';
-
-    mongo = createInMemoryMongo({
-      appData: [
-        {
-          _id: 'classes',
-          classes: [
-            { id: 'class-1', title: 'Migrated Class 1' },
-            { id: 'class-2', title: 'Migrated Class 2' }
-          ]
-        },
-        {
-          _id: 'lessonPlans',
-          lessonPlans: [
-            { id: 'plan-1', title: 'Migrated Plan', classes: ['class-1', 'class-2'] }
-          ]
-        }
-      ]
-    });
-
-    class FakeMongoClient {
-      async connect() {
-        return this;
-      }
-
-      db() {
-        return mongo.db;
-      }
-
-      async close() {
-        return undefined;
-      }
-    }
-
     vi.resetModules();
 
-    mongodbPath = require.resolve('mongodb');
-    delete require.cache[mongodbPath];
-    require.cache[mongodbPath] = {
-      id: mongodbPath,
-      filename: mongodbPath,
+    process.env.SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+
+    const fakeSupabase = createInMemorySupabase();
+
+    const supabasePath = require.resolve('@supabase/supabase-js');
+    delete require.cache[supabasePath];
+    require.cache[supabasePath] = {
+      id: supabasePath,
+      filename: supabasePath,
       loaded: true,
       exports: {
-        MongoClient: FakeMongoClient
+        createClient: () => fakeSupabase
       }
     };
 
@@ -232,31 +209,31 @@ describe('db normalized storage behavior', () => {
       await dbModule.closeDB();
     }
 
-    delete process.env.MONGODB_URI;
-    delete process.env.MONGODB_DB_NAME;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (dbPath) {
       delete require.cache[dbPath];
-    }
-    if (mongodbPath) {
-      delete require.cache[mongodbPath];
     }
 
     vi.resetModules();
   });
 
-  it('migrates legacy appData into normalized collections on connect', async () => {
+  it('connects and saves/loads normalized class documents', async () => {
     const connected = await dbModule.connectDB();
     expect(connected).toBe(true);
 
-    const classesData = await dbModule.loadDoc('classes');
-    const lessonPlansData = await dbModule.loadDoc('lessonPlans');
+    const saved = await dbModule.saveDoc('classes', {
+      classes: [
+        { id: 'class-1', title: 'Class 1' },
+        { id: 'class-2', title: 'Class 2' }
+      ]
+    });
+    expect(saved).toBe(true);
 
-    expect(classesData.classes.map((item) => item.id)).toEqual(['class-1', 'class-2']);
-    expect(lessonPlansData.lessonPlans.map((item) => item.id)).toEqual(['plan-1']);
-
-    const history = mongo.dump('appDataHistory');
-    expect(history.some((entry) => entry.reason === 'legacy-migration')).toBe(true);
+    const loaded = await dbModule.loadDoc('classes');
+    expect(Array.isArray(loaded.classes)).toBe(true);
+    expect(loaded.classes.map((item) => item.id)).toEqual(['class-1', 'class-2']);
   });
 
   it('removes deleted class references from lesson plans', async () => {
@@ -268,6 +245,9 @@ describe('db normalized storage behavior', () => {
       classes: ['class-1', 'class-2']
     });
 
+    await dbModule.upsertClassRecord('class-1', { id: 'class-1', title: 'Class 1' });
+    await dbModule.upsertClassRecord('class-2', { id: 'class-2', title: 'Class 2' });
+
     const deleted = await dbModule.deleteClassRecord('class-1');
     expect(deleted).toBe(true);
 
@@ -276,5 +256,20 @@ describe('db normalized storage behavior', () => {
 
     expect(linkedPlan).toBeTruthy();
     expect(linkedPlan.classes).toEqual(['class-2']);
+  });
+
+  it('returns false when Supabase credentials are missing', async () => {
+    await dbModule.closeDB();
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    vi.resetModules();
+    const freshDbPath = require.resolve('../../db');
+    delete require.cache[freshDbPath];
+    dbModule = require('../../db');
+
+    const connected = await dbModule.connectDB();
+    expect(connected).toBe(false);
+    expect(dbModule.isConnected()).toBe(false);
   });
 });

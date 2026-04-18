@@ -943,49 +943,11 @@ function loadBibleTranslationSetting() {
   select.value = translation;
 }
 
-function getCloudSyncWarning(result) {
-  if (!result || typeof result !== 'object') {
-    return '';
-  }
-
-  if (result.partialSuccess || result?.cloudSync?.ok === false || result.mongoSync === false) {
-    return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
-  }
-
-  return '';
-}
-
-function combineWarnings(...warnings) {
-  return warnings
-    .map((warning) => String(warning || '').trim())
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-}
-
-function shouldIgnorePartialSyncFailure(message) {
-  const text = String(message || '').toLowerCase();
-  return text.includes('cannot put')
-    || text.includes('404')
-    || text.includes('failed to fetch')
-    || text.includes('networkerror')
-    || text.includes('err_connection_refused');
-}
-
-function getClassIdentifier(cls) {
-  if (!cls || typeof cls !== 'object') {
-    return '';
-  }
-
-  return String(cls.id || cls.classNumber || '').trim();
-}
-
-async function saveClassesLocallyOnly() {
+async function saveClasses() {
   const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'x-bst-skip-cloud-sync': '1'
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({ classes: allClasses })
   }, { requireAdmin: true });
@@ -996,24 +958,6 @@ async function saveClassesLocallyOnly() {
   }
 
   return saveResponse.json().catch(() => ({}));
-}
-
-async function persistClassWithPartialMongoSync(cls) {
-  const classId = getClassIdentifier(cls) || String(currentClassId || '').trim();
-  let partialWarning = '';
-
-  if (classId) {
-    try {
-      await window.BSTApi.upsertMongoClass(classId, { class: cls });
-    } catch (err) {
-      const message = err?.message || 'Cloud sync failed for this class.';
-      partialWarning = shouldIgnorePartialSyncFailure(message) ? '' : message;
-    }
-  }
-
-  const saveResult = await saveClassesLocallyOnly();
-  const localWarning = getCloudSyncWarning(saveResult);
-  return combineWarnings(partialWarning, localWarning);
 }
 
 // Save Bible translation setting
@@ -1034,14 +978,10 @@ async function saveBibleTranslationSetting() {
       if (classIndex !== -1) {
         allClasses[classIndex].bibleTranslation = translation;
 
-        const cloudWarning = await persistClassWithPartialMongoSync(allClasses[classIndex]);
+        await saveClasses();
         console.log('Bible translation preference saved:', translation);
-        if (cloudWarning) {
-          updateSaveStatus('Warning: Translation saved locally only (cloud sync failed)');
-        } else {
-          updateSaveStatus('Translation saved');
-          setTimeout(() => updateSaveStatus('Saved'), 2000);
-        }
+        updateSaveStatus('Translation saved');
+        setTimeout(() => updateSaveStatus('Saved'), 2000);
       }
     } else {
       // Fallback to localStorage
@@ -1448,21 +1388,11 @@ async function saveDocument() {
         allNotes[noteIndex].content = content;
         allNotes[noteIndex].lastModified = new Date().toISOString();
 
-        // Sync to MongoDB first (delta sync)
-        let cloudWarning = '';
-        try {
-          await window.BSTApi.upsertMongoNote(currentNoteId, { note: allNotes[noteIndex] });
-        } catch (err) {
-          console.warn('MongoDB sync failed for note:', err);
-          cloudWarning = err?.message || 'Cloud sync failed';
-        }
-
         console.log('Saving note to server...');
         const saveResponse = await window.BSTApi.fetch('/api/save/notes', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'x-bst-skip-cloud-sync': '1'
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ notes: allNotes })
         }, { requireAdmin: true });
@@ -1473,11 +1403,7 @@ async function saveDocument() {
         }
 
         isDirty = false;
-        if (cloudWarning) {
-          updateSaveStatus('Warning: Saved locally only (cloud sync failed)');
-        } else {
-          updateSaveStatus('Saved');
-        }
+        updateSaveStatus('Saved');
         console.log('Note content saved:', content);
       } else {
         throw new Error('Note not found');
@@ -1502,14 +1428,10 @@ async function saveDocument() {
         }
 
         console.log('Saving document to server...');
-        const cloudWarning = await persistClassWithPartialMongoSync(allClasses[classIndex]);
+        await saveClasses();
 
         isDirty = false;
-        if (cloudWarning) {
-          updateSaveStatus('Warning: Saved locally only (cloud sync failed)');
-        } else {
-          updateSaveStatus('Saved');
-        }
+        updateSaveStatus('Saved');
         console.log('Class content saved:', content);
       } else {
         throw new Error('Class not found');
@@ -2057,17 +1979,13 @@ async function applyOutlineToClass() {
       console.log(`Updated class at index ${classIndex} with outline`);
       console.log('Outline structure:', generatedOutline);
 
-      console.log('Sending to server: classes payload with partial Mongo sync');
-      const cloudWarning = await persistClassWithPartialMongoSync(allClasses[classIndex]);
+      console.log('Sending to server: classes payload');
+      await saveClasses();
 
       // Update the outline navigator to reflect new structure
       updateOutlineNavigatorFromGenerated(generatedOutline);
 
-      if (cloudWarning) {
-        alert(`Outline applied locally, but cloud sync failed.\n\n${cloudWarning}`);
-      } else {
-        alert('Outline applied to class successfully!');
-      }
+      alert('Outline applied to class successfully!');
       closeModal('outline-modal');
       console.log('Applied outline:', generatedOutline);
     } else {

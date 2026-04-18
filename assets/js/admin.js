@@ -21,36 +21,6 @@ function generateGUID() {
 function generateNoteGUID() {
   return 'note-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
-function getCloudSyncWarning(result) {
-  if (!result || typeof result !== 'object') {
-    return '';
-  }
-
-  if (result.partialSuccess || result?.cloudSync?.ok === false || result.mongoSync === false) {
-    return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
-  }
-
-  return '';
-}
-
-function combineWarnings(...warnings) {
-  return warnings
-    .map((warning) => String(warning || '').trim())
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-}
-
-function shouldIgnorePartialSyncFailure(message) {
-  const text = String(message || '').toLowerCase();
-  return text.includes('cannot put')
-    || text.includes('cannot delete')
-    || text.includes('404')
-    || text.includes('failed to fetch')
-    || text.includes('networkerror')
-    || text.includes('err_connection_refused');
-}
-
 function getClassIdentifier(cls) {
   if (!cls || typeof cls !== 'object') {
     return '';
@@ -67,77 +37,12 @@ function getLessonPlanIdentifier(plan) {
   return String(plan.id || plan.planId || '').trim();
 }
 
-async function syncClassDeltaToMongo(options = {}) {
-  const { changedClassId = null, deletedClassId = null } = options;
-
-  if (!window.BSTApi) {
-    return '';
-  }
-
-  try {
-    if (deletedClassId) {
-      await window.BSTApi.deleteMongoClass(String(deletedClassId));
-      return '';
-    }
-
-    const normalizedClassId = String(changedClassId || '').trim();
-    if (!normalizedClassId) {
-      return '';
-    }
-
-    const cls = allClasses.find((item) => getClassIdentifier(item) === normalizedClassId);
-    if (!cls) {
-      return '';
-    }
-
-    await window.BSTApi.upsertMongoClass(normalizedClassId, { class: cls });
-    return '';
-  } catch (err) {
-    const message = err?.message || 'Cloud sync failed for class record.';
-    return shouldIgnorePartialSyncFailure(message) ? '' : message;
-  }
-}
-
-async function syncLessonPlanDeltaToMongo(options = {}) {
-  const { changedPlanId = null, deletedPlanId = null } = options;
-
-  if (!window.BSTApi) {
-    return '';
-  }
-
-  try {
-    if (deletedPlanId) {
-      await window.BSTApi.deleteMongoLessonPlan(String(deletedPlanId));
-      return '';
-    }
-
-    const normalizedPlanId = String(changedPlanId || '').trim();
-    if (!normalizedPlanId) {
-      return '';
-    }
-
-    const plan = allLessonPlans.find((item) => getLessonPlanIdentifier(item) === normalizedPlanId);
-    if (!plan) {
-      return '';
-    }
-
-    await window.BSTApi.upsertMongoLessonPlan(normalizedPlanId, { lessonPlan: plan });
-    return '';
-  } catch (err) {
-    const message = err?.message || 'Cloud sync failed for lesson plan record.';
-    return shouldIgnorePartialSyncFailure(message) ? '' : message;
-  }
-}
-
 function showAdminSaveResult(itemLabel, result) {
-  const warning = getCloudSyncWarning(result);
-  if (warning) {
-    showAdminSaveStatus(`${itemLabel} saved locally only. ${warning}`, true, 'warning');
+  if (result?.success) {
+    showAdminSaveStatus(`${itemLabel} saved`, false, 'check_circle');
     return;
   }
-
-  const syncedToCloud = result?.cloudSync?.ok === true || result?.mongoSync === true;
-  showAdminSaveStatus(`${itemLabel} saved${syncedToCloud ? ' + Atlas' : ''}`, false, 'check_circle');
+  showAdminSaveStatus(`${itemLabel} save failed`, true, 'warning');
 }
 
 // Load data on page load
@@ -343,20 +248,12 @@ function goBackToLessonPlans() {
 async function saveLessonPlansToFile(options = {}) {
   console.log('saveLessonPlansToFile called with', allLessonPlans.length, 'lesson plans');
   const jsonData = { lessonPlans: allLessonPlans };
-  const { changedPlanId = null, deletedPlanId = null } = options;
-
-  // Local file save removed. Always use API/cloud.
-
-  // Try API endpoint (web server mode)
   try {
-    const partialSyncWarning = await syncLessonPlanDeltaToMongo({ changedPlanId, deletedPlanId });
-
     console.log('Attempting API save to /api/save/lessonPlans...');
     const response = await window.BSTApi.fetch('/api/save/lessonPlans', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-bst-skip-cloud-sync': '1'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(jsonData),
     }, { requireAdmin: true });
@@ -365,14 +262,6 @@ async function saveLessonPlansToFile(options = {}) {
 
     if (response.ok) {
       const result = await response.json().catch(() => ({}));
-      const saveWarning = getCloudSyncWarning(result);
-      const combinedWarning = combineWarnings(partialSyncWarning, saveWarning);
-
-      if (combinedWarning) {
-        result.partialSuccess = true;
-        result.warning = combinedWarning;
-      }
-
       console.log('[OK] Lesson plans saved successfully:', result);
       showAdminSaveResult('Lesson plans', result);
       return;
@@ -382,16 +271,8 @@ async function saveLessonPlansToFile(options = {}) {
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
   } catch (err) {
-    console.warn('API save failed, falling back to download:', err);
-    // Fallback: download file
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'lessonPlans.json';
-    link.click();
-    URL.revokeObjectURL(url);
-    console.log('Lesson plans downloaded - please replace assets/data/lessonPlans.json with the downloaded file.');
+    console.error('Failed to save lesson plans:', err);
+    showAdminSaveStatus(`Lesson plans save failed: ${err.message}`, true, 'warning');
   }
 }
 
@@ -545,55 +426,17 @@ function getNoteIdentifier(note) {
   return String(note.id || note.noteId || '').trim();
 }
 
-async function syncNoteDeltaToMongo(options = {}) {
-  const { changedNoteId = null, deletedNoteId = null } = options;
-
-  if (!window.BSTApi) {
-    return '';
-  }
-
-  try {
-    if (deletedNoteId) {
-      await window.BSTApi.deleteMongoNote(String(deletedNoteId));
-      return '';
-    }
-
-    const normalizedNoteId = String(changedNoteId || '').trim();
-    if (!normalizedNoteId) {
-      return '';
-    }
-
-    const note = allNotes.find((item) => getNoteIdentifier(item) === normalizedNoteId);
-    if (!note) {
-      return '';
-    }
-
-    await window.BSTApi.upsertMongoNote(normalizedNoteId, { note: note });
-    return '';
-  } catch (err) {
-    const message = err?.message || 'Cloud sync failed for note record.';
-    return shouldIgnorePartialSyncFailure(message) ? '' : message;
-  }
-}
-
 // Save notes to file
 async function saveNotesToFile(options = {}) {
-  const { changedNoteId = null, deletedNoteId = null } = options;
   console.log('saveNotesToFile called with', allNotes.length, 'notes');
   const jsonData = { notes: allNotes };
 
-  // Local file save removed. Always use API/cloud.
-
-  // Try API endpoint (web server mode)
   try {
-    const partialSyncWarning = await syncNoteDeltaToMongo({ changedNoteId, deletedNoteId });
-
     console.log('Attempting API save to /api/save/notes...');
     const response = await window.BSTApi.fetch('/api/save/notes', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-bst-skip-cloud-sync': '1'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(jsonData),
     }, { requireAdmin: true });
@@ -602,14 +445,6 @@ async function saveNotesToFile(options = {}) {
 
     if (response.ok) {
       const result = await response.json().catch(() => ({}));
-      const saveWarning = getCloudSyncWarning(result);
-      const combinedWarning = combineWarnings(partialSyncWarning, saveWarning);
-
-      if (combinedWarning) {
-        result.partialSuccess = true;
-        result.warning = combinedWarning;
-      }
-
       console.log('[OK] Notes saved successfully:', result);
       showAdminSaveResult('Notes', result);
       return;
@@ -619,16 +454,8 @@ async function saveNotesToFile(options = {}) {
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
   } catch (err) {
-    console.warn('API save failed, falling back to download:', err);
-    // Fallback: download file
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'notes.json';
-    link.click();
-    URL.revokeObjectURL(url);
-    console.log('Notes downloaded - please replace assets/data/notes.json with the downloaded file.');
+    console.error('Failed to save notes:', err);
+    showAdminSaveStatus(`Notes save failed: ${err.message}`, true, 'warning');
   }
 }
 
@@ -1410,23 +1237,13 @@ function saveClass() {
 async function saveClassToFile(options = {}) {
   console.log('saveClassToFile called with', allClasses.length, 'classes');
   const jsonData = { classes: allClasses };
-  const activeClassId = currentClass !== null ? getClassIdentifier(allClasses[currentClass]) : '';
-  const changedClassId = String(options?.changedClassId || activeClassId || '').trim();
-  const deletedClassId = String(options?.deletedClassId || '').trim();
 
-  // If running in Electron, save directly to file system
-  // Local file save removed. Always use API/cloud.
-
-  // Try API endpoint (web server mode)
   try {
-    const partialSyncWarning = await syncClassDeltaToMongo({ changedClassId, deletedClassId });
-
     console.log('Attempting API save to /api/save/classes...');
     const response = await window.BSTApi.fetch('/api/save/classes', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-bst-skip-cloud-sync': '1'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(jsonData),
     }, { requireAdmin: true });
@@ -1435,14 +1252,6 @@ async function saveClassToFile(options = {}) {
 
     if (response.ok) {
       const result = await response.json().catch(() => ({}));
-      const saveWarning = getCloudSyncWarning(result);
-      const combinedWarning = combineWarnings(partialSyncWarning, saveWarning);
-
-      if (combinedWarning) {
-        result.partialSuccess = true;
-        result.warning = combinedWarning;
-      }
-
       console.log('[OK] Save successful:', result);
       showAdminSaveResult('Classes', result);
       return;
@@ -1452,16 +1261,8 @@ async function saveClassToFile(options = {}) {
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
   } catch (err) {
-    console.warn('API save failed, falling back to download:', err);
-    // Fallback: download file
-    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'classes.json';
-    link.click();
-    URL.revokeObjectURL(url);
-    alert('Class saved! Please replace assets/data/classes.json with the downloaded file.');
+    console.error('Failed to save classes:', err);
+    showAdminSaveStatus(`Classes save failed: ${err.message}`, true, 'warning');
   }
 }
 
@@ -1815,172 +1616,3 @@ Copy the URL and use an external downloader.
   }
 }
 
-// ===== BACKUP MANAGEMENT =====
-
-let currentBackupTab = 'classes';
-
-// Open backup modal
-function openBackupModal() {
-  document.getElementById('backup-modal').style.display = 'flex';
-  showBackupList('classes');
-}
-
-// Show backups for a specific file type
-async function showBackupList(fileType) {
-  currentBackupTab = fileType;
-
-  // Update tab styling
-  document.getElementById('tab-classes').classList.toggle('active', fileType === 'classes');
-  document.getElementById('tab-lessonPlans').classList.toggle('active', fileType === 'lessonPlans');
-  document.getElementById('tab-notes')?.classList.toggle('active', fileType === 'notes');
-
-  const container = document.getElementById('backup-list');
-  container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Loading backups...</p>';
-
-  const fileTypeLabels = {
-    classes: 'Classes',
-    lessonPlans: 'Lesson Plans',
-    notes: 'Notes'
-  };
-
-  try {
-    const response = await window.BSTApi.fetch(`/api/backups/${fileType}`, {}, { requireAdmin: true });
-    if (!response.ok) throw new Error('Failed to fetch backups');
-
-    const data = await response.json();
-    const backups = data.backups || [];
-
-    if (backups.length === 0) {
-      container.innerHTML = `
-        <div style="text-align: center; padding: 40px; color: var(--muted);">
-          <p>No backups found for ${fileTypeLabels[fileType] || fileType}.</p>
-          <p style="font-size: 13px; margin-top: 8px;">Backups are created automatically when you save changes.</p>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = backups.map(backup => {
-      // Parse the timestamp for display
-      const dateMatch = backup.fileName.match(/_(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
-      let displayDate = backup.timestamp;
-      if (dateMatch) {
-        const [, year, month, day, hour, min, sec] = dateMatch;
-        displayDate = `${month}/${day}/${year} ${hour}:${min}:${sec}`;
-      }
-
-      return `
-        <div class="backup-item">
-          <div class="backup-info">
-            <div class="backup-date"><span class="material-icons" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">event</span> ${escapeHtml(displayDate)}</div>
-            <div class="backup-filename">${escapeHtml(backup.fileName)}</div>
-          </div>
-          <div class="backup-actions">
-            <button onclick="restoreBackup('${backup.fileName}')" class="btn-small btn-restore" title="Restore this backup">
-              <span class="material-icons" style="font-size: 14px; vertical-align: middle;">restore</span> Restore
-            </button>
-            <button onclick="deleteBackup('${backup.fileName}')" class="btn-small btn-delete" title="Delete this backup">
-              <span class="material-icons" style="font-size: 14px; vertical-align: middle;">delete</span>
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-  } catch (err) {
-    console.error('Error loading backups:', err);
-    container.innerHTML = `
-      <div style="text-align: center; padding: 40px; color: #ff6b6b;">
-        <p>Error loading backups: ${escapeHtml(err.message || 'Unknown error')}</p>
-        <p style="font-size: 13px; margin-top: 8px;">Make sure the server is running.</p>
-      </div>
-    `;
-  }
-}
-
-// Create a manual backup
-async function createManualBackup(fileType) {
-  try {
-    const response = await window.BSTApi.fetch('/api/backups/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: fileType })
-    }, { requireAdmin: true });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create backup');
-    }
-
-    const result = await response.json();
-    alert(`Backup created: ${result.backupFileName}`);
-    showBackupList(currentBackupTab);
-
-  } catch (err) {
-    console.error('Error creating backup:', err);
-    alert('Error creating backup: ' + err.message);
-  }
-}
-
-// Restore from a backup
-async function restoreBackup(backupFileName) {
-  const confirmRestore = confirm(
-    `Are you sure you want to restore from this backup?\n\n` +
-    `File: ${backupFileName}\n\n` +
-    `This will replace the current data. A backup of the current data will be created automatically.`
-  );
-
-  if (!confirmRestore) return;
-
-  try {
-    const response = await window.BSTApi.fetch('/api/backups/restore', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ backupFileName })
-    }, { requireAdmin: true });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to restore backup');
-    }
-
-    const result = await response.json();
-    alert(`${result.message}\n\nPlease refresh the page to see the restored data.`);
-
-    // Refresh the page to load restored data
-    if (confirm('Refresh the page now to load the restored data?')) {
-      window.location.reload();
-    }
-
-  } catch (err) {
-    console.error('Error restoring backup:', err);
-    alert('Error restoring backup: ' + err.message);
-  }
-}
-
-// Delete a backup
-async function deleteBackup(backupFileName) {
-  const confirmDelete = confirm(`Delete this backup?\n\n${backupFileName}\n\nThis cannot be undone.`);
-
-  if (!confirmDelete) return;
-
-  try {
-    const response = await window.BSTApi.fetch(`/api/backups/${encodeURIComponent(backupFileName)}`, {
-      method: 'DELETE'
-    }, { requireAdmin: true });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to delete backup');
-    }
-
-    showBackupList(currentBackupTab);
-
-  } catch (err) {
-    console.error('Error deleting backup:', err);
-    alert('Error deleting backup: ' + err.message);
-  }
-}
-
-// Set up backup button listener
-document.getElementById('backup-btn')?.addEventListener('click', openBackupModal);

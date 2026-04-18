@@ -3,14 +3,8 @@ const os = require('os');
 const path = require('path');
 const request = require('supertest');
 
-async function writeJson(filePath, data) {
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-}
-
-describe('server API with connected Mongo (mocked)', () => {
+describe('server API with connected Supabase (mocked)', () => {
   let tempRoot;
-  let dataDir;
-  let backupDir;
   let videoDir;
   let app;
   let serverModule;
@@ -18,38 +12,11 @@ describe('server API with connected Mongo (mocked)', () => {
   let dbModulePath;
 
   beforeEach(async () => {
-    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'bst-api-mongo-test-'));
-    dataDir = path.join(tempRoot, 'data');
-    backupDir = path.join(tempRoot, 'backups');
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'bst-api-supabase-test-'));
     videoDir = path.join(tempRoot, 'video');
 
-    await fs.mkdir(dataDir, { recursive: true });
-    await fs.mkdir(backupDir, { recursive: true });
     await fs.mkdir(videoDir, { recursive: true });
 
-    await writeJson(path.join(dataDir, 'classes.json'), {
-      classes: [
-        {
-          id: 'class-1',
-          title: 'Test Class',
-          outline: [],
-          media: []
-        }
-      ]
-    });
-
-    await writeJson(path.join(dataDir, 'lessonPlans.json'), {
-      lessonPlans: [
-        {
-          id: 'lesson-1',
-          title: 'Test Lesson Plan',
-          classes: ['class-1']
-        }
-      ]
-    });
-
-    process.env.BST_DATA_DIR = dataDir;
-    process.env.BST_BACKUP_DIR = backupDir;
     process.env.BST_VIDEO_DIR = videoDir;
     process.env.BST_DISABLE_BROWSER_OPEN = '1';
 
@@ -62,6 +29,8 @@ describe('server API with connected Mongo (mocked)', () => {
       deleteClassRecord: vi.fn(async () => true),
       upsertLessonPlanRecord: vi.fn(async (_planId, planData) => planData),
       deleteLessonPlanRecord: vi.fn(async () => true),
+      upsertNoteRecord: vi.fn(async (_noteId, noteData) => noteData),
+      deleteNoteRecord: vi.fn(async () => true),
       closeDB: vi.fn(async () => undefined)
     };
 
@@ -86,8 +55,6 @@ describe('server API with connected Mongo (mocked)', () => {
       await serverModule.stopServer();
     }
 
-    delete process.env.BST_DATA_DIR;
-    delete process.env.BST_BACKUP_DIR;
     delete process.env.BST_VIDEO_DIR;
     delete process.env.BST_DISABLE_BROWSER_OPEN;
 
@@ -99,9 +66,9 @@ describe('server API with connected Mongo (mocked)', () => {
     await fs.rm(tempRoot, { recursive: true, force: true });
   });
 
-  it('upserts a class via partial Mongo endpoint when connected', async () => {
+  it('upserts a class via partial Supabase endpoint when connected', async () => {
     const response = await request(app)
-      .put('/api/mongo/classes/class-99')
+      .put('/api/supabase/classes/class-99')
       .send({ id: 'class-99', title: 'Connected Upsert' })
       .expect(200);
 
@@ -114,9 +81,9 @@ describe('server API with connected Mongo (mocked)', () => {
     );
   });
 
-  it('deletes class via partial Mongo endpoint when connected', async () => {
+  it('deletes class via partial Supabase endpoint when connected', async () => {
     const response = await request(app)
-      .delete('/api/mongo/classes/class-99')
+      .delete('/api/supabase/classes/class-99')
       .expect(200);
 
     expect(response.body.success).toBe(true);
@@ -124,14 +91,14 @@ describe('server API with connected Mongo (mocked)', () => {
     expect(dbMock.deleteClassRecord).toHaveBeenCalledWith('class-99', 'api-partial-delete');
   });
 
-  it('upserts and deletes lesson plans via partial Mongo endpoints when connected', async () => {
+  it('upserts and deletes lesson plans via partial Supabase endpoints when connected', async () => {
     await request(app)
-      .put('/api/mongo/lessonPlans/plan-22')
+      .put('/api/supabase/lessonPlans/plan-22')
       .send({ id: 'plan-22', title: 'Connected Plan', classes: ['class-1'] })
       .expect(200);
 
     await request(app)
-      .delete('/api/mongo/lessonPlans/plan-22')
+      .delete('/api/supabase/lessonPlans/plan-22')
       .expect(200);
 
     expect(dbMock.upsertLessonPlanRecord).toHaveBeenCalledWith(
@@ -142,23 +109,23 @@ describe('server API with connected Mongo (mocked)', () => {
     expect(dbMock.deleteLessonPlanRecord).toHaveBeenCalledWith('plan-22', 'api-partial-delete');
   });
 
-  it('supports legacy lessonplans Mongo routes and marks them deprecated', async () => {
+  it('supports legacy lessonplans supabase routes and marks them deprecated', async () => {
     const upsertResponse = await request(app)
-      .put('/api/mongo/lessonplans/plan-legacy')
+      .put('/api/supabase/lessonplans/plan-legacy')
       .send({ id: 'plan-legacy', title: 'Legacy Plan', classes: ['class-1'] })
       .expect(200);
 
     const deleteResponse = await request(app)
-      .delete('/api/mongo/lessonplans/plan-legacy')
+      .delete('/api/supabase/lessonplans/plan-legacy')
       .expect(200);
 
     expect(upsertResponse.headers.deprecation).toBe('true');
-    expect(String(upsertResponse.headers.link || '')).toContain('/api/mongo/lessonPlans/plan-legacy');
+    expect(String(upsertResponse.headers.link || '')).toContain('/api/supabase/lessonPlans/plan-legacy');
     expect(deleteResponse.headers.deprecation).toBe('true');
-    expect(String(deleteResponse.headers.link || '')).toContain('/api/mongo/lessonPlans/plan-legacy');
+    expect(String(deleteResponse.headers.link || '')).toContain('/api/supabase/lessonPlans/plan-legacy');
   });
 
-  it('skips full Mongo sync on save endpoint when skip header is set', async () => {
+  it('saves classes via Supabase on save endpoint', async () => {
     const payload = {
       classes: [
         {
@@ -172,11 +139,10 @@ describe('server API with connected Mongo (mocked)', () => {
 
     const response = await request(app)
       .post('/api/save/classes')
-      .set('x-bst-skip-cloud-sync', '1')
       .send(payload)
       .expect(200);
 
-    expect(response.body.cloudSync?.state).toBe('skipped');
-    expect(dbMock.saveDoc).not.toHaveBeenCalled();
+    expect(response.body.success).toBe(true);
+    expect(dbMock.saveDoc).toHaveBeenCalledWith('classes', payload);
   });
 });

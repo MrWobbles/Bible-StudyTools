@@ -1,15 +1,13 @@
 const { test, expect } = require('@playwright/test');
 
-test.describe('admin partial-sync save flow P1', () => {
-  test('uses partial upserts before aggregate saves for lesson plans and classes', async ({ page }) => {
+test.describe('admin save flow P1', () => {
+  test('saves lesson plans and classes through aggregate endpoints without skip headers', async ({ page }) => {
     const runId = Date.now();
     let lessonPlansState = { lessonPlans: [] };
     let classesState = { classes: [] };
-
-    const callOrder = [];
     const skipHeaders = {
-      classes: '',
-      lessonPlans: ''
+      lessonPlans: null,
+      classes: null
     };
 
     await page.route('**/api/data/lessonPlans', async (route) => {
@@ -28,63 +26,47 @@ test.describe('admin partial-sync save flow P1', () => {
       });
     });
 
-    await page.route('**/api/mongo/lessonPlans/*', async (route) => {
-      callOrder.push('mongo-lessonplans');
+    await page.route('**/api/data/notes', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, mongodb: 'connected' })
-      });
-    });
-
-    await page.route('**/api/mongo/classes/*', async (route) => {
-      callOrder.push('mongo-classes');
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true, mongodb: 'connected' })
+        body: JSON.stringify({ notes: [] })
       });
     });
 
     await page.route('**/api/save/lessonPlans', async (route) => {
-      callOrder.push('save-lessonplans');
       skipHeaders.lessonPlans = route.request().headers()['x-bst-skip-cloud-sync'] || '';
-
       const payload = route.request().postDataJSON() || {};
       lessonPlansState = {
         lessonPlans: Array.isArray(payload.lessonPlans) ? payload.lessonPlans : []
       };
-
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, cloudSync: { ok: true, state: 'skipped' } })
+        body: JSON.stringify({ success: true })
       });
     });
 
     await page.route('**/api/save/classes', async (route) => {
-      callOrder.push('save-classes');
       skipHeaders.classes = route.request().headers()['x-bst-skip-cloud-sync'] || '';
-
       const payload = route.request().postDataJSON() || {};
       classesState = {
         classes: Array.isArray(payload.classes) ? payload.classes : []
       };
-
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, cloudSync: { ok: true, state: 'skipped' } })
+        body: JSON.stringify({ success: true })
       });
     });
 
     await page.goto('/admin.html');
     await page.locator('#new-lessonplan-btn').click();
-    await page.locator('#lessonplan-title').fill(`Partial Sync LP ${runId}`);
-    await page.locator('#lessonplan-description').fill('Partial sync order check');
+    await page.locator('#lessonplan-title').fill(`Supabase LP ${runId}`);
+    await page.locator('#lessonplan-description').fill('Supabase-only save check');
     await page.getByRole('button', { name: /create lesson plan/i }).click();
 
-    const planCard = page.locator('.lessonplan-card').filter({ hasText: `Partial Sync LP ${runId}` }).first();
+    const planCard = page.locator('.lessonplan-card').filter({ hasText: `Supabase LP ${runId}` }).first();
     await expect(planCard).toBeVisible();
     await planCard.getByRole('button', { name: /open/i }).click();
 
@@ -97,26 +79,12 @@ test.describe('admin partial-sync save flow P1', () => {
       }, { timeout: 10_000 })
       .toMatch(/saved/i);
 
-    const firstLessonMongo = callOrder.indexOf('mongo-lessonplans');
-    const firstLessonSave = callOrder.indexOf('save-lessonplans');
-    const firstClassMongo = callOrder.indexOf('mongo-classes');
-
-    expect(firstLessonMongo).toBeGreaterThanOrEqual(0);
-    expect(firstLessonSave).toBeGreaterThanOrEqual(0);
-    expect(firstClassMongo).toBeGreaterThanOrEqual(0);
-
-    expect(firstLessonMongo).toBeLessThan(firstLessonSave);
-
-    expect(skipHeaders.lessonPlans).toBe('1');
-    if (skipHeaders.classes) {
-      expect(skipHeaders.classes).toBe('1');
-    }
+    expect(skipHeaders.lessonPlans).toBe('');
+    expect(skipHeaders.classes).toBe('');
   });
 
-  test('falls back to aggregate save when class partial endpoint is unavailable', async ({ page }) => {
+  test('shows save failure toast when classes save fails', async ({ page }) => {
     let lessonPlansState = { lessonPlans: [] };
-    let classesState = { classes: [] };
-    let saveClassesCalled = false;
 
     await page.route('**/api/data/lessonPlans', async (route) => {
       await route.fulfill({
@@ -130,23 +98,15 @@ test.describe('admin partial-sync save flow P1', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(classesState)
+        body: JSON.stringify({ classes: [] })
       });
     });
 
-    await page.route('**/api/mongo/lessonPlans/*', async (route) => {
+    await page.route('**/api/data/notes', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, mongodb: 'connected' })
-      });
-    });
-
-    await page.route('**/api/mongo/classes/*', async (route) => {
-      await route.fulfill({
-        status: 404,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Cannot PUT /api/mongo/classes/class-1' })
+        body: JSON.stringify({ notes: [] })
       });
     });
 
@@ -155,35 +115,29 @@ test.describe('admin partial-sync save flow P1', () => {
       lessonPlansState = {
         lessonPlans: Array.isArray(payload.lessonPlans) ? payload.lessonPlans : []
       };
-
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, cloudSync: { ok: true, state: 'skipped' } })
+        body: JSON.stringify({ success: true })
       });
     });
 
     await page.route('**/api/save/classes', async (route) => {
-      saveClassesCalled = true;
-      const payload = route.request().postDataJSON() || {};
-      classesState = {
-        classes: Array.isArray(payload.classes) ? payload.classes : []
-      };
-
       await route.fulfill({
-        status: 200,
+        status: 503,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, cloudSync: { ok: true, state: 'skipped' } })
+        body: JSON.stringify({ error: 'Supabase is disconnected. Cannot save classes.' })
       });
     });
 
     await page.goto('/admin.html');
     await page.locator('#new-lessonplan-btn').click();
-    await page.locator('#lessonplan-title').fill('Fallback LP');
+    await page.locator('#lessonplan-title').fill('Failing Save LP');
     await page.getByRole('button', { name: /create lesson plan/i }).click();
 
-    const planCard = page.locator('.lessonplan-card').filter({ hasText: 'Fallback LP' }).first();
+    const planCard = page.locator('.lessonplan-card').filter({ hasText: 'Failing Save LP' }).first();
     await planCard.getByRole('button', { name: /open/i }).click();
+
     await page.locator('#new-class-btn').click();
 
     await expect
@@ -191,8 +145,6 @@ test.describe('admin partial-sync save flow P1', () => {
         const text = await page.locator('#admin-save-toast').textContent();
         return text || '';
       }, { timeout: 10_000 })
-      .toMatch(/saved/i);
-
-    await expect.poll(() => saveClassesCalled, { timeout: 10_000 }).toBe(true);
+      .toMatch(/failed/i);
   });
 });

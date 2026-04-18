@@ -43,10 +43,7 @@
           <span class="material-symbols-outlined theme-toggle__icon">light_mode</span>
           <span class="theme-toggle__label">Light mode</span>
         </button>
-        <button id="backup-btn" class="pill-link"
-          style="background: rgba(76, 175, 80, 0.15); border-color: rgba(76, 175, 80, 0.4);"><span
-            class="material-icons">save</span>
-          Backups</button>
+        <a href="user-admin.html" class="pill-link"><span class="material-symbols-outlined">manage_accounts</span>User Admin</a>
         <button id="back-btn" class="pill-link" style="display: none;"><span
             class="material-symbols-outlined">arrow_back</span>Back</button>
         <a id="view-student-link" href="student.html" class="pill-link" target="_blank" rel="noopener"
@@ -320,58 +317,8 @@
     </div>
   </div>
 
-  <!-- Backup Management Modal -->
-  <div id="backup-modal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 700px;">
-      <div class="modal-header">
-        <h3><span class="material-icons">save</span>
-          Backup Management</h3>
-        <button class="modal-close" onclick="closeModal('backup-modal')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
-          <button onclick="createManualBackup('classes')" class="btn-secondary" style="flex: 1; min-width: 150px;">
-            <span class="material-icons">assignment</span> Backup Classes Now
-          </button>
-          <button onclick="createManualBackup('lessonPlans')" class="btn-secondary" style="flex: 1; min-width: 150px;">
-            <span class="material-icons">library_books</span> Backup Lesson
-            Plans Now
-          </button>
-          <button onclick="createManualBackup('notes')" class="btn-secondary" style="flex: 1; min-width: 150px;">
-            <span class="material-icons">sticky_note_2</span> Backup Notes Now
-          </button>
-        </div>
-
-        <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
-          <button onclick="showBackupList('classes')" class="backup-tab active" id="tab-classes">
-            Classes Backups
-          </button>
-          <button onclick="showBackupList('lessonPlans')" class="backup-tab" id="tab-lessonPlans">
-            Lesson Plans Backups
-          </button>
-          <button onclick="showBackupList('notes')" class="backup-tab" id="tab-notes">
-            Notes Backups
-          </button>
-        </div>
-
-        <div id="backup-list" style="max-height: 400px; overflow-y: auto;">
-          <p style="color: var(--muted); text-align: center; padding: 20px;">Loading backups...</p>
-        </div>
-
-        <div
-          style="margin-top: 16px; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; font-size: 13px; color: var(--muted);">
-          <strong>Auto-backup:</strong> Backups are automatically created when you save changes (max once per minute).
-          Up to 50 backups are kept per file. Backups are stored in the <code>backups/</code> folder.
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeModal('backup-modal')"><span
-            class="material-symbols-outlined">close</span>Close</button>
-      </div>
-    </div>
-  </div>
-
   <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth-guard.js"></script>
   <script src="assets/js/theme.js"></script>
   <script src="assets/js/admin.js"></script>
 </body>

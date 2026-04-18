@@ -61,24 +61,32 @@ python docs/serve.py
 
 Then open `http://localhost:8000` in your browser.
 
-## MongoDB Storage Model (v2)
+## Supabase Storage Model
 
-When `MONGODB_URI` is configured, the server now stores cloud data in normalized collections:
+When Supabase is configured, the server stores cloud data in normalized tables:
 
-- `classes`: one document per class
-- `lessonPlans`: one document per lesson plan (with class references)
-- `appDataHistory`: append-only snapshot records for version/history tracking
+- `bst_classes`: one row per class (`data` JSONB payload)
+- `bst_lesson_plans`: one row per lesson plan (`class_ids` + `data` JSONB)
+- `bst_notes`: one row per note (`data` JSONB)
+- `bst_app_data_history`: append-only history/snapshot records
 
-The legacy `appData` documents (`_id: "classes"` and `_id: "lessonPlans"`) are still supported for compatibility. If normalized collections are empty, the server auto-migrates legacy data on startup.
+Schema SQL is provided at `scripts/supabase/schema.sql`.
 
 For partial cloud updates (without writing full aggregate documents), use:
 
-- `PUT /api/mongo/classes/:classId`
-- `DELETE /api/mongo/classes/:classId`
-- `PUT /api/mongo/lessonPlans/:planId`
-- `DELETE /api/mongo/lessonPlans/:planId`
+- `PUT /api/supabase/classes/:classId`
+- `DELETE /api/supabase/classes/:classId`
+- `PUT /api/supabase/lessonPlans/:planId`
+- `DELETE /api/supabase/lessonPlans/:planId`
+- `PUT /api/supabase/notes/:noteId`
+- `DELETE /api/supabase/notes/:noteId`
 
-These routes require admin access and return `503` when MongoDB is disconnected.
+All partial cloud update routes use `/api/supabase/...`.
+
+Authentication for protected routes supports:
+
+- Supabase bearer session token (`Authorization: Bearer <access_token>`)
+- Optional fallback `BST_ADMIN_TOKEN`
 
 ## API Hardening (Remote Deployments)
 
@@ -179,34 +187,54 @@ ollama pull llama3
 - The app expects Ollama at `http://localhost:11434` (default)
 - Test by visiting [http://localhost:11434](http://localhost:11434) in your browser
 
-### 5. Set Up Your Own MongoDB Database
+### 5. Set Up Supabase Database + Authentication
 
-This app requires you to provide your own MongoDB database for cloud storage and syncing.
+This app requires your own Supabase project for cloud storage and authentication.
 
-#### a. Create a MongoDB Atlas Account (Recommended)
-- Go to [https://www.mongodb.com/atlas/database](https://www.mongodb.com/atlas/database) and sign up for a free account
-- Create a new project and cluster (the free tier is sufficient for most use cases)
-- In your cluster, click "Connect" and choose "Connect your application"
-- Copy the provided connection string (it will look like `mongodb+srv://<user>:<password>@cluster0.mongodb.net/<dbname>?retryWrites=true&w=majority`)
+#### a. Create a Supabase Project
+- Go to [https://supabase.com](https://supabase.com) and create a project
+- In **SQL Editor**, run `scripts/supabase/schema.sql` to create required tables
+- For invite-only signup flow, ensure these tables also exist (or set custom names via env vars):
+  - `bst_user_profiles` (username/email lookup)
+  - `bst_signup_invites` (invite code validation)
+  - `bst_signup_requests` (invite request submissions)
+- In **Authentication**, enable the sign-in methods you want (Email/Password is used by default)
 
-#### b. Set the `MONGODB_URI` Environment Variable
-- In your environment (or in a `.env` file), set:
-  ```bash
-  export MONGODB_URI="<your-connection-string>"
-  ```
-- Replace `<user>`, `<password>`, and `<dbname>` with your actual credentials
-- If running on Windows, use `set` instead of `export`:
-  ```cmd
-  set MONGODB_URI="<your-connection-string>"
-  ```
+#### b. Configure Environment Variables
+- Copy `.env.example` to `.env` and set:
+  - `SUPABASE_URL`
+  - `SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- Optional hardening:
+  - `SUPABASE_ALLOWED_EMAILS` to allowlist emails
+  - `SUPABASE_ALLOWED_ROLES` to allowlist roles
+  - `SUPABASE_ADMIN_EMAILS` to restrict admin-only pages and approval actions
+  - `SUPABASE_ADMIN_ROLES` to restrict admin-only pages and approval actions (defaults to `admin`)
+  - `BST_ADMIN_TOKEN` as fallback token auth
+- Optional auth/invite table overrides:
+  - `SUPABASE_USER_PROFILES_TABLE`
+  - `SUPABASE_SIGNUP_INVITES_TABLE`
+  - `SUPABASE_SIGNUP_REQUESTS_TABLE`
+- Optional first-admin bootstrap on startup:
+  - `BST_BOOTSTRAP_ADMIN_EMAIL`
+  - `BST_BOOTSTRAP_ADMIN_PASSWORD`
+  - `BST_BOOTSTRAP_ADMIN_USERNAME`
+- Optional signup request email notifications (to `shadowofthharvest@gmail.com`):
+  - `SMTP_HOST`
+  - `SMTP_PORT`
+  - `SMTP_USER`
+  - `SMTP_PASS`
+  - `SMTP_FROM`
 
-#### c. (Optional) Local MongoDB
-- You can also run a local MongoDB server if you prefer. See [MongoDB Community Edition](https://www.mongodb.com/try/download/community) for installation instructions.
-- Update `MONGODB_URI` to point to your local instance (e.g., `mongodb://localhost:27017/biblestudy`)
+#### c. Admin Approval Flow
+- `admin.html` and `user-admin.html` are now admin-only routes
+- The signup request approval page is at `/user-admin.html`
+- Approving a request creates an invite code in `bst_signup_invites` and marks the request as `approved`
+- To create the first admin automatically, set the `BST_BOOTSTRAP_ADMIN_*` variables and restart the server
 
 #### d. Start the Node Server
-- The app will automatically use your MongoDB database for all cloud storage features.
-- If `MONGODB_URI` is not set, cloud features will be disabled and saving will not work.
+- Start with `npm run dev` or `npm start`
+- If Supabase variables are missing, the app still runs in local-file mode but cloud sync/partial cloud updates are unavailable
 
 ### 6. Start the App
 - Open `index.html` (student view) and `teacher.html` (teacher view) in your browser

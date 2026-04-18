@@ -217,7 +217,7 @@ async function runHeavyChecks() {
     process.stdout.write(`[smoke] Starting server for ${mode} checks on ${baseUrl}\n`);
     await startServer();
     const status = await waitForServerReady();
-    process.stdout.write(`[smoke] Server ready (mongodb=${status.mongodb})\n`);
+    process.stdout.write(`[smoke] Server ready (supabase=${status.supabase})\n`);
 
     await runLightChecks();
     process.stdout.write('[smoke] Light checks passed.\n');

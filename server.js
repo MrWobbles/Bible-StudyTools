@@ -11,6 +11,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const ytdl = require('ytdl-core');
+const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const {
   connectDB,
@@ -27,10 +28,39 @@ const {
 } = require('./db');
 const { exec } = require('child_process');
 
+let nodemailer = null;
+try {
+  nodemailer = require('nodemailer');
+} catch (err) {
+  nodemailer = null;
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = (process.env.BST_ADMIN_TOKEN || process.env.ADMIN_TOKEN || '').trim();
 const SHOULD_AUTO_OPEN_BROWSER = process.env.BST_DISABLE_BROWSER_OPEN !== '1';
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
+const SUPABASE_ANON_KEY = String(process.env.SUPABASE_ANON_KEY || '').trim();
+const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const SUPABASE_AUTH_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const SUPABASE_SERVICE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+const SUPABASE_ALLOWED_EMAILS = parseCsvSet(process.env.SUPABASE_ALLOWED_EMAILS);
+const SUPABASE_ALLOWED_ROLES = parseCsvSet(process.env.SUPABASE_ALLOWED_ROLES);
+const SUPABASE_ADMIN_EMAILS = parseCsvSet(process.env.SUPABASE_ADMIN_EMAILS);
+const SUPABASE_ADMIN_ROLES = parseCsvSet(process.env.SUPABASE_ADMIN_ROLES || 'admin');
+const SIGNUP_REQUESTS_TABLE = String(process.env.SUPABASE_SIGNUP_REQUESTS_TABLE || 'bst_signup_requests').trim();
+const SIGNUP_INVITES_TABLE = String(process.env.SUPABASE_SIGNUP_INVITES_TABLE || 'bst_signup_invites').trim();
+const USER_PROFILES_TABLE = String(process.env.SUPABASE_USER_PROFILES_TABLE || 'bst_user_profiles').trim();
+const SIGNUP_NOTIFICATION_EMAIL = 'shadowofthharvest@gmail.com';
+const BOOTSTRAP_ADMIN_EMAIL = String(process.env.BST_BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
+const BOOTSTRAP_ADMIN_PASSWORD = String(process.env.BST_BOOTSTRAP_ADMIN_PASSWORD || '');
+const BOOTSTRAP_ADMIN_USERNAME_RAW = String(process.env.BST_BOOTSTRAP_ADMIN_USERNAME || '').trim();
+const SMTP_HOST = String(process.env.SMTP_HOST || '').trim();
+const SMTP_PORT = Number.parseInt(String(process.env.SMTP_PORT || '587'), 10);
+const SMTP_USER = String(process.env.SMTP_USER || '').trim();
+const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
+const SMTP_FROM = String(process.env.SMTP_FROM || SMTP_USER || `Bible Study Tools <${SIGNUP_NOTIFICATION_EMAIL}>`).trim();
+const AUTH_COOKIE_NAME = 'bst_access_token';
 
 app.disable('x-powered-by');
 
@@ -111,91 +141,31 @@ app.use(remoteWriteRateLimit);
 app.use(enforceRemoteCsrf);
 
 // Data directory
-const DATA_DIR = process.env.BST_DATA_DIR
-  ? path.resolve(process.env.BST_DATA_DIR)
-  : path.join(__dirname, 'assets', 'data');
 const VIDEO_DIR = process.env.BST_VIDEO_DIR
   ? path.resolve(process.env.BST_VIDEO_DIR)
   : path.join(__dirname, 'assets', 'video');
-const BACKUP_DIR = process.env.BST_BACKUP_DIR
-  ? path.resolve(process.env.BST_BACKUP_DIR)
-  : path.join(__dirname, 'backups');
-const BACKUP_FILE_PATTERN = /^(classes|lessonPlans|notes)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d{3}Z)?\.json$/;
 const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
-const DATA_FILE_MAP = {
-  classes: 'classes.json',
-  lessonplans: 'lessonPlans.json',
-  notes: 'notes.json'
+const DATA_DOC_MAP = {
+  classes: 'classes',
+  lessonplans: 'lessonPlans',
+  notes: 'notes'
 };
-const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'editor.html', 'student.html', 'teacher.html'];
+const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html'];
 const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
+const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html']);
+const ADMIN_HTML_FILES = new Set(['user-admin.html']);
 
-// Backup settings
-const MAX_BACKUPS_PER_FILE = 50; // Keep last 50 backups per file
-const BACKUP_THROTTLE_MS = 60000; // Don't create backups more than once per minute for same file
+const supabaseServiceClient = SUPABASE_SERVICE_ENABLED
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+  : null;
 
-// Track last backup time per file to avoid excessive backups
-const lastBackupTime = {};
-const fileWriteLocks = new Map();
 let serverInstance = null;
 let shutdownHandlersRegistered = false;
-
-function isPathInsideDirectory(rootDir, targetPath) {
-  const normalizedRoot = path.resolve(rootDir);
-  const normalizedTarget = path.resolve(targetPath);
-  const relative = path.relative(normalizedRoot, normalizedTarget);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
-function resolveDataFilePath(fileKey) {
-  const normalizedKey = String(fileKey || '').toLowerCase();
-  const fileName = DATA_FILE_MAP[normalizedKey];
-  if (!fileName) {
-    const error = new Error('Invalid file name. Use "classes", "lessonPlans", or "notes"');
-    error.status = 400;
-    throw error;
-  }
-
-  const resolvedPath = path.resolve(DATA_DIR, fileName);
-  if (!isPathInsideDirectory(DATA_DIR, resolvedPath)) {
-    const error = new Error('Resolved data path is outside the data directory');
-    error.status = 400;
-    throw error;
-  }
-
-  return { fileName, resolvedPath };
-}
-
-function resolveBackupPathOrThrow(candidate) {
-  const normalizedName = typeof candidate === 'string' ? candidate.trim() : '';
-
-  if (!normalizedName) {
-    const error = new Error('backupFileName is required');
-    error.status = 400;
-    throw error;
-  }
-
-  if (path.basename(normalizedName) !== normalizedName) {
-    const error = new Error('Backup file name must be a base name only');
-    error.status = 400;
-    throw error;
-  }
-
-  if (!BACKUP_FILE_PATTERN.test(normalizedName)) {
-    const error = new Error('Invalid backup file name format');
-    error.status = 400;
-    throw error;
-  }
-
-  const resolvedPath = path.resolve(BACKUP_DIR, normalizedName);
-  if (!isPathInsideDirectory(BACKUP_DIR, resolvedPath)) {
-    const error = new Error('Resolved backup path is outside the backup directory');
-    error.status = 400;
-    throw error;
-  }
-
-  return { backupFileName: normalizedName, backupPath: resolvedPath };
-}
 
 function isLoopbackRequest(req) {
   const candidates = [req.ip, req.socket?.remoteAddress]
@@ -210,32 +180,828 @@ function hasValidAdminToken(req) {
     return false;
   }
 
-  const authHeader = String(req.get('authorization') || '');
-  const bearerToken = authHeader.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length).trim()
-    : '';
+  const bearerToken = extractBearerToken(req);
   const headerToken = String(req.get('x-bst-admin-token') || '').trim();
 
   return areTokensEqual(headerToken, ADMIN_TOKEN) || areTokensEqual(bearerToken, ADMIN_TOKEN);
 }
 
-function requireAdminAccess(req, res, next) {
+function getCookieValue(req, key) {
+  const cookieHeader = String(req.get('cookie') || '');
+  if (!cookieHeader) {
+    return '';
+  }
+
+  const pairs = cookieHeader.split(';');
+  for (const pair of pairs) {
+    const [rawName, ...rest] = pair.split('=');
+    if (String(rawName || '').trim() !== key) {
+      continue;
+    }
+
+    const joined = rest.join('=');
+    try {
+      return decodeURIComponent(joined).trim();
+    } catch (err) {
+      return String(joined || '').trim();
+    }
+  }
+
+  return '';
+}
+
+function extractBearerToken(req) {
+  const authHeader = String(req.get('authorization') || '');
+  const headerToken = authHeader.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : '';
+
+  if (headerToken) {
+    return headerToken;
+  }
+
+  return getCookieValue(req, AUTH_COOKIE_NAME);
+}
+
+function setAuthCookie(res, accessToken, expiresInSeconds = 3600) {
+  const maxAgeMs = Math.max(60, Number.parseInt(String(expiresInSeconds || 3600), 10)) * 1000;
+  res.cookie(AUTH_COOKIE_NAME, accessToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: maxAgeMs
+  });
+}
+
+function clearAuthCookie(res) {
+  res.cookie(AUTH_COOKIE_NAME, '', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    expires: new Date(0)
+  });
+}
+
+function normalizeUsername(username) {
+  return String(username || '').trim().toLowerCase();
+}
+
+function isValidUsername(username) {
+  return /^[a-z0-9._-]{3,30}$/.test(username);
+}
+
+function getSupabaseUserEmail(user) {
+  return String(user?.email || '').trim().toLowerCase();
+}
+
+function getSupabaseUserRole(user) {
+  return String(user?.app_metadata?.role || '').trim().toLowerCase();
+}
+
+function getRequestOwnerUserId(req) {
+  return String(req?.authUser?.id || '').trim() || null;
+}
+
+function getRequestOwnerOptions(req) {
+  const ownerUserId = getRequestOwnerUserId(req);
+  return ownerUserId ? { ownerUserId } : null;
+}
+
+function toPublicAuthUser(user) {
+  return {
+    id: user.id,
+    email: user.email || null,
+    role: getSupabaseUserRole(user) || null,
+    isAdmin: isSupabaseAdminUser(user)
+  };
+}
+
+function isSupabaseAdminUser(user) {
+  if (!user || typeof user !== 'object') {
+    return false;
+  }
+
+  const email = getSupabaseUserEmail(user);
+  const role = getSupabaseUserRole(user);
+
+  if (SUPABASE_ADMIN_EMAILS.size > 0 && SUPABASE_ADMIN_EMAILS.has(email)) {
+    return true;
+  }
+
+  if (SUPABASE_ADMIN_ROLES.size > 0 && SUPABASE_ADMIN_ROLES.has(role)) {
+    return true;
+  }
+
+  return false;
+}
+
+async function resolveLoginEmail(identifier) {
+  const normalized = String(identifier || '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized.includes('@')) {
+    return normalized.toLowerCase();
+  }
+
+  if (!supabaseServiceClient) {
+    return '';
+  }
+
+  const username = normalizeUsername(normalized);
+  const { data, error } = await supabaseServiceClient
+    .from(USER_PROFILES_TABLE)
+    .select('email')
+    .eq('username', username)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to resolve username: ${error.message}`);
+  }
+
+  return String(data?.email || '').trim().toLowerCase();
+}
+
+async function findInviteRecord(inviteCode) {
+  if (!supabaseServiceClient) {
+    return null;
+  }
+
+  const normalizedCode = String(inviteCode || '').trim();
+  if (!normalizedCode) {
+    return null;
+  }
+
+  const { data, error } = await supabaseServiceClient
+    .from(SIGNUP_INVITES_TABLE)
+    .select('*')
+    .eq('invite_code', normalizedCode)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load invite code: ${error.message}`);
+  }
+
+  return data || null;
+}
+
+async function findSignupRequestById(requestId) {
+  if (!supabaseServiceClient) {
+    return null;
+  }
+
+  const normalizedId = Number.parseInt(String(requestId || ''), 10);
+  if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+    return null;
+  }
+
+  const { data, error } = await supabaseServiceClient
+    .from(SIGNUP_REQUESTS_TABLE)
+    .select('*')
+    .eq('id', normalizedId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, SIGNUP_REQUESTS_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to load signup request: ${error.message}`);
+  }
+
+  return data || null;
+}
+
+async function listSignupRequests(statusFilter) {
+  if (!supabaseServiceClient) {
+    return [];
+  }
+
+  let query = supabaseServiceClient
+    .from(SIGNUP_REQUESTS_TABLE)
+    .select('*')
+    .order('requested_at', { ascending: false })
+    .limit(200);
+
+  const normalizedStatus = String(statusFilter || '').trim().toLowerCase();
+  if (normalizedStatus) {
+    query = query.eq('status', normalizedStatus);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, SIGNUP_REQUESTS_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to load signup requests: ${error.message}`);
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+function generateInviteCode() {
+  return crypto.randomBytes(9).toString('base64url').replace(/[^A-Za-z0-9]/g, '').slice(0, 12).toUpperCase();
+}
+
+async function createInviteRecord(payload) {
+  if (!supabaseServiceClient) {
+    throw new Error('Supabase service role is not configured for invite creation.');
+  }
+
+  const suppliedInviteCode = String(payload.inviteCode || '').trim().toUpperCase();
+  const inviteEmail = String(payload.email || '').trim().toLowerCase() || null;
+  const expiresAt = payload.expiresAt || null;
+  const createdByUserId = String(payload.createdByUserId || '').trim() || null;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const inviteCode = suppliedInviteCode || generateInviteCode();
+    const { data, error } = await supabaseServiceClient
+      .from(SIGNUP_INVITES_TABLE)
+      .insert({
+        invite_code: inviteCode,
+        email: inviteEmail,
+        expires_at: expiresAt,
+        created_by_user_id: createdByUserId
+      })
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+
+    if (!error) {
+      return data || null;
+    }
+
+    const missingTableMessage = getMissingSupabaseTableMessage(error, SIGNUP_INVITES_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    const duplicateInvite = String(error.message || '').toLowerCase().includes('duplicate')
+      || String(error.message || '').toLowerCase().includes('unique');
+    if (duplicateInvite && !suppliedInviteCode) {
+      continue;
+    }
+
+    throw new Error(`Failed to create invite code: ${error.message}`);
+  }
+
+  throw new Error('Failed to generate a unique invite code. Try again.');
+}
+
+async function updateSignupRequestApproval(requestId, payload) {
+  if (!supabaseServiceClient) {
+    throw new Error('Supabase service role is not configured for signup approvals.');
+  }
+
+  const normalizedId = Number.parseInt(String(requestId || ''), 10);
+  const { data, error } = await supabaseServiceClient
+    .from(SIGNUP_REQUESTS_TABLE)
+    .update({
+      status: payload.status,
+      invite_code: payload.inviteCode || null,
+      approved_at: payload.approvedAt || null,
+      approved_by_user_id: payload.approvedByUserId || null
+    })
+    .eq('id', normalizedId)
+    .select('*')
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, SIGNUP_REQUESTS_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to update signup request: ${error.message}`);
+  }
+
+  return data || null;
+}
+
+function buildSupabaseAdminHeaders() {
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function createSupabaseAuthUser({ email, password, appMetadata = {}, userMetadata = {}, emailConfirm = true }) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: buildSupabaseAdminHeaders(),
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: emailConfirm,
+      app_metadata: appMetadata,
+      user_metadata: userMetadata
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.msg || payload?.error_description || payload?.error || 'Failed to create account.');
+  }
+
+  return payload;
+}
+
+async function updateSupabaseAuthUser(userId, payload) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(String(userId || '').trim())}`, {
+    method: 'PUT',
+    headers: buildSupabaseAdminHeaders(),
+    body: JSON.stringify(payload)
+  });
+
+  const responsePayload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(responsePayload?.msg || responsePayload?.error_description || responsePayload?.error || 'Failed to update account.');
+  }
+
+  return responsePayload;
+}
+
+async function deleteSupabaseAuthUser(userId, shouldSoftDelete = false) {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) {
+    throw new Error('A valid user id is required.');
+  }
+
+  const suffix = shouldSoftDelete ? '?should_soft_delete=true' : '';
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(normalizedUserId)}${suffix}`, {
+    method: 'DELETE',
+    headers: buildSupabaseAdminHeaders()
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.msg || payload?.error_description || payload?.error || 'Failed to delete account.');
+  }
+}
+
+async function findUserProfileByIdentifier(identifier) {
+  const normalized = String(identifier || '').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const normalizedEmail = normalized.toLowerCase();
+  const normalizedUsername = normalizeUsername(normalized);
+
+  const { data, error } = await supabaseServiceClient
+    .from(USER_PROFILES_TABLE)
+    .select('user_id, username, email')
+    .or(`email.eq.${normalizedEmail},username.eq.${normalizedUsername}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, USER_PROFILES_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to load account profile: ${error.message}`);
+  }
+
+  return data || null;
+}
+
+async function listAllUserProfiles() {
+  const { data, error } = await supabaseServiceClient
+    .from(USER_PROFILES_TABLE)
+    .select('user_id, username, email, created_at')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, USER_PROFILES_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to load user accounts: ${error.message}`);
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+async function deleteUserProfileRecord(userId) {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) {
+    return;
+  }
+
+  const { error } = await supabaseServiceClient
+    .from(USER_PROFILES_TABLE)
+    .delete()
+    .eq('user_id', normalizedUserId);
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, USER_PROFILES_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to remove user profile: ${error.message}`);
+  }
+}
+
+async function upsertUserProfileRecord(userId, username, email) {
+  const { error } = await supabaseServiceClient
+    .from(USER_PROFILES_TABLE)
+    .upsert({
+      user_id: userId,
+      username,
+      email,
+      created_at: new Date().toISOString()
+    }, {
+      onConflict: 'user_id'
+    });
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, USER_PROFILES_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to save user profile: ${error.message}`);
+  }
+}
+
+async function findExistingUserProfile(username, email) {
+  const { data, error } = await supabaseServiceClient
+    .from(USER_PROFILES_TABLE)
+    .select('user_id, username, email')
+    .or(`username.eq.${username},email.eq.${email}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, USER_PROFILES_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to validate uniqueness: ${error.message}`);
+  }
+
+  return data || null;
+}
+
+async function ensureBootstrapAdminAccount() {
+  if (!SUPABASE_SERVICE_ENABLED) {
+    return;
+  }
+
+  if (!BOOTSTRAP_ADMIN_EMAIL && !BOOTSTRAP_ADMIN_PASSWORD && !BOOTSTRAP_ADMIN_USERNAME_RAW) {
+    return;
+  }
+
+  if (!BOOTSTRAP_ADMIN_EMAIL || !BOOTSTRAP_ADMIN_PASSWORD) {
+    console.warn('[Supabase] Admin bootstrap skipped: set both BST_BOOTSTRAP_ADMIN_EMAIL and BST_BOOTSTRAP_ADMIN_PASSWORD.');
+    return;
+  }
+
+  const derivedUsername = BOOTSTRAP_ADMIN_USERNAME_RAW || BOOTSTRAP_ADMIN_EMAIL.split('@')[0] || 'admin';
+  const username = normalizeUsername(derivedUsername);
+  if (!isValidUsername(username)) {
+    console.warn('[Supabase] Admin bootstrap skipped: BST_BOOTSTRAP_ADMIN_USERNAME must be 3-30 chars using letters, numbers, dot, underscore, or dash.');
+    return;
+  }
+
+  try {
+    const existingProfile = await findExistingUserProfile(username, BOOTSTRAP_ADMIN_EMAIL);
+    if (existingProfile?.user_id) {
+      await updateSupabaseAuthUser(existingProfile.user_id, {
+        app_metadata: { role: 'admin' },
+        user_metadata: { username }
+      });
+      await upsertUserProfileRecord(existingProfile.user_id, username, BOOTSTRAP_ADMIN_EMAIL);
+      console.log(`[Supabase] Bootstrap admin ensured for ${BOOTSTRAP_ADMIN_EMAIL}.`);
+      return;
+    }
+
+    const createdUser = await createSupabaseAuthUser({
+      email: BOOTSTRAP_ADMIN_EMAIL,
+      password: BOOTSTRAP_ADMIN_PASSWORD,
+      appMetadata: { role: 'admin' },
+      userMetadata: { username },
+      emailConfirm: true
+    });
+
+    const userId = String(createdUser?.id || '').trim();
+    if (!userId) {
+      throw new Error('Supabase returned an invalid bootstrap admin user record.');
+    }
+
+    await upsertUserProfileRecord(userId, username, BOOTSTRAP_ADMIN_EMAIL);
+    console.log(`[Supabase] Bootstrap admin account created for ${BOOTSTRAP_ADMIN_EMAIL}.`);
+  } catch (err) {
+    console.error('[Supabase] Failed to bootstrap admin account:', err.message);
+  }
+}
+
+function getMissingSupabaseTableMessage(error, tableName) {
+  const message = String(error?.message || '').trim();
+  if (!message) {
+    return '';
+  }
+
+  const normalizedTable = String(tableName || '').trim();
+  const isMissingTableError = message.includes('schema cache')
+    || message.includes('Could not find the table')
+    || message.includes('relation') && message.includes('does not exist');
+
+  if (!isMissingTableError || !normalizedTable) {
+    return '';
+  }
+
+  return `Missing Supabase table \"public.${normalizedTable}\". Run scripts/supabase/schema.sql in the Supabase SQL editor, then retry after the schema cache refreshes.`;
+}
+
+async function markInviteUsed(inviteCode, userId) {
+  if (!supabaseServiceClient) {
+    return;
+  }
+
+  const { error } = await supabaseServiceClient
+    .from(SIGNUP_INVITES_TABLE)
+    .update({
+      used_at: new Date().toISOString(),
+      used_by_user_id: userId
+    })
+    .eq('invite_code', String(inviteCode || '').trim());
+
+  if (error) {
+    throw new Error(`Failed to mark invite as used: ${error.message}`);
+  }
+}
+
+async function saveSignupRequestToDatabase(payload) {
+  if (!supabaseServiceClient) {
+    throw new Error('Supabase service role is not configured for signup requests.');
+  }
+
+  const insertPayload = {
+    requested_at: new Date().toISOString(),
+    status: 'pending',
+    username: normalizeUsername(payload.username),
+    email: String(payload.email || '').trim().toLowerCase(),
+    display_name: String(payload.displayName || '').trim() || null,
+    message: String(payload.message || '').trim() || null,
+    source_ip: String(payload.sourceIp || '').trim() || null
+  };
+
+  const { data, error } = await supabaseServiceClient
+    .from(SIGNUP_REQUESTS_TABLE)
+    .insert(insertPayload)
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    const missingTableMessage = getMissingSupabaseTableMessage(error, SIGNUP_REQUESTS_TABLE);
+    if (missingTableMessage) {
+      throw new Error(missingTableMessage);
+    }
+
+    throw new Error(`Failed to save signup request: ${error.message}`);
+  }
+
+  return data || null;
+}
+
+async function sendSignupRequestNotification(payload) {
+  if (!nodemailer) {
+    return {
+      sent: false,
+      reason: 'Nodemailer is not installed.'
+    };
+  }
+
+  if (!SMTP_HOST || !Number.isInteger(SMTP_PORT) || !SMTP_USER || !SMTP_PASS) {
+    return {
+      sent: false,
+      reason: 'SMTP is not configured.'
+    };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS
+    }
+  });
+
+  const createdAt = new Date().toISOString();
+  const subject = `Signup request: ${payload.username}`;
+  const lines = [
+    'A new signup request was submitted.',
+    '',
+    `Username: ${payload.username}`,
+    `Email: ${payload.email}`,
+    `Name: ${payload.displayName || '(not provided)'}`,
+    `Submitted at: ${createdAt}`,
+    `Source IP: ${payload.sourceIp || '(unknown)'}`,
+    '',
+    'Message:',
+    payload.message || '(none)'
+  ];
+
+  await transporter.sendMail({
+    from: SMTP_FROM,
+    to: SIGNUP_NOTIFICATION_EMAIL,
+    subject,
+    text: lines.join('\n')
+  });
+
+  return { sent: true };
+}
+
+async function requireAuthenticatedPage(req, res, next) {
+  if (!SUPABASE_AUTH_ENABLED) {
+    return next();
+  }
+
+  const token = extractBearerToken(req);
+  if (!token) {
+    const redirect = encodeURIComponent(req.originalUrl || '/admin.html');
+    return res.redirect(`/auth.html?redirect=${redirect}`);
+  }
+
+  const user = await getSupabaseUserFromToken(token);
+  if (!user) {
+    clearAuthCookie(res);
+    const redirect = encodeURIComponent(req.originalUrl || '/admin.html');
+    return res.redirect(`/auth.html?redirect=${redirect}`);
+  }
+
+  req.authUser = user;
+  return next();
+}
+
+async function requireAdminPage(req, res, next) {
+  if (!SUPABASE_AUTH_ENABLED) {
+    return next();
+  }
+
+  const token = extractBearerToken(req);
+  if (!token) {
+    const redirect = encodeURIComponent(req.originalUrl || '/admin.html');
+    return res.redirect(`/auth.html?redirect=${redirect}`);
+  }
+
+  const user = await getSupabaseUserFromToken(token, { requireAdmin: true });
+  if (!user) {
+    clearAuthCookie(res);
+    const redirect = encodeURIComponent(req.originalUrl || '/admin.html');
+    return res.redirect(`/auth.html?redirect=${redirect}`);
+  }
+
+  req.authUser = user;
+  return next();
+}
+
+function parseCsvSet(rawValue) {
+  return new Set(
+    String(rawValue || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function isSupabaseUserAuthorized(user) {
+  if (!user || typeof user !== 'object') {
+    return false;
+  }
+
+  if (isSupabaseAdminUser(user)) {
+    return true;
+  }
+
+  if (SUPABASE_ALLOWED_EMAILS.size === 0 && SUPABASE_ALLOWED_ROLES.size === 0) {
+    return true;
+  }
+
+  const email = getSupabaseUserEmail(user);
+  const role = getSupabaseUserRole(user);
+
+  if (SUPABASE_ALLOWED_EMAILS.size > 0 && SUPABASE_ALLOWED_EMAILS.has(email)) {
+    return true;
+  }
+
+  if (SUPABASE_ALLOWED_ROLES.size > 0 && SUPABASE_ALLOWED_ROLES.has(role)) {
+    return true;
+  }
+
+  return false;
+}
+
+async function getSupabaseUserFromToken(accessToken, options = {}) {
+  if (!SUPABASE_AUTH_ENABLED || !accessToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const user = await response.json();
+    if (!isSupabaseUserAuthorized(user)) {
+      return null;
+    }
+
+    if (options.requireAdmin && !isSupabaseAdminUser(user)) {
+      return null;
+    }
+
+    return user;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function requireAdminAccess(req, res, next) {
   const isLoopback = isLoopbackRequest(req);
   if (isLoopback && !REQUIRE_ADMIN_ON_LOOPBACK) {
     return next();
   }
 
-  if (!ADMIN_TOKEN) {
+  if (hasValidAdminToken(req)) {
+    return next();
+  }
+
+  const bearerToken = extractBearerToken(req);
+  if (bearerToken) {
+    const user = await getSupabaseUserFromToken(bearerToken, { requireAdmin: true });
+    if (user) {
+      req.authUser = user;
+      return next();
+    }
+  }
+
+  if (!ADMIN_TOKEN && !SUPABASE_AUTH_ENABLED) {
     return res.status(403).json({
-      error: 'Remote write access is disabled. Set BST_ADMIN_TOKEN to allow authenticated remote administration.'
+      error: 'Remote write access is disabled. Configure Supabase auth or set BST_ADMIN_TOKEN.'
     });
   }
 
-  if (!hasValidAdminToken(req)) {
-    return res.status(401).json({ error: 'Admin token required' });
+  return res.status(401).json({
+    error: SUPABASE_AUTH_ENABLED
+      ? 'Authentication required. Sign in with Supabase or provide a valid admin token.'
+      : 'Admin token required'
+  });
+}
+
+async function requireAuthenticatedAccess(req, res, next) {
+  const isLoopback = isLoopbackRequest(req);
+  if (isLoopback && !REQUIRE_ADMIN_ON_LOOPBACK) {
+    return next();
   }
 
-  return next();
+  if (!SUPABASE_AUTH_ENABLED) {
+    return next();
+  }
+
+  if (hasValidAdminToken(req)) {
+    return next();
+  }
+
+  const bearerToken = extractBearerToken(req);
+  if (bearerToken) {
+    const user = await getSupabaseUserFromToken(bearerToken);
+    if (user) {
+      req.authUser = user;
+      return next();
+    }
+  }
+
+  return res.status(401).json({ error: 'Authentication required.' });
 }
 
 function isApiWriteRequest(req) {
@@ -412,12 +1178,6 @@ function requestAuditMiddleware(req, res, next) {
   return next();
 }
 
-async function readDataDocument(fileKey) {
-  const { resolvedPath } = resolveDataFilePath(fileKey);
-  const content = await fs.readFile(resolvedPath, 'utf8');
-  return JSON.parse(content);
-}
-
 function getHttpStatus(err, fallbackStatus = 500) {
   return err?.status && Number.isInteger(err.status) ? err.status : fallbackStatus;
 }
@@ -437,17 +1197,11 @@ function parseBooleanLike(value) {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-function shouldSkipCloudSync(req) {
-  const queryValue = req.query?.skipCloudSync;
-  const headerValue = req.get('x-bst-skip-cloud-sync');
-  return parseBooleanLike(queryValue) || parseBooleanLike(headerValue);
-}
-
-function requireMongoConnection(res) {
+function requireSupabaseConnection(res) {
   if (!isConnected()) {
     res.status(503).json({
-      error: 'MongoDB is disconnected. Partial cloud updates are unavailable.',
-      mongodb: 'disconnected'
+      error: 'Supabase is disconnected. Partial cloud updates are unavailable.',
+      supabase: 'disconnected'
     });
     return false;
   }
@@ -455,211 +1209,38 @@ function requireMongoConnection(res) {
   return true;
 }
 
-function areDocumentsEqual(firstDoc, secondDoc) {
-  return JSON.stringify(firstDoc) === JSON.stringify(secondDoc);
-}
-
-function withFileLock(lockKey, work) {
-  const previous = fileWriteLocks.get(lockKey) || Promise.resolve();
-  const current = previous
-    .catch(() => undefined)
-    .then(work);
-
-  fileWriteLocks.set(lockKey, current);
-  return current.finally(() => {
-    if (fileWriteLocks.get(lockKey) === current) {
-      fileWriteLocks.delete(lockKey);
-    }
-  });
-}
-
-async function writeJsonFileAtomic(targetPath, data) {
-  const payload = JSON.stringify(data, null, 2);
-  const dirPath = path.dirname(targetPath);
-  const tempPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
-
-  await fs.mkdir(dirPath, { recursive: true });
-
-  try {
-    await fs.writeFile(tempPath, payload, 'utf8');
-    await fs.rename(tempPath, targetPath);
-  } catch (err) {
-    try {
-      await fs.unlink(tempPath);
-    } catch (cleanupErr) {
-      // temp file may not exist; ignore cleanup errors
-    }
-    throw err;
-  }
-}
-
-async function syncDocumentToMongo(docId, data) {
-  if (!isConnected()) {
-    return {
-      ok: false,
-      state: 'disconnected',
-      message: 'Saved locally, but cloud sync is unavailable because MongoDB is disconnected.'
-    };
-  }
-
-  try {
-    const synced = await saveDoc(docId, data);
-    if (synced) {
-      return {
-        ok: true,
-        state: 'synced',
-        message: 'Saved locally and synced to cloud.'
-      };
-    }
-
-    return {
-      ok: false,
-      state: 'failed',
-      message: 'Saved locally, but cloud sync failed. Check MongoDB connectivity and logs.'
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      state: 'failed',
-      message: 'Saved locally, but cloud sync failed. Check MongoDB connectivity and logs.'
-    };
-  }
-}
-
-// ===== BACKUP FUNCTIONS =====
-
-/**
- * Compare two data objects for equality (using JSON serialization)
- */
-function dataHasChanged(currentData, newData) {
-  try {
-    return JSON.stringify(currentData) !== JSON.stringify(newData);
-  } catch {
-    // If serialization fails, assume data changed to be safe
-    return true;
-  }
-}
-
-/**
- * Create a backup of a file before saving
- */
-async function createBackup(fileName, data) {
-  try {
-    // Ensure backup directory exists
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
-
-    // Check throttle - don't backup if we just did one
-    const now = Date.now();
-    const lastTime = lastBackupTime[fileName] || 0;
-    if (now - lastTime < BACKUP_THROTTLE_MS) {
-      console.log(`[!] Backup throttled for ${fileName} (last backup ${Math.round((now - lastTime) / 1000)}s ago)`);
-      return null;
-    }
-
-    // Create timestamp-based backup filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFileName = `${path.basename(fileName, '.json')}_${timestamp}.json`;
-    const backupPath = path.join(BACKUP_DIR, backupFileName);
-
-    // Write backup atomically
-    await writeJsonFileAtomic(backupPath, data);
-    lastBackupTime[fileName] = now;
-    console.log(`[✓] Backup created: ${backupFileName}`);
-
-    // Clean old backups
-    await cleanOldBackups(fileName);
-
-    return backupFileName;
-  } catch (err) {
-    console.error('Error creating backup:', err);
-    return null;
-  }
-}
-
-/**
- * Clean old backups, keeping only the most recent ones
- */
-async function cleanOldBackups(fileName) {
-  try {
-    const baseName = path.basename(fileName, '.json');
-    const files = await fs.readdir(BACKUP_DIR);
-
-    // Filter backups for this file
-    const backups = files
-      .filter(f => f.startsWith(baseName + '_') && f.endsWith('.json'))
-      .sort()
-      .reverse(); // Newest first (ISO timestamp sorts correctly)
-
-    // Remove old backups beyond the limit
-    if (backups.length > MAX_BACKUPS_PER_FILE) {
-      const toDelete = backups.slice(MAX_BACKUPS_PER_FILE);
-      for (const file of toDelete) {
-        await fs.unlink(path.join(BACKUP_DIR, file));
-        console.log(`[✓] Deleted old backup: ${file}`);
-      }
-    }
-  } catch (err) {
-    console.error('Error cleaning old backups:', err);
-  }
-}
-
-/**
- * List all backups for a specific file
- */
-async function listBackups(fileName) {
-  try {
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
-    const baseName = path.basename(fileName, '.json');
-    const files = await fs.readdir(BACKUP_DIR);
-
-    const backups = files
-      .filter(f => f.startsWith(baseName + '_') && f.endsWith('.json'))
-      .sort()
-      .reverse()
-      .map(f => {
-        // Parse timestamp from filename
-        const match = f.match(/_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
-        const timestamp = match ? match[1].replace(/-/g, (m, i) => i > 9 ? ':' : '-').replace('T', ' ') : 'Unknown';
-        return {
-          fileName: f,
-          timestamp,
-          displayName: timestamp.replace('T', ' ').substring(0, 19)
-        };
-      });
-
-    return backups;
-  } catch (err) {
-    console.error('Error listing backups:', err);
-    return [];
-  }
-}
-
 // ===== API ENDPOINTS =====
 
-app.get('/api/data/:fileName', async (req, res) => {
+app.get('/api/data/:fileName', requireAuthenticatedAccess, async (req, res) => {
   try {
-    const data = await readDataDocument(req.params.fileName);
+    const key = String(req.params.fileName || '').toLowerCase();
+    const docId = DATA_DOC_MAP[key];
+    if (!docId) {
+      return res.status(400).json({ error: 'Invalid data key. Use "classes", "lessonPlans", or "notes".' });
+    }
+    if (!isConnected()) {
+      return res.status(503).json({ error: 'Supabase is disconnected. Data is unavailable.' });
+    }
+    const ownerOptions = getRequestOwnerOptions(req);
+    const data = ownerOptions
+      ? await loadDoc(docId, ownerOptions)
+      : await loadDoc(docId);
+    if (!data) {
+      return res.status(404).json({ error: 'Data not found' });
+    }
     res.json(data);
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      return res.status(404).json({ error: 'Data file not found' });
-    }
-    sendApiError(res, err, 'Failed to load data file');
+    sendApiError(res, err, 'Failed to load data');
   }
 });
 
 /**
  * POST /api/save/classes
- * Save classes.json with automatic backup
+ * Save classes document to Supabase
  */
-app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
+app.post('/api/save/classes', requireAuthenticatedAccess, async (req, res) => {
   try {
-    const filePath = path.join(DATA_DIR, 'classes.json');
-    const parsed = parseBodyWithSchema(
-      classesSaveSchema,
-      req.body,
-      'Invalid classes payload'
-    );
+    const parsed = parseBodyWithSchema(classesSaveSchema, req.body, 'Invalid classes payload');
     if (!parsed.ok) {
       return res.status(parsed.status).json({
         error: parsed.error,
@@ -667,53 +1248,19 @@ app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
       });
     }
 
-    const data = parsed.data;
-    const skipCloudSync = shouldSkipCloudSync(req);
-
-    const { backupFile, cloudSync } = await withFileLock('classes.json', async () => {
-      let backupFileName = null;
-
-      try {
-        const currentContent = await fs.readFile(filePath, 'utf8');
-        const currentData = JSON.parse(currentContent);
-        if (dataHasChanged(currentData, data)) {
-          backupFileName = await createBackup('classes.json', currentData);
-        } else {
-          console.log('[Backup] No changes detected in classes.json, skipping backup');
-        }
-      } catch (err) {
-        if (err.code !== 'ENOENT') {
-          console.warn('[Backup] Could not capture pre-save classes.json backup:', err.message);
-        }
-      }
-
-      await writeJsonFileAtomic(filePath, data);
-      console.log('[✓] Saved classes.json (atomic write)');
-
-      const syncResult = skipCloudSync
-        ? {
-          ok: true,
-          state: 'skipped',
-          message: 'Cloud sync skipped by request flag.'
-        }
-        : await syncDocumentToMongo('classes', data);
-      return { backupFile: backupFileName, cloudSync: syncResult };
-    });
-
-    const response = {
-      success: true,
-      message: 'Classes saved successfully',
-      backup: backupFile,
-      mongoSync: cloudSync.ok,
-      cloudSync
-    };
-
-    if (!cloudSync.ok) {
-      response.partialSuccess = true;
-      response.warning = cloudSync.message;
+    if (!isConnected()) {
+      return res.status(503).json({ error: 'Supabase is disconnected. Cannot save classes.' });
     }
 
-    res.json(response);
+    const ownerOptions = getRequestOwnerOptions(req);
+    const ok = ownerOptions
+      ? await saveDoc('classes', parsed.data, ownerOptions)
+      : await saveDoc('classes', parsed.data);
+    if (!ok) {
+      return res.status(500).json({ error: 'Failed to save classes to Supabase.' });
+    }
+
+    res.json({ success: true, message: 'Classes saved successfully' });
   } catch (err) {
     console.error('Error saving classes:', err);
     sendApiError(res, err, 'Failed to save classes');
@@ -722,19 +1269,14 @@ app.post('/api/save/classes', requireAdminAccess, async (req, res) => {
 
 /**
  * POST /api/save/lessonPlans
- * Save lessonPlans.json with automatic backup
+ * Save lesson plans document to Supabase
  */
 app.post([
   `/api/save/${LESSON_PLANS_SEGMENT}`,
   `/api/save/${LEGACY_LESSON_PLANS_SEGMENT}`
-], markLegacyLessonPlansRoute, requireAdminAccess, async (req, res) => {
+], markLegacyLessonPlansRoute, requireAuthenticatedAccess, async (req, res) => {
   try {
-    const filePath = path.join(DATA_DIR, 'lessonPlans.json');
-    const parsed = parseBodyWithSchema(
-      lessonPlansSaveSchema,
-      req.body,
-      'Invalid lesson plans payload'
-    );
+    const parsed = parseBodyWithSchema(lessonPlansSaveSchema, req.body, 'Invalid lesson plans payload');
     if (!parsed.ok) {
       return res.status(parsed.status).json({
         error: parsed.error,
@@ -742,53 +1284,19 @@ app.post([
       });
     }
 
-    const data = parsed.data;
-    const skipCloudSync = shouldSkipCloudSync(req);
-
-    const { backupFile, cloudSync } = await withFileLock('lessonPlans.json', async () => {
-      let backupFileName = null;
-
-      try {
-        const currentContent = await fs.readFile(filePath, 'utf8');
-        const currentData = JSON.parse(currentContent);
-        if (dataHasChanged(currentData, data)) {
-          backupFileName = await createBackup('lessonPlans.json', currentData);
-        } else {
-          console.log('[Backup] No changes detected in lessonPlans.json, skipping backup');
-        }
-      } catch (err) {
-        if (err.code !== 'ENOENT') {
-          console.warn('[Backup] Could not capture pre-save lessonPlans.json backup:', err.message);
-        }
-      }
-
-      await writeJsonFileAtomic(filePath, data);
-      console.log('[✓] Saved lessonPlans.json (atomic write)');
-
-      const syncResult = skipCloudSync
-        ? {
-          ok: true,
-          state: 'skipped',
-          message: 'Cloud sync skipped by request flag.'
-        }
-        : await syncDocumentToMongo('lessonPlans', data);
-      return { backupFile: backupFileName, cloudSync: syncResult };
-    });
-
-    const response = {
-      success: true,
-      message: 'Lesson plans saved successfully',
-      backup: backupFile,
-      mongoSync: cloudSync.ok,
-      cloudSync
-    };
-
-    if (!cloudSync.ok) {
-      response.partialSuccess = true;
-      response.warning = cloudSync.message;
+    if (!isConnected()) {
+      return res.status(503).json({ error: 'Supabase is disconnected. Cannot save lesson plans.' });
     }
 
-    res.json(response);
+    const ownerOptions = getRequestOwnerOptions(req);
+    const ok = ownerOptions
+      ? await saveDoc('lessonPlans', parsed.data, ownerOptions)
+      : await saveDoc('lessonPlans', parsed.data);
+    if (!ok) {
+      return res.status(500).json({ error: 'Failed to save lesson plans to Supabase.' });
+    }
+
+    res.json({ success: true, message: 'Lesson plans saved successfully' });
   } catch (err) {
     console.error('Error saving lesson plans:', err);
     sendApiError(res, err, 'Failed to save lesson plans');
@@ -797,16 +1305,11 @@ app.post([
 
 /**
  * POST /api/save/notes
- * Save notes.json with automatic backup
+ * Save notes document to Supabase
  */
-app.post('/api/save/notes', requireAdminAccess, async (req, res) => {
+app.post('/api/save/notes', requireAuthenticatedAccess, async (req, res) => {
   try {
-    const filePath = path.join(DATA_DIR, 'notes.json');
-    const parsed = parseBodyWithSchema(
-      notesSaveSchema,
-      req.body,
-      'Invalid notes payload'
-    );
+    const parsed = parseBodyWithSchema(notesSaveSchema, req.body, 'Invalid notes payload');
     if (!parsed.ok) {
       return res.status(parsed.status).json({
         error: parsed.error,
@@ -814,170 +1317,22 @@ app.post('/api/save/notes', requireAdminAccess, async (req, res) => {
       });
     }
 
-    const data = parsed.data;
+    if (!isConnected()) {
+      return res.status(503).json({ error: 'Supabase is disconnected. Cannot save notes.' });
+    }
 
-    const { backupFile } = await withFileLock('notes.json', async () => {
-      let backupFileName = null;
+    const ownerOptions = getRequestOwnerOptions(req);
+    const ok = ownerOptions
+      ? await saveDoc('notes', parsed.data, ownerOptions)
+      : await saveDoc('notes', parsed.data);
+    if (!ok) {
+      return res.status(500).json({ error: 'Failed to save notes to Supabase.' });
+    }
 
-      try {
-        const currentContent = await fs.readFile(filePath, 'utf8');
-        const currentData = JSON.parse(currentContent);
-        if (dataHasChanged(currentData, data)) {
-          backupFileName = await createBackup('notes.json', currentData);
-        } else {
-          console.log('[Backup] No changes detected in notes.json, skipping backup');
-        }
-      } catch (err) {
-        if (err.code !== 'ENOENT') {
-          console.warn('[Backup] Could not capture pre-save notes.json backup:', err.message);
-        }
-      }
-
-      await writeJsonFileAtomic(filePath, data);
-      console.log('[✓] Saved notes.json (atomic write)');
-
-      return { backupFile: backupFileName };
-    });
-
-    res.json({
-      success: true,
-      message: 'Notes saved successfully',
-      backup: backupFile
-    });
+    res.json({ success: true, message: 'Notes saved successfully' });
   } catch (err) {
     console.error('Error saving notes:', err);
     sendApiError(res, err, 'Failed to save notes');
-  }
-});
-
-/**
- * GET /api/backups/:fileName
- * List all backups for a specific file (classes, lessonPlans, or notes)
- */
-app.get('/api/backups/:fileName', requireAdminAccess, async (req, res) => {
-  try {
-    const { fileName } = resolveDataFilePath(req.params.fileName);
-    const backups = await listBackups(fileName);
-    res.json({ success: true, backups });
-  } catch (err) {
-    console.error('Error listing backups:', err);
-    sendApiError(res, err, 'Failed to list backups');
-  }
-});
-
-/**
- * POST /api/backups/restore
- * Restore a specific backup
- * Body: { backupFileName: "classes_2026-02-28T10-30-00.json" }
- */
-app.post('/api/backups/restore', requireAdminAccess, async (req, res) => {
-  try {
-    const { backupFileName, backupPath } = resolveBackupPathOrThrow(req.body?.backupFileName);
-
-    // Check if backup exists
-    try {
-      await fs.stat(backupPath);
-    } catch (err) {
-      return res.status(404).json({ error: 'Backup file not found' });
-    }
-
-    // Read backup content
-    const backupContent = await fs.readFile(backupPath, 'utf8');
-    const backupData = JSON.parse(backupContent);
-
-    // Determine target file
-    const targetFileName = backupFileName.startsWith('classes') ? 'classes.json' : 'lessonPlans.json';
-    const targetPath = path.join(DATA_DIR, targetFileName);
-    const targetDocId = targetFileName === 'classes.json' ? 'classes' : 'lessonPlans';
-
-    const cloudSync = await withFileLock(targetFileName, async () => {
-      // Read current file and backup it before restoring
-      try {
-        const currentContent = await fs.readFile(targetPath, 'utf8');
-        const currentData = JSON.parse(currentContent);
-        await createBackup(targetFileName, currentData);
-      } catch (err) {
-        // Current file might not exist, that's ok
-      }
-
-      // Restore the backup atomically
-      await writeJsonFileAtomic(targetPath, backupData);
-      console.log(`[✓] Restored ${targetFileName} from ${backupFileName} (atomic write)`);
-
-      // Re-sync Mongo immediately so local and remote do not drift after restore
-      return syncDocumentToMongo(targetDocId, backupData);
-    });
-
-    const response = {
-      success: true,
-      message: `Restored ${targetFileName} from backup`,
-      restoredFrom: backupFileName,
-      mongoSync: cloudSync.ok,
-      cloudSync
-    };
-
-    if (!cloudSync.ok) {
-      response.partialSuccess = true;
-      response.warning = cloudSync.message;
-    }
-
-    res.json(response);
-  } catch (err) {
-    console.error('Error restoring backup:', err);
-    sendApiError(res, err, 'Failed to restore backup');
-  }
-});
-
-/**
- * DELETE /api/backups/:backupFileName
- * Delete a specific backup
- */
-app.delete('/api/backups/:backupFileName', requireAdminAccess, async (req, res) => {
-  try {
-    const { backupFileName, backupPath } = resolveBackupPathOrThrow(req.params.backupFileName);
-
-    await fs.unlink(backupPath);
-    console.log(`[✓] Deleted backup: ${backupFileName}`);
-
-    res.json({ success: true, message: 'Backup deleted' });
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      return res.status(404).json({ error: 'Backup file not found' });
-    }
-    console.error('Error deleting backup:', err);
-    sendApiError(res, err, 'Failed to delete backup');
-  }
-});
-
-/**
- * POST /api/backups/create
- * Manually create a backup of current data
- * Body: { fileName: "classes" or "lessonPlans" }
- */
-app.post('/api/backups/create', requireAdminAccess, async (req, res) => {
-  try {
-    const { fileName: sourceFile, resolvedPath: sourcePath } = resolveDataFilePath(req.body?.fileName);
-
-    // Read current data
-    const content = await fs.readFile(sourcePath, 'utf8');
-    const data = JSON.parse(content);
-
-    // Force create backup (bypass throttle for manual backups)
-    delete lastBackupTime[sourceFile];
-    const backupFile = await createBackup(sourceFile, data);
-
-    if (backupFile) {
-      res.json({
-        success: true,
-        message: 'Backup created successfully',
-        backupFileName: backupFile
-      });
-    } else {
-      res.status(500).json({ error: 'Failed to create backup' });
-    }
-  } catch (err) {
-    console.error('Error creating manual backup:', err);
-    sendApiError(res, err, 'Failed to create backup');
   }
 });
 
@@ -989,17 +1344,455 @@ app.get('/api/status', (req, res) => {
   res.json({
     status: 'ok',
     message: 'API is running',
-    mongodb: isConnected() ? 'connected' : 'disconnected'
+    supabase: isConnected() ? 'connected' : 'disconnected'
+  });
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  if (!SUPABASE_AUTH_ENABLED) {
+    return res.status(503).json({ error: 'Supabase auth is not configured on this server.' });
+  }
+
+  const identifier = String(req.body?.identifier || req.body?.email || '').trim();
+  const password = String(req.body?.password || '');
+
+  if (!identifier || !password) {
+    return res.status(400).json({ error: 'identifier and password are required' });
+  }
+
+  try {
+    const email = await resolveLoginEmail(identifier);
+    if (!email) {
+      return res.status(401).json({ error: 'Invalid username/email or password.' });
+    }
+
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      return res.status(401).json({ error: payload?.error_description || payload?.error || 'Login failed' });
+    }
+
+    const user = await getSupabaseUserFromToken(String(payload.access_token || ''));
+    if (!user) {
+      return res.status(403).json({ error: 'Authenticated user is not allowed to access this server.' });
+    }
+
+    setAuthCookie(res, String(payload.access_token || ''), payload.expires_in);
+
+    return res.json({
+      success: true,
+      session: {
+        accessToken: payload.access_token,
+        refreshToken: payload.refresh_token,
+        tokenType: payload.token_type,
+        expiresIn: payload.expires_in,
+        expiresAt: payload.expires_at,
+        user: toPublicAuthUser(user)
+      },
+      defaultRedirect: '/admin.html'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to authenticate with Supabase.' });
+  }
+});
+
+app.post('/api/auth/signup', async (req, res) => {
+  if (!SUPABASE_AUTH_ENABLED || !SUPABASE_SERVICE_ENABLED) {
+    return res.status(503).json({ error: 'Supabase signup is not configured on this server.' });
+  }
+
+  const username = normalizeUsername(req.body?.username);
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const password = String(req.body?.password || '');
+  const inviteCode = String(req.body?.inviteCode || '').trim();
+
+  if (!isValidUsername(username)) {
+    return res.status(400).json({ error: 'Username must be 3-30 chars using letters, numbers, dot, underscore, or dash.' });
+  }
+
+  if (!email || !password || !inviteCode) {
+    return res.status(400).json({ error: 'username, email, password, and inviteCode are required.' });
+  }
+
+  try {
+    const invite = await findInviteRecord(inviteCode);
+    if (!invite) {
+      return res.status(403).json({ error: 'Invitation code is invalid.' });
+    }
+
+    if (invite.used_at) {
+      return res.status(403).json({ error: 'Invitation code has already been used.' });
+    }
+
+    if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
+      return res.status(403).json({ error: 'Invitation code has expired.' });
+    }
+
+    const inviteEmail = String(invite.email || '').trim().toLowerCase();
+    if (inviteEmail && inviteEmail !== email) {
+      return res.status(403).json({ error: 'Invitation code does not match this email address.' });
+    }
+
+    const existingProfile = await findExistingUserProfile(username, email);
+    if (existingProfile) {
+      return res.status(409).json({ error: 'Username or email is already registered.' });
+    }
+
+    const createUserPayload = await createSupabaseAuthUser({
+      email,
+      password,
+      appMetadata: { role: 'teacher' },
+      userMetadata: { username },
+      emailConfirm: true
+    });
+
+    const userId = String(createUserPayload?.id || '').trim();
+    if (!userId) {
+      return res.status(500).json({ error: 'Supabase returned an invalid user record.' });
+    }
+
+    await upsertUserProfileRecord(userId, username, email);
+
+    await markInviteUsed(inviteCode, userId);
+
+    return res.json({
+      success: true,
+      message: 'Account created successfully. You can now sign in.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to sign up.' });
+  }
+});
+
+app.get('/api/admin/signup-requests', requireAdminAccess, async (req, res) => {
+  if (!SUPABASE_SERVICE_ENABLED || !supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase admin request management is not configured on this server.' });
+  }
+
+  try {
+    const status = String(req.query?.status || '').trim();
+    const requests = await listSignupRequests(status);
+    return res.json({ success: true, requests });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to load signup requests.' });
+  }
+});
+
+app.get('/api/admin/accounts', requireAdminAccess, async (req, res) => {
+  if (!SUPABASE_SERVICE_ENABLED || !supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase admin account management is not configured on this server.' });
+  }
+
+  try {
+    const accounts = await listAllUserProfiles();
+    return res.json({ success: true, accounts });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to load user accounts.' });
+  }
+});
+
+app.post('/api/admin/signup-requests/:requestId/approve', requireAdminAccess, async (req, res) => {
+  if (!SUPABASE_SERVICE_ENABLED || !supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase admin request management is not configured on this server.' });
+  }
+
+  const requestId = Number.parseInt(String(req.params.requestId || ''), 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'requestId must be a positive integer.' });
+  }
+
+  const inviteCode = String(req.body?.inviteCode || '').trim().toUpperCase();
+  const expiresInDays = Number.parseInt(String(req.body?.expiresInDays || '7'), 10);
+  if (!Number.isInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 90) {
+    return res.status(400).json({ error: 'expiresInDays must be an integer between 1 and 90.' });
+  }
+
+  try {
+    const signupRequest = await findSignupRequestById(requestId);
+    if (!signupRequest) {
+      return res.status(404).json({ error: 'Signup request not found.' });
+    }
+
+    if (String(signupRequest.status || '').trim().toLowerCase() === 'approved') {
+      return res.status(409).json({ error: 'Signup request has already been approved.' });
+    }
+
+    const approvedAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString();
+    const createdInvite = await createInviteRecord({
+      inviteCode,
+      email: signupRequest.email,
+      expiresAt,
+      createdByUserId: req.authUser?.id || null
+    });
+
+    const updatedRequest = await updateSignupRequestApproval(requestId, {
+      status: 'approved',
+      inviteCode: String(createdInvite?.invite_code || '').trim() || inviteCode,
+      approvedAt,
+      approvedByUserId: req.authUser?.id || null
+    });
+
+    return res.json({
+      success: true,
+      inviteCode: String(createdInvite?.invite_code || '').trim() || inviteCode,
+      invite: createdInvite,
+      request: updatedRequest,
+      message: 'Signup request approved.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to approve signup request.' });
+  }
+});
+
+app.post('/api/admin/signup-requests/:requestId/reject', requireAdminAccess, async (req, res) => {
+  if (!SUPABASE_SERVICE_ENABLED || !supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase admin request management is not configured on this server.' });
+  }
+
+  const requestId = Number.parseInt(String(req.params.requestId || ''), 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ error: 'requestId must be a positive integer.' });
+  }
+
+  const reason = String(req.body?.reason || '').trim();
+
+  try {
+    const signupRequest = await findSignupRequestById(requestId);
+    if (!signupRequest) {
+      return res.status(404).json({ error: 'Signup request not found.' });
+    }
+
+    const currentStatus = String(signupRequest.status || '').trim().toLowerCase();
+    if (currentStatus === 'approved') {
+      return res.status(409).json({ error: 'Approved requests cannot be rejected.' });
+    }
+
+    if (currentStatus === 'rejected') {
+      return res.status(409).json({ error: 'Signup request has already been rejected.' });
+    }
+
+    const updatedRequest = await updateSignupRequestApproval(requestId, {
+      status: 'rejected',
+      inviteCode: null,
+      approvedAt: new Date().toISOString(),
+      approvedByUserId: req.authUser?.id || null
+    });
+
+    if (reason && supabaseServiceClient) {
+      await supabaseServiceClient
+        .from(SIGNUP_REQUESTS_TABLE)
+        .update({ message: `${String(signupRequest.message || '').trim()}\n\n[Rejected by admin] ${reason}`.trim() })
+        .eq('id', requestId);
+    }
+
+    return res.json({
+      success: true,
+      request: updatedRequest,
+      message: 'Signup request rejected.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to reject signup request.' });
+  }
+});
+
+app.post('/api/admin/accounts/reset-password', requireAdminAccess, async (req, res) => {
+  if (!SUPABASE_SERVICE_ENABLED || !supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase admin account management is not configured on this server.' });
+  }
+
+  const identifier = String(req.body?.identifier || '').trim();
+  const newPassword = String(req.body?.newPassword || '');
+
+  if (!identifier || !newPassword) {
+    return res.status(400).json({ error: 'identifier and newPassword are required.' });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'newPassword must be at least 8 characters.' });
+  }
+
+  try {
+    const profile = await findUserProfileByIdentifier(identifier);
+    if (!profile?.user_id) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    await updateSupabaseAuthUser(profile.user_id, {
+      password: newPassword
+    });
+
+    return res.json({
+      success: true,
+      userId: profile.user_id,
+      identifier: profile.email || profile.username,
+      message: 'Password reset successfully.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to reset password.' });
+  }
+});
+
+app.delete('/api/admin/accounts/:identifier', requireAdminAccess, async (req, res) => {
+  if (!SUPABASE_SERVICE_ENABLED || !supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase admin account management is not configured on this server.' });
+  }
+
+  const identifier = String(req.params.identifier || '').trim();
+  if (!identifier) {
+    return res.status(400).json({ error: 'identifier is required.' });
+  }
+
+  try {
+    const profile = await findUserProfileByIdentifier(identifier);
+    if (!profile?.user_id) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    const targetUserId = String(profile.user_id || '').trim();
+    if (req.authUser?.id && targetUserId === String(req.authUser.id).trim()) {
+      return res.status(400).json({ error: 'You cannot remove the account currently in use.' });
+    }
+
+    await deleteSupabaseAuthUser(targetUserId, false);
+    await deleteUserProfileRecord(targetUserId);
+
+    return res.json({
+      success: true,
+      userId: targetUserId,
+      identifier: profile.email || profile.username,
+      message: 'Account removed successfully.'
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to remove account.' });
+  }
+});
+
+app.post('/api/auth/signup-request', async (req, res) => {
+  const username = normalizeUsername(req.body?.username);
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const displayName = String(req.body?.displayName || '').trim();
+  const message = String(req.body?.message || '').trim();
+
+  if (!isValidUsername(username)) {
+    return res.status(400).json({ error: 'Username must be 3-30 chars using letters, numbers, dot, underscore, or dash.' });
+  }
+
+  if (!email) {
+    return res.status(400).json({ error: 'email is required.' });
+  }
+
+  try {
+    const sourceIp = String(req.ip || req.socket?.remoteAddress || '').trim();
+    const payload = {
+      username,
+      email,
+      displayName,
+      message,
+      sourceIp
+    };
+
+    const row = await saveSignupRequestToDatabase(payload);
+    const notification = await sendSignupRequestNotification(payload);
+
+    return res.status(notification.sent ? 200 : 202).json({
+      success: true,
+      message: notification.sent
+        ? 'Signup request submitted successfully.'
+        : 'Signup request saved, but email notification is not configured.',
+      requestId: row?.id || null,
+      notificationSent: notification.sent
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to submit signup request.' });
+  }
+});
+
+app.post('/api/auth/refresh', async (req, res) => {
+  if (!SUPABASE_AUTH_ENABLED) {
+    return res.status(503).json({ error: 'Supabase auth is not configured on this server.' });
+  }
+
+  const refreshToken = String(req.body?.refreshToken || '').trim();
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'refreshToken is required' });
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      return res.status(401).json({ error: payload?.error_description || payload?.error || 'Token refresh failed' });
+    }
+
+    const user = await getSupabaseUserFromToken(String(payload.access_token || ''));
+    if (!user) {
+      return res.status(403).json({ error: 'Authenticated user is not allowed to access this server.' });
+    }
+
+    setAuthCookie(res, String(payload.access_token || ''), payload.expires_in);
+
+    return res.json({
+      success: true,
+      session: {
+        accessToken: payload.access_token,
+        refreshToken: payload.refresh_token,
+        tokenType: payload.token_type,
+        expiresIn: payload.expires_in,
+        expiresAt: payload.expires_at,
+        user: toPublicAuthUser(user)
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to refresh Supabase session.' });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  clearAuthCookie(res);
+  return res.json({ success: true });
+});
+
+app.get('/api/auth/me', async (req, res) => {
+  const token = extractBearerToken(req);
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+
+  const user = await getSupabaseUserFromToken(token);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid or expired session.' });
+  }
+
+  return res.json({
+    success: true,
+    user: toPublicAuthUser(user)
   });
 });
 
 /**
- * PUT /api/mongo/classes/:classId
- * Upsert a single class record directly in MongoDB normalized storage
+ * PUT /api/supabase/classes/:classId
+ * Upsert a single class record directly in cloud normalized storage
  */
-app.put('/api/mongo/classes/:classId', requireAdminAccess, async (req, res) => {
+app.put('/api/supabase/classes/:classId', requireAuthenticatedAccess, async (req, res) => {
   try {
-    if (!requireMongoConnection(res)) {
+    if (!requireSupabaseConnection(res)) {
       return;
     }
 
@@ -1010,31 +1803,34 @@ app.put('/api/mongo/classes/:classId', requireAdminAccess, async (req, res) => {
       return res.status(400).json({ error: 'Invalid class payload' });
     }
 
-    const saved = await upsertClassRecord(classId, classData, 'api-partial-upsert');
+    const ownerOptions = getRequestOwnerOptions(req);
+    const saved = ownerOptions
+      ? await upsertClassRecord(classId, classData, 'api-partial-upsert', ownerOptions)
+      : await upsertClassRecord(classId, classData, 'api-partial-upsert');
     if (!saved) {
       return res.status(400).json({ error: 'Unable to upsert class record' });
     }
 
     return res.json({
       success: true,
-      message: 'Class upserted in MongoDB',
+      message: 'Class upserted in Supabase',
       classId,
       class: saved,
-      mongodb: 'connected'
+      supabase: 'connected'
     });
   } catch (err) {
-    console.error('Error upserting Mongo class:', err);
-    sendApiError(res, err, 'Failed to upsert Mongo class');
+    console.error('Error upserting Supabase class:', err);
+    sendApiError(res, err, 'Failed to upsert Supabase class');
   }
 });
 
 /**
- * DELETE /api/mongo/classes/:classId
- * Delete a single class record directly in MongoDB normalized storage
+ * DELETE /api/supabase/classes/:classId
+ * Delete a single class record directly in cloud normalized storage
  */
-app.delete('/api/mongo/classes/:classId', requireAdminAccess, async (req, res) => {
+app.delete('/api/supabase/classes/:classId', requireAuthenticatedAccess, async (req, res) => {
   try {
-    if (!requireMongoConnection(res)) {
+    if (!requireSupabaseConnection(res)) {
       return;
     }
 
@@ -1043,30 +1839,33 @@ app.delete('/api/mongo/classes/:classId', requireAdminAccess, async (req, res) =
       return res.status(400).json({ error: 'classId is required' });
     }
 
-    const deleted = await deleteClassRecord(classId, 'api-partial-delete');
+    const ownerOptions = getRequestOwnerOptions(req);
+    const deleted = ownerOptions
+      ? await deleteClassRecord(classId, 'api-partial-delete', ownerOptions)
+      : await deleteClassRecord(classId, 'api-partial-delete');
     return res.json({
       success: true,
-      message: deleted ? 'Class deleted from MongoDB' : 'Class not found in MongoDB',
+      message: deleted ? 'Class deleted from Supabase' : 'Class not found in Supabase',
       classId,
       deleted,
-      mongodb: 'connected'
+      supabase: 'connected'
     });
   } catch (err) {
-    console.error('Error deleting Mongo class:', err);
-    sendApiError(res, err, 'Failed to delete Mongo class');
+    console.error('Error deleting Supabase class:', err);
+    sendApiError(res, err, 'Failed to delete Supabase class');
   }
 });
 
 /**
- * PUT /api/mongo/lessonPlans/:planId
- * Upsert a single lesson plan record directly in MongoDB normalized storage
+ * PUT /api/supabase/lessonPlans/:planId
+ * Upsert a single lesson plan record directly in cloud normalized storage
  */
 app.put([
-  `/api/mongo/${LESSON_PLANS_SEGMENT}/:planId`,
-  `/api/mongo/${LEGACY_LESSON_PLANS_SEGMENT}/:planId`
-], markLegacyLessonPlansRoute, requireAdminAccess, async (req, res) => {
+  `/api/supabase/${LESSON_PLANS_SEGMENT}/:planId`,
+  `/api/supabase/${LEGACY_LESSON_PLANS_SEGMENT}/:planId`
+], markLegacyLessonPlansRoute, requireAuthenticatedAccess, async (req, res) => {
   try {
-    if (!requireMongoConnection(res)) {
+    if (!requireSupabaseConnection(res)) {
       return;
     }
 
@@ -1079,34 +1878,37 @@ app.put([
       return res.status(400).json({ error: 'Invalid lesson plan payload' });
     }
 
-    const saved = await upsertLessonPlanRecord(planId, lessonPlanData, 'api-partial-upsert');
+    const ownerOptions = getRequestOwnerOptions(req);
+    const saved = ownerOptions
+      ? await upsertLessonPlanRecord(planId, lessonPlanData, 'api-partial-upsert', ownerOptions)
+      : await upsertLessonPlanRecord(planId, lessonPlanData, 'api-partial-upsert');
     if (!saved) {
       return res.status(400).json({ error: 'Unable to upsert lesson plan record' });
     }
 
     return res.json({
       success: true,
-      message: 'Lesson plan upserted in MongoDB',
+      message: 'Lesson plan upserted in Supabase',
       planId,
       lessonPlan: saved,
-      mongodb: 'connected'
+      supabase: 'connected'
     });
   } catch (err) {
-    console.error('Error upserting Mongo lesson plan:', err);
-    sendApiError(res, err, 'Failed to upsert Mongo lesson plan');
+    console.error('Error upserting Supabase lesson plan:', err);
+    sendApiError(res, err, 'Failed to upsert Supabase lesson plan');
   }
 });
 
 /**
- * DELETE /api/mongo/lessonPlans/:planId
- * Delete a single lesson plan record directly in MongoDB normalized storage
+ * DELETE /api/supabase/lessonPlans/:planId
+ * Delete a single lesson plan record directly in cloud normalized storage
  */
 app.delete([
-  `/api/mongo/${LESSON_PLANS_SEGMENT}/:planId`,
-  `/api/mongo/${LEGACY_LESSON_PLANS_SEGMENT}/:planId`
-], markLegacyLessonPlansRoute, requireAdminAccess, async (req, res) => {
+  `/api/supabase/${LESSON_PLANS_SEGMENT}/:planId`,
+  `/api/supabase/${LEGACY_LESSON_PLANS_SEGMENT}/:planId`
+], markLegacyLessonPlansRoute, requireAuthenticatedAccess, async (req, res) => {
   try {
-    if (!requireMongoConnection(res)) {
+    if (!requireSupabaseConnection(res)) {
       return;
     }
 
@@ -1115,27 +1917,30 @@ app.delete([
       return res.status(400).json({ error: 'planId is required' });
     }
 
-    const deleted = await deleteLessonPlanRecord(planId, 'api-partial-delete');
+    const ownerOptions = getRequestOwnerOptions(req);
+    const deleted = ownerOptions
+      ? await deleteLessonPlanRecord(planId, 'api-partial-delete', ownerOptions)
+      : await deleteLessonPlanRecord(planId, 'api-partial-delete');
     return res.json({
       success: true,
-      message: deleted ? 'Lesson plan deleted from MongoDB' : 'Lesson plan not found in MongoDB',
+      message: deleted ? 'Lesson plan deleted from Supabase' : 'Lesson plan not found in Supabase',
       planId,
       deleted,
-      mongodb: 'connected'
+      supabase: 'connected'
     });
   } catch (err) {
-    console.error('Error deleting Mongo lesson plan:', err);
-    sendApiError(res, err, 'Failed to delete Mongo lesson plan');
+    console.error('Error deleting Supabase lesson plan:', err);
+    sendApiError(res, err, 'Failed to delete Supabase lesson plan');
   }
 });
 
 /**
- * PUT /api/mongo/notes/:noteId
- * Upsert a single note record directly in MongoDB normalized storage
+ * PUT /api/supabase/notes/:noteId
+ * Upsert a single note record directly in cloud normalized storage
  */
-app.put('/api/mongo/notes/:noteId', requireAdminAccess, async (req, res) => {
+app.put('/api/supabase/notes/:noteId', requireAuthenticatedAccess, async (req, res) => {
   try {
-    if (!requireMongoConnection(res)) {
+    if (!requireSupabaseConnection(res)) {
       return;
     }
 
@@ -1148,31 +1953,34 @@ app.put('/api/mongo/notes/:noteId', requireAdminAccess, async (req, res) => {
       return res.status(400).json({ error: 'Invalid note payload' });
     }
 
-    const saved = await upsertNoteRecord(noteId, noteData, 'api-partial-upsert');
+    const ownerOptions = getRequestOwnerOptions(req);
+    const saved = ownerOptions
+      ? await upsertNoteRecord(noteId, noteData, 'api-partial-upsert', ownerOptions)
+      : await upsertNoteRecord(noteId, noteData, 'api-partial-upsert');
     if (!saved) {
       return res.status(400).json({ error: 'Unable to upsert note record' });
     }
 
     return res.json({
       success: true,
-      message: 'Note upserted in MongoDB',
+      message: 'Note upserted in Supabase',
       noteId,
       note: saved,
-      mongodb: 'connected'
+      supabase: 'connected'
     });
   } catch (err) {
-    console.error('Error upserting Mongo note:', err);
-    sendApiError(res, err, 'Failed to upsert Mongo note');
+    console.error('Error upserting Supabase note:', err);
+    sendApiError(res, err, 'Failed to upsert Supabase note');
   }
 });
 
 /**
- * DELETE /api/mongo/notes/:noteId
- * Delete a single note record directly in MongoDB normalized storage
+ * DELETE /api/supabase/notes/:noteId
+ * Delete a single note record directly in cloud normalized storage
  */
-app.delete('/api/mongo/notes/:noteId', requireAdminAccess, async (req, res) => {
+app.delete('/api/supabase/notes/:noteId', requireAuthenticatedAccess, async (req, res) => {
   try {
-    if (!requireMongoConnection(res)) {
+    if (!requireSupabaseConnection(res)) {
       return;
     }
 
@@ -1181,17 +1989,20 @@ app.delete('/api/mongo/notes/:noteId', requireAdminAccess, async (req, res) => {
       return res.status(400).json({ error: 'noteId is required' });
     }
 
-    const deleted = await deleteNoteRecord(noteId, 'api-partial-delete');
+    const ownerOptions = getRequestOwnerOptions(req);
+    const deleted = ownerOptions
+      ? await deleteNoteRecord(noteId, 'api-partial-delete', ownerOptions)
+      : await deleteNoteRecord(noteId, 'api-partial-delete');
     return res.json({
       success: true,
-      message: deleted ? 'Note deleted from MongoDB' : 'Note not found in MongoDB',
+      message: deleted ? 'Note deleted from Supabase' : 'Note not found in Supabase',
       noteId,
       deleted,
-      mongodb: 'connected'
+      supabase: 'connected'
     });
   } catch (err) {
-    console.error('Error deleting Mongo note:', err);
-    sendApiError(res, err, 'Failed to delete Mongo note');
+    console.error('Error deleting Supabase note:', err);
+    sendApiError(res, err, 'Failed to delete Supabase note');
   }
 });
 
@@ -1308,11 +2119,20 @@ PUBLIC_ASSET_DIRS.forEach((dirName) => {
   app.use(`/assets/${dirName}`, express.static(path.join(__dirname, 'assets', dirName)));
 });
 
-PUBLIC_HTML_FILES.forEach((fileName) => {
+['auth.html', ...PUBLIC_HTML_FILES].forEach((fileName) => {
   const routePaths = fileName === 'index.html' ? ['/', '/index.html'] : [`/${fileName}`];
   routePaths.forEach((routePath) => {
-    app.get(routePath, (req, res) => {
-      res.sendFile(path.join(__dirname, fileName));
+    const middleware = AUTH_PUBLIC_HTML_FILES.has(fileName)
+      ? []
+      : ADMIN_HTML_FILES.has(fileName)
+        ? [requireAdminPage]
+        : [requireAuthenticatedPage];
+
+    app.get(routePath, ...middleware, (req, res) => {
+      if (fileName === 'index.html') {
+        return res.redirect('/admin.html');
+      }
+      return res.sendFile(path.join(__dirname, fileName));
     });
   });
 });
@@ -1336,79 +2156,14 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: message });
 });
 
-// ===== MONGODB SYNC HELPERS =====
-
-/**
- * On startup, sync data between Atlas and local JSON files.
- * - If Atlas has data that is newer/different: overwrite the local file.
- * - If Atlas has no data for a doc: seed it from the local file.
- */
-async function syncFromMongoDB() {
-  const docs = [
-    { docId: 'classes', fileName: 'classes.json' },
-    { docId: 'lessonPlans', fileName: 'lessonPlans.json' },
-  ];
-
-  for (const { docId, fileName } of docs) {
-    const filePath = path.join(DATA_DIR, fileName);
-    const mongoData = await loadDoc(docId);
-    let localData = null;
-
-    try {
-      const localContent = await fs.readFile(filePath, 'utf8');
-      localData = JSON.parse(localContent);
-    } catch (err) {
-      if (err.code !== 'ENOENT') {
-        console.warn(`[MongoDB] Could not parse local "${docId}" file; skipping startup sync for this document.`);
-        continue;
-      }
-    }
-
-    if (mongoData) {
-      if (!localData) {
-        await writeJsonFileAtomic(filePath, mongoData);
-        console.log(`[MongoDB] Synced "${docId}" Atlas → local file (local file missing)`);
-        continue;
-      }
-
-      if (areDocumentsEqual(localData, mongoData)) {
-        console.log(`[MongoDB] "${docId}" already in sync`);
-        continue;
-      }
-
-      const pushed = await saveDoc(docId, localData);
-      if (pushed) {
-        console.warn(`[MongoDB] Conflict detected for "${docId}". Preserved local edits and updated Atlas from local file.`);
-      } else {
-        console.warn(`[MongoDB] Conflict detected for "${docId}". Preserved local edits, but failed to update Atlas.`);
-      }
-    } else {
-      // Atlas has no doc yet — seed it from the local file
-      if (localData) {
-        const ok = await saveDoc(docId, localData);
-        if (ok) console.log(`[MongoDB] Seeded "${docId}" local file → Atlas`);
-      } else {
-        console.log(`[MongoDB] No local file found for "${docId}"; skipping seed.`);
-      }
-    }
-  }
-}
+// ===== SUPABASE SYNC HELPERS =====
 
 // ===== START SERVER =====
 
 async function initializeServerState() {
-  // Ensure backup directory exists on startup
-  try {
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
-  } catch (err) {
-    // Directory might already exist
-  }
-
-  // Connect to MongoDB Atlas and sync data
-  const mongoOk = await connectDB();
-  if (mongoOk) {
-    await syncFromMongoDB();
-  }
+  // Connect to Supabase and sync data
+  await connectDB();
+  await ensureBootstrapAdminAccount();
 }
 
 function logServerStartup(port) {
@@ -1418,30 +2173,33 @@ function logServerStartup(port) {
 ╚════════════════════════════════════════╝
 
 Server running at: http://localhost:${port}
-Static files: ./
-Data saved to: ${DATA_DIR}
-Backups saved to: ${BACKUP_DIR}
 
 Open in browser:
   - Admin:   http://localhost:${port}/admin.html
+  - User Admin: http://localhost:${port}/user-admin.html
   - Student: http://localhost:${port}/student.html
   - Teacher: http://localhost:${port}/teacher.html
 
 API Endpoints:
-  - POST /api/save/classes       - Save classes.json (auto-backup)
-  - POST /api/save/lessonPlans   - Save lessonPlans.json (auto-backup)
-  - POST /api/save/notes         - Save notes.json (auto-backup)
-  - GET  /api/backups/:fileName  - List backups (classes/lessonPlans/notes)
-  - POST /api/backups/restore    - Restore from backup
-  - POST /api/backups/create     - Create manual backup
-  - DELETE /api/backups/:file    - Delete a backup
-  - GET  /api/status             - Health check
-  - PUT  /api/mongo/classes/:id  - Upsert one class in MongoDB
-  - DELETE /api/mongo/classes/:id - Delete one class in MongoDB
-  - PUT  /api/mongo/lessonPlans/:id - Upsert one lesson plan in MongoDB
-  - DELETE /api/mongo/lessonPlans/:id - Delete one lesson plan in MongoDB
-  - PUT  /api/mongo/notes/:id    - Upsert one note in MongoDB
-  - DELETE /api/mongo/notes/:id  - Delete one note in MongoDB
+    - POST /api/save/classes       - Save classes to Supabase
+    - POST /api/save/lessonPlans   - Save lesson plans to Supabase
+    - POST /api/save/notes         - Save notes to Supabase
+    - GET  /api/status             - Health check
+  - PUT  /api/supabase/classes/:id  - Upsert one class in Supabase
+  - DELETE /api/supabase/classes/:id - Delete one class in Supabase
+  - PUT  /api/supabase/lessonPlans/:id - Upsert one lesson plan in Supabase
+  - DELETE /api/supabase/lessonPlans/:id - Delete one lesson plan in Supabase
+  - PUT  /api/supabase/notes/:id    - Upsert one note in Supabase
+  - DELETE /api/supabase/notes/:id  - Delete one note in Supabase
+  - POST /api/auth/login            - Supabase email/password login
+  - POST /api/auth/refresh          - Refresh Supabase session
+  - GET  /api/auth/me               - Get authenticated user
+  - GET  /api/admin/signup-requests - List signup requests
+  - GET  /api/admin/accounts - List active user accounts
+  - POST /api/admin/signup-requests/:id/approve - Approve request and create invite
+  - POST /api/admin/signup-requests/:id/reject - Reject signup request
+  - POST /api/admin/accounts/reset-password - Reset account password
+  - DELETE /api/admin/accounts/:identifier - Remove account by email or username
 
 Press Ctrl+C to stop
   `);
@@ -1533,8 +2291,6 @@ module.exports = {
   startServer,
   stopServer,
   paths: {
-    DATA_DIR,
     VIDEO_DIR,
-    BACKUP_DIR
   }
 };
