@@ -195,7 +195,8 @@
       requireAdmin = false,
       retryOnUnauthorized = true,
       tryRefreshOnUnauthorized = true,
-      tryInteractiveLoginOnUnauthorized = true
+      tryInteractiveLoginOnUnauthorized = true,
+      promptForAdminTokenOnUnauthorized = true
     } = config;
 
     const runRequest = () => fetch(url, {
@@ -236,15 +237,18 @@
         }
       }
 
-      const enteredToken = window.prompt('Enter the admin token for this server (optional fallback):', getAdminToken());
-      if (enteredToken && enteredToken.trim()) {
-        setAdminToken(enteredToken);
-        response = await fetchWithSecurity(url, options, {
-          ...config,
-          retryOnUnauthorized: false,
-          tryRefreshOnUnauthorized: false,
-          tryInteractiveLoginOnUnauthorized: false
-        });
+      if (promptForAdminTokenOnUnauthorized) {
+        const enteredToken = window.prompt('Enter the admin token for this server (optional fallback):', getAdminToken());
+        if (enteredToken && enteredToken.trim()) {
+          setAdminToken(enteredToken);
+          response = await fetchWithSecurity(url, options, {
+            ...config,
+            retryOnUnauthorized: false,
+            tryRefreshOnUnauthorized: false,
+            tryInteractiveLoginOnUnauthorized: false,
+            promptForAdminTokenOnUnauthorized: false
+          });
+        }
       }
     }
 
@@ -358,7 +362,8 @@
   async function getCurrentUser() {
     return fetchJson('/api/auth/me', {}, {
       requireAdmin: true,
-      tryInteractiveLoginOnUnauthorized: false
+      tryInteractiveLoginOnUnauthorized: false,
+      promptForAdminTokenOnUnauthorized: false
     });
   }
 

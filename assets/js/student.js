@@ -672,11 +672,14 @@ function handlePendingMedia() {
     }
 
     const safeTitle = escapeHtml(pendingMedia.title || 'External Link');
+    const safeLinkUrl = escapeHtml(linkUrl);
     playerDiv.innerHTML = `
-      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; text-align:center; gap:12px; padding:30px;">
-        <span class="material-symbols-outlined" style="font-size:56px;">link</span>
-        <h3 style="margin:0;">${safeTitle}</h3>
-        <a href="${linkUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary" style="display:inline-block; padding:10px 20px;">Open Link</a>
+      <div style="display:flex; flex-direction:column; height:100%; padding:16px; gap:10px; background:#0f1419;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <h3 style="margin:0; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${safeTitle}</h3>
+          <a href="${safeLinkUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary" style="display:inline-block; padding:8px 14px;">Open in new tab</a>
+        </div>
+        <iframe src="${safeLinkUrl}" style="width:100%; height:100%; border:none; border-radius:10px; background:#fff;" title="${safeTitle}"></iframe>
       </div>
     `;
     pendingMedia = null;

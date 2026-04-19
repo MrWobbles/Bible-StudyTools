@@ -8,7 +8,9 @@
     (function () {
       try {
         var theme = localStorage.getItem('bst-theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+        var allowedThemes = ['dark', 'light', 'monokai-dark', 'dracula-dark', 'nord-dark'];
+        var normalizedTheme = allowedThemes.includes(theme) ? theme : 'dark';
+        document.documentElement.setAttribute('data-theme', normalizedTheme);
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
@@ -37,12 +39,18 @@
         <h1 id="header-title">Lesson Plans</h1>
         <p class="subtitle app__subtitle" id="header-subtitle">Create and manage Bible study lesson plans</p>
       </div>
-      <div class="app__actions" style="display: flex; gap: 10px;">
-        <button id="theme-toggle-admin" class="pill-link" data-theme-toggle aria-label="Switch to light mode"
-          title="Switch to light mode">
-          <span class="material-symbols-outlined theme-toggle__icon">light_mode</span>
-          <span class="theme-toggle__label">Light mode</span>
-        </button>
+      <div class="app__actions">
+        <label class="theme-select-pill" for="theme-select-admin">
+          <span class="material-symbols-outlined">palette</span>
+          <span>Theme</span>
+          <select id="theme-select-admin" data-theme-select aria-label="Theme selection">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="monokai-dark">Monokai Dark</option>
+            <option value="dracula-dark">Dracula Dark</option>
+            <option value="nord-dark">Nord Dark</option>
+          </select>
+        </label>
         <a href="user-admin.html" class="pill-link"><span class="material-symbols-outlined">manage_accounts</span>User Admin</a>
         <button id="back-btn" class="pill-link" style="display: none;"><span
             class="material-symbols-outlined">arrow_back</span>Back</button>

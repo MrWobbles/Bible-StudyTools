@@ -8,7 +8,9 @@
     (function () {
       try {
         var theme = localStorage.getItem('bst-theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+        var allowedThemes = ['dark', 'light', 'monokai-dark', 'dracula-dark', 'nord-dark'];
+        var normalizedTheme = allowedThemes.includes(theme) ? theme : 'dark';
+        document.documentElement.setAttribute('data-theme', normalizedTheme);
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
@@ -39,9 +41,17 @@
         </div>
       </div>
       <div class="header-right">
-        <button id="theme-toggle-editor" class="btn btn-secondary" data-theme-toggle aria-label="Switch to light mode"
-          title="Switch to light mode"><span class="material-symbols-outlined theme-toggle__icon">light_mode</span><span
-            class="theme-toggle__label">Light mode</span></button>
+        <label class="btn btn-secondary theme-select-btn" for="theme-select-editor">
+          <span class="material-symbols-outlined">palette</span>
+          <span>Theme</span>
+          <select id="theme-select-editor" data-theme-select aria-label="Theme selection">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="monokai-dark">Monokai Dark</option>
+            <option value="dracula-dark">Dracula Dark</option>
+            <option value="nord-dark">Nord Dark</option>
+          </select>
+        </label>
         <button id="btn-save" class="btn btn-primary"><span class="material-symbols-outlined">save</span>Save</button>
         <button id="btn-view-teacher" class="btn btn-secondary"><span
             class="material-symbols-outlined">co_present</span>View Teacher</button>

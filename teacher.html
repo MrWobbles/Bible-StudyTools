@@ -8,7 +8,9 @@
     (function () {
       try {
         var theme = localStorage.getItem('bst-theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+        var allowedThemes = ['dark', 'light', 'monokai-dark', 'dracula-dark', 'nord-dark'];
+        var normalizedTheme = allowedThemes.includes(theme) ? theme : 'dark';
+        document.documentElement.setAttribute('data-theme', normalizedTheme);
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }

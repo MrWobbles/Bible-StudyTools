@@ -99,6 +99,9 @@ let generatedOutline = null; // Stores the generated outline from the outline ge
 let isNoteMode = false; // Flag to track if we're editing a note
 let editorMediaItems = [];
 let lastEditorInteractionAt = 0;
+let eventListenersInitialized = false;
+let displayControlChannel = null;
+let displayControlChannelName = '';
 
 // Initialize editor on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -135,10 +138,9 @@ function initializeEditor() {
       Underline,
       Highlight.configure({ multicolor: true }),
       Link.configure({
-        openOnClick: true,
+        openOnClick: false,
         HTMLAttributes: {
           class: 'editor-link',
-          target: '_blank',
           rel: 'noopener noreferrer',
         },
       }),
@@ -175,11 +177,14 @@ function initializeEditor() {
 
   console.log('Editor initialized:', editor);
 
+  const editorHost = document.getElementById('editor');
+  editorHost.addEventListener('click', handleEditorLinkClick);
+
   // Add click handler for Q&A pause markers
-  document.getElementById('editor').addEventListener('click', handleQAPauseClick);
+  editorHost.addEventListener('click', handleQAPauseClick);
 
   // Ensure clicks on empty editor chrome still place caret in the document.
-  document.getElementById('editor').addEventListener('mousedown', (e) => {
+  editorHost.addEventListener('mousedown', (e) => {
     markEditorInteraction();
 
     if (e.button !== 0 || !editor) {
@@ -194,7 +199,7 @@ function initializeEditor() {
   });
 
   // If a user right-clicks the empty editor area, focus the editor first so paste is available.
-  document.getElementById('editor').addEventListener('contextmenu', (e) => {
+  editorHost.addEventListener('contextmenu', (e) => {
     markEditorInteraction();
 
     if (!editor) {
@@ -208,7 +213,7 @@ function initializeEditor() {
   });
 
   // Prevent navigating away when media tiles inside the editor are clicked
-  document.getElementById('editor').addEventListener('click', (e) => {
+  editorHost.addEventListener('click', (e) => {
     markEditorInteraction();
 
     const mediaTile = e.target.closest('.editor-media-tile');
@@ -216,6 +221,132 @@ function initializeEditor() {
       e.preventDefault();
     }
   });
+}
+
+async function handleEditorLinkClick(e) {
+  const link = e.target.closest('a[href]');
+  if (!link) {
+    return;
+  }
+
+  const href = String(link.getAttribute('href') || '').trim();
+  if (!href || href === '#' || href.startsWith('#') || href.startsWith('bst-media:')) {
+    return;
+  }
+
+  e.preventDefault();
+  markEditorInteraction();
+
+  const title = String(link.textContent || '').trim() || href;
+  const routed = await sendEditorLinkToDisplay(href, title);
+  if (!routed) {
+    const fallbackUrl = normalizeEditorLinkUrl(href);
+    if (fallbackUrl) {
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    }
+  }
+}
+
+function getCurrentClassForDisplayRouting() {
+  if (!currentClassId || !Array.isArray(allClasses) || allClasses.length === 0) {
+    return null;
+  }
+
+  return allClasses.find(c => c.id === currentClassId || c.classNumber == currentClassId) || null;
+}
+
+function getDisplayChannelName() {
+  const cls = getCurrentClassForDisplayRouting();
+  if (cls?.channelName) {
+    return cls.channelName;
+  }
+  return `class${currentClassId || '1'}-control`;
+}
+
+function getDisplayStorageFallbackKey() {
+  return `${getDisplayChannelName()}-storage`;
+}
+
+function normalizeEditorLinkUrl(rawUrl) {
+  if (typeof rawUrl !== 'string') {
+    return '';
+  }
+
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(trimmed, window.location.origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.href;
+    }
+  } catch (err) {
+    // Ignore parse failures and fall back to local paths.
+  }
+
+  return trimmed.startsWith('/') || trimmed.startsWith('assets/') || trimmed.startsWith('./') || trimmed.startsWith('../')
+    ? trimmed
+    : '';
+}
+
+function getOrCreateDisplayChannel() {
+  const channelName = getDisplayChannelName();
+
+  if (displayControlChannel && displayControlChannelName === channelName) {
+    return displayControlChannel;
+  }
+
+  displayControlChannelName = channelName;
+
+  if (window.bst?.createBroadcastChannel) {
+    displayControlChannel = window.bst.createBroadcastChannel(channelName);
+    return displayControlChannel;
+  }
+
+  if ('BroadcastChannel' in window) {
+    displayControlChannel = new BroadcastChannel(channelName);
+    return displayControlChannel;
+  }
+
+  displayControlChannel = null;
+  return null;
+}
+
+async function sendEditorLinkToDisplay(rawUrl, title) {
+  const linkUrl = normalizeEditorLinkUrl(rawUrl);
+  if (!linkUrl) {
+    return false;
+  }
+
+  if (!isNoteMode && currentClassId) {
+    window.open(`student.html?class=${currentClassId}`, 'display-screen', 'width=1280,height=720');
+  }
+
+  const message = {
+    type: 'displayMedia',
+    media: {
+      type: 'link',
+      title: title || 'External Link',
+      url: linkUrl,
+      sources: [{ url: linkUrl }]
+    },
+    sentAt: Date.now()
+  };
+
+  const channel = getOrCreateDisplayChannel();
+  if (channel) {
+    channel.postMessage(message);
+  }
+
+  try {
+    localStorage.setItem(getDisplayStorageFallbackKey(), JSON.stringify(message));
+  } catch (err) {
+    console.warn('Failed to write display link fallback:', err);
+  }
+
+  return !!channel;
 }
 
 // Handle clicks on Q&A pause markers
@@ -303,6 +434,11 @@ function updateToolbarActiveStates(ed) {
 
 // Setup Event Listeners
 function setupEventListeners() {
+  if (eventListenersInitialized) {
+    return;
+  }
+  eventListenersInitialized = true;
+
     // Verse Lookup by Thought button
     document.getElementById('btn-verse-lookup-thought').addEventListener('click', async () => {
       await handleVerseLookupByThought();
@@ -501,15 +637,6 @@ function setupEventListeners() {
   // Keyboard shortcuts
 
   document.addEventListener('keydown', async (e) => {
-    const isPasteShortcut = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'v';
-    if (isPasteShortcut && shouldRoutePasteToEditor(e.target)) {
-      const pasted = await pasteClipboardTextIntoEditor();
-      if (pasted) {
-        e.preventDefault();
-        return;
-      }
-    }
-
     // Ctrl+S to save
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
