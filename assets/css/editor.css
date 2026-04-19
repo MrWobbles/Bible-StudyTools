@@ -788,6 +788,16 @@ body.page--editor .editor {
   max-height: calc(100vh - 200px);
 }
 
+body.page--editor .editor .tiptap:focus,
+body.page--editor .editor .tiptap:focus-visible,
+body.page--editor .editor .ProseMirror:focus,
+body.page--editor .editor .ProseMirror:focus-visible,
+body.page--editor .editor [contenteditable="true"]:focus,
+body.page--editor .editor [contenteditable="true"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 body.page--editor .modal-header,
 body.page--editor .modal-footer {
   display: flex;

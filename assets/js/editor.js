@@ -98,6 +98,7 @@ let allNotes = [];
 let generatedOutline = null; // Stores the generated outline from the outline generator
 let isNoteMode = false; // Flag to track if we're editing a note
 let editorMediaItems = [];
+let lastEditorInteractionAt = 0;
 
 // Initialize editor on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -177,8 +178,39 @@ function initializeEditor() {
   // Add click handler for Q&A pause markers
   document.getElementById('editor').addEventListener('click', handleQAPauseClick);
 
+  // Ensure clicks on empty editor chrome still place caret in the document.
+  document.getElementById('editor').addEventListener('mousedown', (e) => {
+    markEditorInteraction();
+
+    if (e.button !== 0 || !editor) {
+      return;
+    }
+
+    const clickedEditable = e.target.closest('.ProseMirror, .tiptap, [contenteditable="true"]');
+    if (!clickedEditable) {
+      e.preventDefault();
+      editor.commands.focus('end');
+    }
+  });
+
+  // If a user right-clicks the empty editor area, focus the editor first so paste is available.
+  document.getElementById('editor').addEventListener('contextmenu', (e) => {
+    markEditorInteraction();
+
+    if (!editor) {
+      return;
+    }
+
+    const clickedEditable = e.target.closest('.ProseMirror, .tiptap, [contenteditable="true"]');
+    if (!clickedEditable) {
+      editor.commands.focus('end');
+    }
+  });
+
   // Prevent navigating away when media tiles inside the editor are clicked
   document.getElementById('editor').addEventListener('click', (e) => {
+    markEditorInteraction();
+
     const mediaTile = e.target.closest('.editor-media-tile');
     if (mediaTile) {
       e.preventDefault();
@@ -469,13 +501,22 @@ function setupEventListeners() {
   // Keyboard shortcuts
 
   document.addEventListener('keydown', async (e) => {
+    const isPasteShortcut = (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'v';
+    if (isPasteShortcut && shouldRoutePasteToEditor(e.target)) {
+      const pasted = await pasteClipboardTextIntoEditor();
+      if (pasted) {
+        e.preventDefault();
+        return;
+      }
+    }
+
     // Ctrl+S to save
-    if (e.ctrlKey && e.key === 's') {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
       saveDocument();
     }
     // Ctrl+F to search
-    if (e.ctrlKey && e.key === 'f') {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       openModal('search-modal');
     }
@@ -518,7 +559,57 @@ function setupEventListeners() {
     }
   });
 
+  document.addEventListener('paste', (e) => {
+    if (!shouldRoutePasteToEditor(e.target) || !editor) {
+      return;
+    }
+
+    const text = e.clipboardData?.getData('text/plain');
+    if (typeof text !== 'string') {
+      return;
+    }
+
+    e.preventDefault();
+    editor.chain().focus().insertContent(text).run();
+    markEditorInteraction();
+  });
+
   setupMediaDropSupport();
+}
+
+function markEditorInteraction() {
+  lastEditorInteractionAt = Date.now();
+}
+
+function hasRecentEditorInteraction() {
+  return Date.now() - lastEditorInteractionAt < 5000;
+}
+
+function isNativeTextInputTarget(target) {
+  if (!target || !(target instanceof Element)) {
+    return false;
+  }
+
+  return !!target.closest('input, textarea, [contenteditable="true"], select');
+}
+
+function shouldRoutePasteToEditor(target) {
+  const active = document.activeElement;
+
+  if (isEditorTarget(target) || isEditorTarget(active)) {
+    return true;
+  }
+
+  const hasOpenModal = !!document.querySelector('.modal.is-open');
+  if (hasOpenModal) {
+    return false;
+  }
+
+  if (isNativeTextInputTarget(active) && !isEditorTarget(active)) {
+    return false;
+  }
+
+  return hasRecentEditorInteraction();
 }
 
 function getMediaIconForEditor(type) {
@@ -634,6 +725,34 @@ function setupMediaDropSupport() {
       insertMediaTile(media);
     }
   });
+}
+
+function isEditorTarget(target) {
+  if (!target) {
+    return false;
+  }
+
+  const editorHost = document.getElementById('editor');
+  return !!(editorHost && editorHost.contains(target));
+}
+
+async function pasteClipboardTextIntoEditor() {
+  if (!editor || !navigator.clipboard?.readText) {
+    return false;
+  }
+
+  try {
+    const text = await navigator.clipboard.readText();
+    if (typeof text !== 'string') {
+      return false;
+    }
+
+    editor.chain().focus().insertContent(text).run();
+    return true;
+  } catch (error) {
+    console.warn('Clipboard paste fallback failed:', error);
+    return false;
+  }
 }
 
 function renderEditorMediaSidebar(cls) {
