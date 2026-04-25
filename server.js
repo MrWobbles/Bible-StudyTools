@@ -1,3 +1,4 @@
+
 // CSRF token endpoint (read-only, safe for public fetch)
 app.get('/api/csrf-token', (req, res) => {
   if (!ENFORCE_REMOTE_CSRF || !REMOTE_CSRF_TOKEN) {
@@ -6,7 +7,7 @@ app.get('/api/csrf-token', (req, res) => {
   // Only send the token, never any other secrets
   res.json({ csrfToken: REMOTE_CSRF_TOKEN });
 });
-#!/usr/bin/env node
+
 /**
  * Bible Study Tools - Web Server with API
  * Serves static files and provides API endpoints for saving JSON data and downloading videos
