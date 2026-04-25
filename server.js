@@ -2268,7 +2268,7 @@ async function startServer(options = {}) {
   await initializeServerState();
 
   serverInstance = await new Promise((resolve, reject) => {
-    const listener = app.listen(requestedPort, () => resolve(listener));
+    const listener = app.listen(requestedPort, '0.0.0.0', () => resolve(listener));
     listener.on('error', reject);
   });
 
