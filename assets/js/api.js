@@ -2,6 +2,7 @@
   const STORAGE_KEY_ADMIN = 'bst-admin-token';
   const STORAGE_KEY_ACCESS = 'bst-supabase-access-token';
   const STORAGE_KEY_REFRESH = 'bst-supabase-refresh-token';
+  const STORAGE_KEY_CSRF = 'bst-csrf-token';
   const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
   function isLoopbackHost(hostname) {
@@ -31,6 +32,27 @@
 
   function getAccessToken() {
     return localStorage.getItem(STORAGE_KEY_ACCESS)?.trim() || '';
+  }
+
+  function getCsrfToken() {
+    const localToken = localStorage.getItem(STORAGE_KEY_CSRF)?.trim() || '';
+    if (localToken) {
+      return localToken;
+    }
+
+    const globalToken = typeof window.BST_CSRF_TOKEN === 'string'
+      ? window.BST_CSRF_TOKEN.trim()
+      : '';
+    return globalToken;
+  }
+
+  function setCsrfToken(token) {
+    const normalized = typeof token === 'string' ? token.trim() : '';
+    if (normalized) {
+      localStorage.setItem(STORAGE_KEY_CSRF, normalized);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_CSRF);
+    }
   }
 
   function getRefreshToken() {
@@ -172,7 +194,7 @@
     }
   }
 
-  function buildHeaders(existingHeaders, requireAdmin) {
+  function buildHeaders(existingHeaders, requireAdmin, requestMethod = 'GET') {
     const headers = new Headers(existingHeaders || {});
 
     if (requireAdmin) {
@@ -184,6 +206,15 @@
         if (token) {
           headers.set('x-bst-admin-token', token);
         }
+      }
+    }
+
+    const method = String(requestMethod || '').trim().toUpperCase();
+    const inferredMethod = method || 'GET';
+    if (inferredMethod !== 'GET' && inferredMethod !== 'HEAD') {
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        headers.set('x-bst-csrf-token', csrfToken);
       }
     }
 
@@ -201,7 +232,7 @@
 
     const runRequest = () => fetch(url, {
       ...options,
-      headers: buildHeaders(options.headers, requireAdmin)
+      headers: buildHeaders(options.headers, requireAdmin, options.method)
     });
 
     let response = await runRequest();
@@ -455,6 +486,8 @@
     setAuthSession,
     clearAuthSession,
     clearAdminToken: () => setAdminToken(''),
+    getCsrfToken,
+    setCsrfToken,
     isLoopbackHost: () => isLoopbackHost(window.location.hostname),
     isAdminUser
   };

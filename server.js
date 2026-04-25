@@ -67,7 +67,9 @@ app.disable('x-powered-by');
 const LESSON_PLANS_SEGMENT = 'lessonPlans';
 const LEGACY_LESSON_PLANS_SEGMENT = 'lessonplans';
 const API_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const REQUIRE_ADMIN_ON_LOOPBACK = parseBooleanLike(process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK);
+const REQUIRE_ADMIN_ON_LOOPBACK = process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK == null
+  ? process.env.NODE_ENV === 'production'
+  : parseBooleanLike(process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK);
 const ENFORCE_REMOTE_CSRF = parseBooleanLike(process.env.BST_ENFORCE_REMOTE_CSRF);
 const REMOTE_CSRF_TOKEN = String(process.env.BST_CSRF_TOKEN || '').trim();
 const TRUSTED_REMOTE_ORIGINS = new Set(
@@ -980,15 +982,25 @@ async function requireAdminAccess(req, res, next) {
 
 async function requireAuthenticatedAccess(req, res, next) {
   const isLoopback = isLoopbackRequest(req);
-  if (isLoopback && !REQUIRE_ADMIN_ON_LOOPBACK) {
+  if (hasValidAdminToken(req)) {
     return next();
   }
 
   if (!SUPABASE_AUTH_ENABLED) {
-    return next();
+    if (isLoopback && !REQUIRE_ADMIN_ON_LOOPBACK) {
+      return next();
+    }
+
+    if (!ADMIN_TOKEN) {
+      return res.status(403).json({
+        error: 'Protected API access is disabled. Configure Supabase auth or set BST_ADMIN_TOKEN.'
+      });
+    }
+
+    return res.status(401).json({ error: 'Admin token required' });
   }
 
-  if (hasValidAdminToken(req)) {
+  if (isLoopback && !REQUIRE_ADMIN_ON_LOOPBACK) {
     return next();
   }
 
