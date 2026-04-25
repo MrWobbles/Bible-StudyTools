@@ -491,4 +491,21 @@
     isLoopbackHost: () => isLoopbackHost(window.location.hostname),
     isAdminUser
   };
+
+  // Auto-fetch CSRF token on page load if needed
+  (async function ensureCsrfToken() {
+    try {
+      if (window.BSTApi.getCsrfToken()) return;
+      // Only fetch if CSRF protection is likely enabled
+      const resp = await fetch('/api/csrf-token');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.csrfToken) {
+          window.BSTApi.setCsrfToken(data.csrfToken);
+        }
+      }
+    } catch (err) {
+      // Ignore fetch errors (token will be required for writes, not reads)
+    }
+  })();
 })();

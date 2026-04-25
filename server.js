@@ -1,3 +1,11 @@
+// CSRF token endpoint (read-only, safe for public fetch)
+app.get('/api/csrf-token', (req, res) => {
+  if (!ENFORCE_REMOTE_CSRF || !REMOTE_CSRF_TOKEN) {
+    return res.status(404).json({ error: 'CSRF protection is not enabled.' });
+  }
+  // Only send the token, never any other secrets
+  res.json({ csrfToken: REMOTE_CSRF_TOKEN });
+});
 #!/usr/bin/env node
 /**
  * Bible Study Tools - Web Server with API
