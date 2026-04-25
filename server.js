@@ -1137,6 +1137,15 @@ function enforceRemoteCsrf(req, res, next) {
     return next();
   }
 
+  // Bypass CSRF token requirement if the request uses a custom authentication header.
+  // Custom headers cannot be forged via standard CSRF attacks (they require a CORS preflight).
+  const hasAdminHeader = Boolean(String(req.get('x-bst-admin-token') || '').trim());
+  const hasBearerHeader = Boolean(String(req.get('authorization') || '').toLowerCase().startsWith('bearer '));
+  
+  if (hasAdminHeader || hasBearerHeader) {
+    return next();
+  }
+
   if (!REMOTE_CSRF_TOKEN) {
     return res.status(500).json({
       error: 'Remote CSRF protection is enabled but BST_CSRF_TOKEN is not configured.'
