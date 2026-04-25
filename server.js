@@ -140,8 +140,6 @@ const notesSaveSchema = z.object({
 app.use(express.json({ limit: '10mb' }));
 app.use(requestAuditMiddleware);
 app.use(remoteWriteRateLimit);
-app.use(enforceRemoteCsrf);
-
 // CSRF token endpoint (read-only, safe for public fetch)
 app.get('/api/csrf-token', (req, res) => {
   if (!ENFORCE_REMOTE_CSRF || !REMOTE_CSRF_TOKEN) {
@@ -150,6 +148,8 @@ app.get('/api/csrf-token', (req, res) => {
   // Only send the token, never any other secrets
   res.json({ csrfToken: REMOTE_CSRF_TOKEN });
 });
+
+app.use(enforceRemoteCsrf);
 
 // Data directory
 const VIDEO_DIR = process.env.BST_VIDEO_DIR
