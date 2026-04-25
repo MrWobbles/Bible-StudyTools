@@ -2,7 +2,6 @@
   const STORAGE_KEY_ADMIN = 'bst-admin-token';
   const STORAGE_KEY_ACCESS = 'bst-supabase-access-token';
   const STORAGE_KEY_REFRESH = 'bst-supabase-refresh-token';
-  const STORAGE_KEY_CSRF = 'bst-csrf-token';
   const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
   function isLoopbackHost(hostname) {
@@ -32,27 +31,6 @@
 
   function getAccessToken() {
     return localStorage.getItem(STORAGE_KEY_ACCESS)?.trim() || '';
-  }
-
-  function getCsrfToken() {
-    const localToken = localStorage.getItem(STORAGE_KEY_CSRF)?.trim() || '';
-    if (localToken) {
-      return localToken;
-    }
-
-    const globalToken = typeof window.BST_CSRF_TOKEN === 'string'
-      ? window.BST_CSRF_TOKEN.trim()
-      : '';
-    return globalToken;
-  }
-
-  function setCsrfToken(token) {
-    const normalized = typeof token === 'string' ? token.trim() : '';
-    if (normalized) {
-      localStorage.setItem(STORAGE_KEY_CSRF, normalized);
-    } else {
-      localStorage.removeItem(STORAGE_KEY_CSRF);
-    }
   }
 
   function getRefreshToken() {
@@ -206,15 +184,6 @@
         if (token) {
           headers.set('x-bst-admin-token', token);
         }
-      }
-    }
-
-    const method = String(requestMethod || '').trim().toUpperCase();
-    const inferredMethod = method || 'GET';
-    if (inferredMethod !== 'GET' && inferredMethod !== 'HEAD') {
-      const csrfToken = getCsrfToken();
-      if (csrfToken) {
-        headers.set('x-bst-csrf-token', csrfToken);
       }
     }
 
@@ -486,26 +455,7 @@
     setAuthSession,
     clearAuthSession,
     clearAdminToken: () => setAdminToken(''),
-    getCsrfToken,
-    setCsrfToken,
     isLoopbackHost: () => isLoopbackHost(window.location.hostname),
     isAdminUser
   };
-
-  // Auto-fetch CSRF token on page load if needed
-  (async function ensureCsrfToken() {
-    try {
-      if (window.BSTApi.getCsrfToken()) return;
-      // Only fetch if CSRF protection is likely enabled
-      const resp = await fetch('/api/csrf-token');
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data && data.csrfToken) {
-          window.BSTApi.setCsrfToken(data.csrfToken);
-        }
-      }
-    } catch (err) {
-      // Ignore fetch errors (token will be required for writes, not reads)
-    }
-  })();
 })();

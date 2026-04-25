@@ -70,14 +70,6 @@ const API_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const REQUIRE_ADMIN_ON_LOOPBACK = process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK == null
   ? process.env.NODE_ENV === 'production'
   : parseBooleanLike(process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK);
-const ENFORCE_REMOTE_CSRF = parseBooleanLike(process.env.BST_ENFORCE_REMOTE_CSRF);
-const REMOTE_CSRF_TOKEN = String(process.env.BST_CSRF_TOKEN || '').trim();
-const TRUSTED_REMOTE_ORIGINS = new Set(
-  String(process.env.BST_TRUSTED_ORIGINS || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-);
 const ENABLE_REMOTE_RATE_LIMIT = parseBooleanLike(process.env.BST_ENABLE_REMOTE_RATE_LIMIT || '1');
 const RATE_LIMIT_WINDOW_MS = getBoundedPositiveInt(process.env.BST_RATE_LIMIT_WINDOW_MS, 60000, 3600000);
 const RATE_LIMIT_MAX_REQUESTS = getBoundedPositiveInt(process.env.BST_RATE_LIMIT_MAX_REQUESTS, 120, 5000);
@@ -140,16 +132,6 @@ const notesSaveSchema = z.object({
 app.use(express.json({ limit: '10mb' }));
 app.use(requestAuditMiddleware);
 app.use(remoteWriteRateLimit);
-// CSRF token endpoint (read-only, safe for public fetch)
-app.get('/api/csrf-token', (req, res) => {
-  if (!ENFORCE_REMOTE_CSRF || !REMOTE_CSRF_TOKEN) {
-    return res.status(404).json({ error: 'CSRF protection is not enabled.' });
-  }
-  // Only send the token, never any other secrets
-  res.json({ csrfToken: REMOTE_CSRF_TOKEN });
-});
-
-app.use(enforceRemoteCsrf);
 
 // Data directory
 const VIDEO_DIR = process.env.BST_VIDEO_DIR
@@ -1127,39 +1109,6 @@ function remoteWriteRateLimit(req, res, next) {
       error: 'Rate limit exceeded for remote write requests. Try again later.',
       retryAfterSeconds
     });
-  }
-
-  return next();
-}
-
-function enforceRemoteCsrf(req, res, next) {
-  if (!isApiWriteRequest(req) || isLoopbackRequest(req) || !ENFORCE_REMOTE_CSRF) {
-    return next();
-  }
-
-  // Bypass CSRF token requirement if the request uses a custom authentication header.
-  // Custom headers cannot be forged via standard CSRF attacks (they require a CORS preflight).
-  const hasAdminHeader = Boolean(String(req.get('x-bst-admin-token') || '').trim());
-  const hasBearerHeader = Boolean(String(req.get('authorization') || '').toLowerCase().startsWith('bearer '));
-  
-  if (hasAdminHeader || hasBearerHeader) {
-    return next();
-  }
-
-  if (!REMOTE_CSRF_TOKEN) {
-    return res.status(500).json({
-      error: 'Remote CSRF protection is enabled but BST_CSRF_TOKEN is not configured.'
-    });
-  }
-
-  const providedToken = String(req.get('x-bst-csrf-token') || req.get('x-csrf-token') || '').trim();
-  if (!areTokensEqual(providedToken, REMOTE_CSRF_TOKEN)) {
-    return res.status(403).json({ error: 'CSRF token required for remote write requests' });
-  }
-
-  const origin = String(req.get('origin') || '').trim();
-  if (TRUSTED_REMOTE_ORIGINS.size > 0 && origin && !TRUSTED_REMOTE_ORIGINS.has(origin)) {
-    return res.status(403).json({ error: 'Request origin is not trusted' });
   }
 
   return next();
