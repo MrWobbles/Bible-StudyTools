@@ -676,9 +676,7 @@ function renderMediaGallery() {
   const datalist = document.getElementById('bible-versions');
 
   // Fetch full list of bibles for typeahead
-  fetch('https://api.scripture.api.bible/v1/bibles', {
-    headers: { 'api-key': 'TY21PVY_De4zgNFnlrKCL' }
-  }).then(res => res.json()).then(data => {
+  fetch('/api/bible/bibles').then(res => res.json()).then(data => {
     if (data && data.data) {
       datalist.innerHTML = ''; // clear defaults
       data.data.forEach(b => {

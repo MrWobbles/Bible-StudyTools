@@ -840,7 +840,7 @@ async function renderVerseMedia(media) {
 let apiBibleMapCache = null;
 const API_BIBLE_FALLBACKS = new Set(['web', 'kjv', 'esv', 'niv', 'nasb', 'nlt', 'amp', 'net']);
 
-async function getApiBibleMap(apiKey) {
+async function getApiBibleMap() {
   if (apiBibleMapCache) return apiBibleMapCache;
   
   apiBibleMapCache = {
@@ -850,9 +850,7 @@ async function getApiBibleMap(apiKey) {
   };
 
   try {
-    const res = await fetch('https://api.scripture.api.bible/v1/bibles', {
-      headers: { 'api-key': apiKey }
-    });
+    const res = await fetch('/api/bible/bibles');
     if (res.ok) {
       const data = await res.json();
       if (data && data.data) {
@@ -870,14 +868,13 @@ async function getApiBibleMap(apiKey) {
 }
 
 async function fetchVerseData(reference, preferredTranslations) {
-  const apiBibleKey = 'TY21PVY_De4zgNFnlrKCL';
-  const apiBibleMap = await getApiBibleMap(apiBibleKey);
+  const apiBibleMap = await getApiBibleMap();
 
   for (const translation of preferredTranslations) {
     const normTrans = String(translation || '').toLowerCase();
 
-    if (apiBibleMap[normTrans] && apiBibleKey) {
-      const apiBible = await fetchFromApiBible(reference, apiBibleMap[normTrans], apiBibleKey, normTrans);
+    if (apiBibleMap[normTrans]) {
+      const apiBible = await fetchFromApiBible(reference, apiBibleMap[normTrans], normTrans);
       if (apiBible) return apiBible;
       continue;
     }
@@ -916,16 +913,18 @@ async function fetchVerseData(reference, preferredTranslations) {
   return null;
 }
 
-async function fetchFromApiBible(reference, bibleId, apiKey, translation = '') {
-  const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/passages?reference=${encodeURIComponent(reference)}`;
+async function fetchFromApiBible(reference, bibleId, translation = '') {
+  const url = `/api/bible/passages?bibleId=${encodeURIComponent(bibleId)}&reference=${encodeURIComponent(reference)}`;
   
   try {
-    const res = await fetch(url, {
-      headers: {
-        'api-key': apiKey
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        const text = await res.text();
+        console.error(`API.Bible auth failed (${res.status}):`, text || res.statusText);
       }
-    });
-    if (!res.ok) return null;
+      return null;
+    }
     const data = await res.json();
 
     const passage = Array.isArray(data?.data)

@@ -60,6 +60,8 @@ const SMTP_PORT = Number.parseInt(String(process.env.SMTP_PORT || '587'), 10);
 const SMTP_USER = String(process.env.SMTP_USER || '').trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
 const SMTP_FROM = String(process.env.SMTP_FROM || SMTP_USER || `Bible Study Tools <${SIGNUP_NOTIFICATION_EMAIL}>`).trim();
+const API_BIBLE_KEY = String(process.env.API_BIBLE_KEY || '').trim();
+const API_BIBLE_BASE_URL = 'https://api.scripture.api.bible/v1';
 const AUTH_COOKIE_NAME = 'bst_access_token';
 
 app.disable('x-powered-by');
@@ -1325,6 +1327,50 @@ app.get('/api/status', (req, res) => {
     message: 'API is running',
     supabase: isConnected() ? 'connected' : 'disconnected'
   });
+});
+
+app.get('/api/bible/bibles', async (req, res) => {
+  if (!API_BIBLE_KEY) {
+    return res.status(503).json({ error: 'API_BIBLE_KEY is not configured on the server.' });
+  }
+
+  try {
+    const response = await fetch(`${API_BIBLE_BASE_URL}/bibles`, {
+      headers: { 'api-key': API_BIBLE_KEY }
+    });
+
+    const body = await response.text();
+    res.status(response.status).send(body);
+  } catch (err) {
+    console.error('Error proxying API.Bible bibles request:', err);
+    res.status(500).json({ error: 'Failed to fetch Bible list from API.Bible' });
+  }
+});
+
+app.get('/api/bible/passages', async (req, res) => {
+  if (!API_BIBLE_KEY) {
+    return res.status(503).json({ error: 'API_BIBLE_KEY is not configured on the server.' });
+  }
+
+  const bibleId = String(req.query.bibleId || '').trim();
+  const reference = String(req.query.reference || '').trim();
+
+  if (!bibleId || !reference) {
+    return res.status(400).json({ error: 'bibleId and reference are required' });
+  }
+
+  try {
+    const url = `${API_BIBLE_BASE_URL}/bibles/${encodeURIComponent(bibleId)}/passages?reference=${encodeURIComponent(reference)}`;
+    const response = await fetch(url, {
+      headers: { 'api-key': API_BIBLE_KEY }
+    });
+
+    const body = await response.text();
+    res.status(response.status).send(body);
+  } catch (err) {
+    console.error('Error proxying API.Bible passages request:', err);
+    res.status(500).json({ error: 'Failed to fetch passage from API.Bible' });
+  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
