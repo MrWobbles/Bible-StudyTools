@@ -97,6 +97,7 @@ let allClasses = [];
 let allNotes = [];
 let generatedOutline = null; // Stores the generated outline from the outline generator
 let isNoteMode = false; // Flag to track if we're editing a note
+let isCodeView = false; // Flag to track if we're in code view
 let editorMediaItems = [];
 let lastEditorInteractionAt = 0;
 let eventListenersInitialized = false;
@@ -623,6 +624,19 @@ function setupEventListeners() {
 
   // AI Assistant
   document.getElementById('btn-ai-assistant').addEventListener('click', openAIAssistant);
+
+  // Code view
+  document.getElementById('btn-code-view')?.addEventListener('click', toggleCodeView);
+
+  const codeTextarea = document.getElementById('editor-code-view');
+  if (codeTextarea) {
+    codeTextarea.addEventListener('input', () => {
+      isDirty = true;
+      updateSaveStatus('Modified');
+      startAutoSave();
+    });
+  }
+
   document.getElementById('btn-ask-ai').addEventListener('click', askAIQuestion);
   document.getElementById('btn-copy-response').addEventListener('click', copyAIResponse);
 
@@ -724,7 +738,7 @@ function shouldRoutePasteToEditor(target) {
   const active = document.activeElement;
 
   if (isEditorTarget(target) || isEditorTarget(active)) {
-    return true;
+    return false;
   }
 
   const hasOpenModal = !!document.querySelector('.modal.is-open');
@@ -1606,11 +1620,52 @@ function extractText(node) {
   return '';
 }
 
+// Code View Toggle Function
+function toggleCodeView() {
+  if (!editor) return;
+
+  const editorDiv = document.getElementById('editor');
+  const codeTextarea = document.getElementById('editor-code-view');
+  const codeBtn = document.getElementById('btn-code-view');
+
+  if (!editorDiv || !codeTextarea || !codeBtn) return;
+
+  isCodeView = !isCodeView;
+
+  if (isCodeView) {
+    // Switch to Code View
+    const currentHtml = editor.getHTML();
+    codeTextarea.value = currentHtml;
+    editorDiv.style.display = 'none';
+    codeTextarea.style.display = 'block';
+    codeBtn.classList.add('is-active');
+  } else {
+    // Switch back to Rich Text View
+    const newHtml = codeTextarea.value;
+    editor.commands.setContent(newHtml);
+    codeTextarea.style.display = 'none';
+    editorDiv.style.display = 'block';
+    codeBtn.classList.remove('is-active');
+    
+    // Save document since we might have made changes in code view
+    isDirty = true;
+    updateSaveStatus('Modified');
+    startAutoSave();
+  }
+}
+
 // Save Document
 async function saveDocument() {
   if (!editor) return;
 
   updateSaveStatus('Saving...');
+
+  if (isCodeView) {
+    const codeTextarea = document.getElementById('editor-code-view');
+    if (codeTextarea) {
+      editor.commands.setContent(codeTextarea.value);
+    }
+  }
 
   const content = {
     html: editor.getHTML(),

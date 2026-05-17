@@ -581,6 +581,26 @@ function renderMediaGallery() {
     document.body.appendChild(verseDrawer);
   }
 
+  let textDrawer = document.getElementById('text-drawer');
+  if (!textDrawer) {
+    textDrawer = document.createElement('aside');
+    textDrawer.id = 'text-drawer';
+    textDrawer.className = 'verse-drawer'; // Reusing verse-drawer styles
+    textDrawer.innerHTML = `
+      <div class="media-drawer-header">
+        <div>
+          <div class="tag">Custom Display</div>
+          <h3 style="margin: 6px 0 0;">Custom Text</h3>
+        </div>
+        <button id="text-close-btn" aria-label="Close custom text panel" title="Close">
+          <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+      </div>
+      <div class="media-drawer-body" id="text-panel"></div>
+    `;
+    document.body.appendChild(textDrawer);
+  }
+
   const mediaPanel = document.getElementById('media-panel');
   if (mediaPanel) {
     // Render a compact vertical list of class materials
@@ -633,16 +653,12 @@ function renderMediaGallery() {
   versePanel.innerHTML = `
     <div class="quick-verse-form-row quick-verse-main-row">
       <input id="verse-ref-input" class="quick-verse-input" type="text" placeholder="e.g., John 3:16–18" />
-      <select id="verse-translation-input" class="quick-verse-select" aria-label="Bible version">
-        <option value="nkjv" selected>NKJV</option>
-        <option value="kjv">KJV</option>
-        <option value="esv">ESV</option>
-        <option value="niv">NIV</option>
-        <option value="nasb">NASB</option>
-        <option value="nlt">NLT</option>
-        <option value="amp">AMP</option>
-        <option value="web">WEB</option>
-      </select>
+      <input id="verse-translation-input" class="quick-verse-input" list="bible-versions" placeholder="e.g. NKJV" aria-label="Bible version" style="width: 120px;" value="NKJV" />
+      <datalist id="bible-versions">
+        <option value="NKJV">New King James Version</option>
+        <option value="KJV">King James Version</option>
+        <option value="CSB">Christian Standard Bible</option>
+      </datalist>
       <button id="verse-send-btn" class="quick-verse-btn">Show</button>
     </div>
     <div class="quick-verse-form-row quick-verse-nav-row">
@@ -650,17 +666,73 @@ function renderMediaGallery() {
       <button id="verse-next" class="quick-verse-btn quick-verse-btn-nav"><span class="material-symbols-outlined">navigate_next</span>Next</button>
     </div>
     <div class="quick-verse-help">
-      Defaults to NKJV via labs.bible.org, falls back to KJV and bible-api.com
+      Defaults to NKJV. Uses API.Bible for exact premium matches. Falls back to WEB, KJV, or NET (labs.bible.org) if the exact translation is unavailable.
     </div>
   `;
 
   const verseRefInput = document.getElementById('verse-ref-input');
   const verseTranslationInput = document.getElementById('verse-translation-input');
   const verseSendBtn = document.getElementById('verse-send-btn');
+  const datalist = document.getElementById('bible-versions');
+
+  // Fetch full list of bibles for typeahead
+  fetch('https://api.scripture.api.bible/v1/bibles', {
+    headers: { 'api-key': 'TY21PVY_De4zgNFnlrKCL' }
+  }).then(res => res.json()).then(data => {
+    if (data && data.data) {
+      datalist.innerHTML = ''; // clear defaults
+      data.data.forEach(b => {
+        const option = document.createElement('option');
+        // Prefer abbreviation if available, otherwise name
+        option.value = b.abbreviation || b.name;
+        // The text content helps users filter when typing
+        option.textContent = `${b.name} (${b.language.name})`;
+        datalist.appendChild(option);
+      });
+      // Add bible-api.com fallbacks just in case
+      const fallbacks = ['WEB', 'ESV', 'NIV', 'NASB', 'NLT', 'AMP'];
+      fallbacks.forEach(f => {
+        const option = document.createElement('option');
+        option.value = f;
+        datalist.appendChild(option);
+      });
+    }
+  }).catch(err => console.error('Failed to fetch API.Bible list for typeahead:', err));
 
   if (verseSendBtn && verseRefInput) {
     verseSendBtn.onclick = () =>
-      sendVerseToStudent(verseRefInput.value, verseTranslationInput?.value || 'web');
+      sendVerseToStudent(verseRefInput.value, verseTranslationInput?.value || 'NKJV');
+  }
+
+  const textPanel = document.getElementById('text-panel');
+  if (textPanel) {
+    textPanel.innerHTML = `
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <label for="text-title-input" style="display: block; margin-bottom: 8px; font-weight: 500;">Title (optional)</label>
+          <input id="text-title-input" class="quick-verse-input" type="text" placeholder="e.g., Key Point" style="width: 100%; box-sizing: border-box; margin: 0;" />
+        </div>
+        <div>
+          <label for="text-content-input" style="display: block; margin-bottom: 8px; font-weight: 500;">Text Content</label>
+          <textarea id="text-content-input" class="quick-verse-input" placeholder="Type what you want to display on the screen..." style="width: 100%; min-height: 120px; box-sizing: border-box; resize: vertical; margin: 0; padding: 12px; font-family: inherit; font-size: 14px; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); border-radius: 6px; color: inherit;"></textarea>
+        </div>
+        <button id="text-send-btn" class="btn-primary" style="width: 100%; padding: 12px;">Display on Screen</button>
+      </div>
+    `;
+
+    const textTitleInput = document.getElementById('text-title-input');
+    const textContentInput = document.getElementById('text-content-input');
+    const textSendBtn = document.getElementById('text-send-btn');
+
+    if (textSendBtn && textContentInput) {
+      textSendBtn.onclick = () => {
+        const title = textTitleInput ? textTitleInput.value.trim() : '';
+        const content = textContentInput.value.trim();
+        if (content) {
+          sendTextToStudent(title, content);
+        }
+      };
+    }
   }
 
   const toggleBtn = document.getElementById('toggle-media-btn');
@@ -690,6 +762,21 @@ function renderMediaGallery() {
   if (verseCloseBtn) {
     verseCloseBtn.onclick = () => {
       verseDrawer.classList.remove('open');
+      page.classList.remove('verse-drawer-open');
+    };
+  }
+
+  const textToggleBtn = document.getElementById('toggle-text-btn');
+  const textCloseBtn = document.getElementById('text-close-btn');
+  if (textToggleBtn) {
+    textToggleBtn.onclick = () => {
+      textDrawer.classList.toggle('open');
+      page.classList.toggle('verse-drawer-open');
+    };
+  }
+  if (textCloseBtn) {
+    textCloseBtn.onclick = () => {
+      textDrawer.classList.remove('open');
       page.classList.remove('verse-drawer-open');
     };
   }
@@ -1183,6 +1270,19 @@ function sendVerseToStudent(reference, translation = 'nkjv') {
       reference: reference.trim(),
       translation: (translation || 'nkjv').trim(),
       title: reference.trim()
+    }
+  });
+}
+
+function sendTextToStudent(title, content) {
+  if (!content || !content.trim()) return;
+  currentMediaType = 'text';
+  updateControlVisibility();
+  sendCommand('displayMedia', {
+    media: {
+      type: 'text',
+      title: (title || 'Key Point').trim(),
+      content: content.trim()
     }
   });
 }

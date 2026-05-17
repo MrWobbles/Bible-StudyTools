@@ -691,6 +691,10 @@ function handlePendingMedia() {
     const media = pendingMedia;
     pendingMedia = null;
     renderQuestionMedia(media);
+  } else if (pendingMedia.type === 'text') {
+    const media = pendingMedia;
+    pendingMedia = null;
+    renderTextMedia(media);
   }
 }
 
@@ -725,6 +729,35 @@ function renderQuestionMedia(media) {
         <div style="font-size:48px;margin-bottom:24px;"><span class="material-symbols-outlined" style="font-size: 48px;">help</span></div>
         <h1 class="question-prompt" style="color:#fff;font-size:52px;line-height:1.4;font-weight:600;margin:0;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">${escapeHtml(prompt)}</h1>
         ${media.title && media.title !== prompt ? `<div style="color:rgba(255,255,255,0.7);font-size:24px;margin-top:24px;">${escapeHtml(media.title)}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Render custom text on the student screen
+function renderTextMedia(media) {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
+  const content = media.content || '';
+  if (!content) return;
+
+  if (player) {
+    player.destroy();
+    player = null;
+  }
+
+  const lines = content.split('\n').filter(line => line.trim() !== '');
+  const paragraphs = lines.map(line => `<p style="margin: 0 0 16px 0;">${escapeHtml(line)}</p>`).join('');
+
+  playerDiv.innerHTML = `
+    <div class="text-frame" style="padding:60px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"none\" stroke=\"rgba(240,180,41,0.1)\" stroke-width=\"0.5\"/></svg>') repeat;opacity:0.3;"></div>
+      <div style="text-align:left;max-width:85%;position:relative;z-index:1;background:rgba(0,0,0,0.3);padding:40px 60px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);">
+        ${media.title ? `<h1 style="color:var(--brand);font-size:36px;margin:0 0 30px 0;border-bottom:2px solid rgba(240,180,41,0.3);padding-bottom:15px;">${escapeHtml(media.title)}</h1>` : ''}
+        <div class="text-content" style="color:#fff;font-size:42px;line-height:1.5;font-weight:400;text-shadow:1px 1px 2px rgba(0,0,0,0.5);">
+          ${paragraphs}
+        </div>
       </div>
     </div>
   `;
@@ -804,21 +837,144 @@ async function renderVerseMedia(media) {
   }
 }
 
-async function fetchVerseData(reference, preferredTranslations) {
-  for (const translation of preferredTranslations) {
-    const labs = await fetchFromLabs(reference, translation);
-    if (labs) return labs;
+let apiBibleMapCache = null;
 
+async function getApiBibleMap(apiKey) {
+  if (apiBibleMapCache) return apiBibleMapCache;
+  
+  apiBibleMapCache = {
+    'nkjv': '63097d2a0a2f7db3-01',
+    'kjv': 'de4e12af7f28f599-01'
+  };
+
+  try {
+    const res = await fetch('https://api.scripture.api.bible/v1/bibles', {
+      headers: { 'api-key': apiKey }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.data) {
+        data.data.forEach(bible => {
+          if (bible.abbreviation) apiBibleMapCache[bible.abbreviation.toLowerCase()] = bible.id;
+          if (bible.abbreviationLocal) apiBibleMapCache[bible.abbreviationLocal.toLowerCase()] = bible.id;
+          if (bible.name) apiBibleMapCache[bible.name.toLowerCase()] = bible.id;
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch API.Bible map:', err);
+  }
+  return apiBibleMapCache;
+}
+
+async function fetchVerseData(reference, preferredTranslations) {
+  const apiBibleKey = 'TY21PVY_De4zgNFnlrKCL'; 
+  const apiBibleMap = await getApiBibleMap(apiBibleKey);
+
+  // Try API.Bible for supported premium versions
+  for (const translation of preferredTranslations) {
+    const normTrans = translation.toLowerCase();
+    if (apiBibleMap[normTrans] && apiBibleKey) {
+      const apiBible = await fetchFromApiBible(reference, apiBibleMap[normTrans], apiBibleKey);
+      if (apiBible) return apiBible;
+    }
+  }
+
+  // Try the requested translations via bible-api.com
+  for (const translation of preferredTranslations) {
     const bibleApi = await fetchFromBibleApi(reference, translation);
     if (bibleApi) return bibleApi;
+  }
+
+  // If requested translation was 'net', or as a fallback
+  if (preferredTranslations.map(t => t.toLowerCase()).includes('net')) {
+    const labs = await fetchFromLabs(reference);
+    if (labs) return labs;
+  }
+
+  // Fallbacks for copyrighted versions (NKJV, NIV, ESV, etc)
+  const fallbackWeb = await fetchFromBibleApi(reference, 'web');
+  if (fallbackWeb) {
+    fallbackWeb.sourceLabel += ' (Fallback)';
+    return fallbackWeb;
+  }
+
+  const fallbackKjv = await fetchFromBibleApi(reference, 'kjv');
+  if (fallbackKjv) {
+    fallbackKjv.sourceLabel += ' (Fallback)';
+    return fallbackKjv;
+  }
+
+  const labsFallback = await fetchFromLabs(reference);
+  if (labsFallback) {
+    labsFallback.sourceLabel = 'NET via labs.bible.org (Fallback)';
+    return labsFallback;
   }
 
   return null;
 }
 
-async function fetchFromLabs(reference, translation) {
-  const version = String(translation || '').toUpperCase();
-  const url = `https://labs.bible.org/api/?passage=${encodeURIComponent(reference)}&version=${encodeURIComponent(version)}&type=json`;
+async function fetchFromApiBible(reference, bibleId, apiKey) {
+  const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/search?query=${encodeURIComponent(reference)}`;
+  
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'api-key': apiKey
+      }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    
+    if (!data || !data.data || !data.data.passages || data.data.passages.length === 0) {
+      return null;
+    }
+
+    const passage = data.data.passages[0];
+    
+    // Parse the HTML content returned by API.Bible to extract verse text
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = passage.content;
+    
+    // Clean up footnotes and cross-references often included
+    tempDiv.querySelectorAll('.f, .x').forEach(el => el.remove());
+    
+    // Extract verses
+    const verses = tempDiv.querySelectorAll('.v');
+    const lines = [];
+    
+    if (verses.length > 0) {
+      verses.forEach(v => {
+        const verseNum = v.getAttribute('data-number') || v.textContent.trim();
+        // The text is the siblings after the verse span until the next verse span
+        let text = '';
+        let sibling = v.nextSibling;
+        while (sibling && (!sibling.classList || !sibling.classList.contains('v'))) {
+          text += sibling.textContent || '';
+          sibling = sibling.nextSibling;
+        }
+        if (text.trim()) {
+          lines.push(`${verseNum} ${text.replace(/\s+/g, ' ').trim()}`);
+        }
+      });
+    } else {
+      // Fallback if no specific .v spans were parsed
+      lines.push(tempDiv.textContent.replace(/\s+/g, ' ').trim());
+    }
+
+    const copyright = passage.copyright || '';
+    const sourceLabel = `NKJV via API.Bible${copyright ? ' © Thomas Nelson' : ''}`;
+    
+    return { title: passage.reference, lines, sourceLabel };
+  } catch (err) {
+    console.error('API.Bible fetch error:', err);
+    return null;
+  }
+}
+
+async function fetchFromLabs(reference) {
+  // labs.bible.org only returns the NET Bible, regardless of requested version
+  const url = `https://labs.bible.org/api/?passage=${encodeURIComponent(reference)}&type=json`;
 
   try {
     const res = await fetch(url);
@@ -827,7 +983,7 @@ async function fetchFromLabs(reference, translation) {
     if (!Array.isArray(data) || data.length === 0) return null;
 
     const lines = data.map(item => `${item.verse} ${item.text}`);
-    const sourceLabel = `${version} via labs.bible.org`;
+    const sourceLabel = `NET via labs.bible.org`;
     return { title: reference, lines, sourceLabel };
   } catch (err) {
     return null;
