@@ -675,8 +675,10 @@ function renderMediaGallery() {
   const verseSendBtn = document.getElementById('verse-send-btn');
   const datalist = document.getElementById('bible-versions');
 
-  // Fetch full list of bibles for typeahead
-  fetch('/api/bible/bibles').then(res => res.json()).then(data => {
+  // Fetch full list of bibles for typeahead via the server proxy
+  const bibleListUrl = '/api/bible/bibles';
+  console.debug('[Teacher] fetching Bible list from proxy:', bibleListUrl);
+  fetch(bibleListUrl).then(res => res.json()).then(data => {
     if (data && data.data) {
       datalist.innerHTML = ''; // clear defaults
       data.data.forEach(b => {
