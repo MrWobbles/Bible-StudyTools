@@ -838,13 +838,15 @@ async function renderVerseMedia(media) {
 }
 
 let apiBibleMapCache = null;
+const API_BIBLE_FALLBACKS = new Set(['web', 'kjv', 'esv', 'niv', 'nasb', 'nlt', 'amp', 'net']);
 
 async function getApiBibleMap(apiKey) {
   if (apiBibleMapCache) return apiBibleMapCache;
   
   apiBibleMapCache = {
     'nkjv': '63097d2a0a2f7db3-01',
-    'kjv': 'de4e12af7f28f599-01'
+    'kjv': 'de4e12af7f28f599-01',
+    'csb': 'a556c5305ee15c3f-01'
   };
 
   try {
@@ -868,26 +870,26 @@ async function getApiBibleMap(apiKey) {
 }
 
 async function fetchVerseData(reference, preferredTranslations) {
-  const apiBibleKey = 'TY21PVY_De4zgNFnlrKCL'; 
+  const apiBibleKey = 'TY21PVY_De4zgNFnlrKCL';
   const apiBibleMap = await getApiBibleMap(apiBibleKey);
 
-  // Try API.Bible for supported premium versions
   for (const translation of preferredTranslations) {
-    const normTrans = translation.toLowerCase();
+    const normTrans = String(translation || '').toLowerCase();
+
     if (apiBibleMap[normTrans] && apiBibleKey) {
-      const apiBible = await fetchFromApiBible(reference, apiBibleMap[normTrans], apiBibleKey);
+      const apiBible = await fetchFromApiBible(reference, apiBibleMap[normTrans], apiBibleKey, normTrans);
       if (apiBible) return apiBible;
+      continue;
+    }
+
+    if (API_BIBLE_FALLBACKS.has(normTrans)) {
+      const bibleApi = await fetchFromBibleApi(reference, normTrans);
+      if (bibleApi) return bibleApi;
     }
   }
 
-  // Try the requested translations via bible-api.com
-  for (const translation of preferredTranslations) {
-    const bibleApi = await fetchFromBibleApi(reference, translation);
-    if (bibleApi) return bibleApi;
-  }
-
   // If requested translation was 'net', or as a fallback
-  if (preferredTranslations.map(t => t.toLowerCase()).includes('net')) {
+  if (preferredTranslations.map(t => String(t || '').toLowerCase()).includes('net')) {
     const labs = await fetchFromLabs(reference);
     if (labs) return labs;
   }
@@ -914,8 +916,8 @@ async function fetchVerseData(reference, preferredTranslations) {
   return null;
 }
 
-async function fetchFromApiBible(reference, bibleId, apiKey) {
-  const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/search?query=${encodeURIComponent(reference)}`;
+async function fetchFromApiBible(reference, bibleId, apiKey, translation = '') {
+  const url = `https://api.scripture.api.bible/v1/bibles/${bibleId}/passages?reference=${encodeURIComponent(reference)}`;
   
   try {
     const res = await fetch(url, {
@@ -925,28 +927,25 @@ async function fetchFromApiBible(reference, bibleId, apiKey) {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    
-    if (!data || !data.data || !data.data.passages || data.data.passages.length === 0) {
+
+    const passage = Array.isArray(data?.data)
+      ? data.data[0]
+      : data?.data?.passages?.[0] || data?.data;
+
+    if (!passage || !passage.content) {
       return null;
     }
 
-    const passage = data.data.passages[0];
-    
-    // Parse the HTML content returned by API.Bible to extract verse text
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = passage.content;
-    
-    // Clean up footnotes and cross-references often included
     tempDiv.querySelectorAll('.f, .x').forEach(el => el.remove());
-    
-    // Extract verses
+
     const verses = tempDiv.querySelectorAll('.v');
     const lines = [];
-    
+
     if (verses.length > 0) {
       verses.forEach(v => {
         const verseNum = v.getAttribute('data-number') || v.textContent.trim();
-        // The text is the siblings after the verse span until the next verse span
         let text = '';
         let sibling = v.nextSibling;
         while (sibling && (!sibling.classList || !sibling.classList.contains('v'))) {
@@ -958,14 +957,13 @@ async function fetchFromApiBible(reference, bibleId, apiKey) {
         }
       });
     } else {
-      // Fallback if no specific .v spans were parsed
       lines.push(tempDiv.textContent.replace(/\s+/g, ' ').trim());
     }
 
     const copyright = passage.copyright || '';
-    const sourceLabel = `NKJV via API.Bible${copyright ? ' © Thomas Nelson' : ''}`;
-    
-    return { title: passage.reference, lines, sourceLabel };
+    const sourceLabel = `${translation.toUpperCase() || 'API.Bible'} via API.Bible${copyright ? ` © ${copyright}` : ''}`;
+
+    return { title: passage.reference || reference, lines, sourceLabel };
   } catch (err) {
     console.error('API.Bible fetch error:', err);
     return null;
