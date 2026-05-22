@@ -61,9 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button class="btn btn-block btn-danger" onclick="updateStatus('${track.id}', 'rejected')"><i class="fas fa-times"></i> Reject</button>
             `;
         } else if (type === 'active') {
+            const spotifySearchUrl = `https://open.spotify.com/search/${encodeURIComponent(track.title + ' ' + track.artist)}`;
             actionButtons = `
-                ${track.url ? `<a href="${track.url}" target="_blank" class="btn btn-block btn-link"><i class="fas fa-external-link-alt"></i> Open Link</a>` : ''}
+                <a href="${spotifySearchUrl}" target="_blank" class="btn btn-block btn-link" style="background-color: #1DB954; color: white; border: none;"><i class="fab fa-spotify"></i> Spotify</a>
                 <button class="btn btn-block btn-outline" onclick="updateStatus('${track.id}', 'played')"><i class="fas fa-play-circle"></i> Mark Played</button>
+                <button class="btn btn-block btn-danger" onclick="deleteTrack('${track.id}')"><i class="fas fa-trash"></i> Delete</button>
             `;
         } else if (type === 'history') {
             actionButtons = `
@@ -113,6 +115,94 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    window.deleteTrack = async (id) => {
+        if (!confirm('Are you sure you want to permanently delete this request?')) return;
+        try {
+            const res = await fetch(`/api/dj/queue/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+            fetchQueue(); // Instant refresh
+        } catch (err) {
+            showToast(err.message, true);
+        }
+    };
+
+    // --- File Upload Logic ---
+    const uploadPicksBtn = document.getElementById('uploadPicksBtn');
+    const uploadModal = document.getElementById('uploadModal');
+    const closeUploadBtn = document.getElementById('closeUploadBtn');
+    const picksFileInput = document.getElementById('picksFileInput');
+    const processUploadBtn = document.getElementById('processUploadBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+
+    uploadPicksBtn.addEventListener('click', () => {
+        uploadModal.classList.remove('hidden');
+        picksFileInput.value = '';
+        uploadProgress.classList.add('hidden');
+    });
+
+    closeUploadBtn.addEventListener('click', () => {
+        uploadModal.classList.add('hidden');
+    });
+
+    uploadModal.addEventListener('click', (e) => {
+        if (e.target === uploadModal) uploadModal.classList.add('hidden');
+    });
+
+    processUploadBtn.addEventListener('click', async () => {
+        const file = picksFileInput.files[0];
+        if (!file) return showToast('Please select a file first.', true);
+
+        processUploadBtn.disabled = true;
+        
+        try {
+            const text = await file.text();
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            
+            if (lines.length === 0) throw new Error('File is empty.');
+
+            uploadProgress.classList.remove('hidden');
+            const resolvedTracks = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const query = lines[i];
+                uploadProgress.textContent = `Resolving track ${i + 1} of ${lines.length}...`;
+                
+                try {
+                    const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.results && data.results.length > 0) {
+                            resolvedTracks.push(data.results[0]);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to resolve:', query);
+                }
+                
+                // Slight delay to be nice to iTunes API
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            uploadProgress.textContent = 'Saving to database...';
+
+            const saveRes = await fetch('/api/dj/pre-approved', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ list: resolvedTracks })
+            });
+
+            if (!saveRes.ok) throw new Error('Failed to save pre-approved list.');
+
+            showToast(`Successfully updated Quick Picks with ${resolvedTracks.length} tracks!`);
+            uploadModal.classList.add('hidden');
+            
+        } catch (err) {
+            showToast(err.message, true);
+        } finally {
+            processUploadBtn.disabled = false;
+        }
+    });
+
     // --- QR Code Logic ---
     let qrGenerated = false;
 
@@ -123,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Generate full URL for requests.html based on current host
             const protocol = window.location.protocol;
             const host = window.location.host; // includes port
-            const fullUrl = `${protocol}//${host}/requests.html`;
+            const fullUrl = `${protocol}//${host}/requests`;
             
             qrUrlEl.textContent = fullUrl;
             

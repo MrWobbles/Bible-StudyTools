@@ -2165,6 +2165,21 @@ app.get('/api/dj/pre-approved', async (req, res) => {
   }
 });
 
+app.post('/api/dj/pre-approved', async (req, res) => {
+  try {
+    const { list } = req.body;
+    if (!Array.isArray(list)) {
+      return res.status(400).json({ error: 'Expected an array of tracks in "list" property' });
+    }
+    const data = await getQueueData();
+    data.preApprovedList = list;
+    await saveQueueData(data);
+    res.json({ success: true, preApprovedList: list });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to update pre-approved list');
+  }
+});
+
 app.get('/api/dj/queue', async (req, res) => {
   try {
     const data = await getQueueData();
@@ -2236,6 +2251,22 @@ app.put('/api/dj/queue/:id/status', async (req, res) => {
   }
 });
 
+app.delete('/api/dj/queue/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await getQueueData();
+    const initialLength = (data.queue || []).length;
+    data.queue = (data.queue || []).filter(q => q.id !== id);
+    if (data.queue.length === initialLength) {
+      return res.status(404).json({ error: 'Song not found in queue' });
+    }
+    await saveQueueData(data);
+    res.json({ success: true });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to delete song');
+  }
+});
+
 app.get('/api/music/search', async (req, res) => {
   try {
     const query = String(req.query.q || '').trim();
@@ -2267,7 +2298,8 @@ PUBLIC_ASSET_DIRS.forEach((dirName) => {
 });
 
 ['auth.html', ...PUBLIC_HTML_FILES].forEach((fileName) => {
-  const routePaths = fileName === 'index.html' ? ['/', '/index.html'] : [`/${fileName}`];
+  const baseName = fileName.replace('.html', '');
+  const routePaths = fileName === 'index.html' ? ['/', '/index.html'] : [`/${fileName}`, `/${baseName}`];
   routePaths.forEach((routePath) => {
     const middleware = AUTH_PUBLIC_HTML_FILES.has(fileName)
       ? []
@@ -2277,7 +2309,7 @@ PUBLIC_ASSET_DIRS.forEach((dirName) => {
 
     app.get(routePath, ...middleware, (req, res) => {
       if (fileName === 'index.html') {
-        return res.redirect('/admin.html');
+        return res.redirect('/admin');
       }
       return res.sendFile(path.join(__dirname, fileName));
     });

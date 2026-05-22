@@ -28,9 +28,13 @@
 
         <!-- Pre-approved Section -->
         <section class="card">
-            <h2>Quick Picks</h2>
-            <div id="preApprovedList" class="track-list">
-                <div class="loading">Loading quick picks...</div>
+            <h2 class="accordion-header" id="quickPicksHeader">
+                Quick Picks <i class="fas fa-chevron-down accordion-icon"></i>
+            </h2>
+            <div id="quickPicksContent" class="accordion-content hidden">
+                <div id="preApprovedList" class="track-list">
+                    <div class="loading">Loading quick picks...</div>
+                </div>
             </div>
         </section>
 

@@ -72,6 +72,42 @@ body {
     padding-bottom: 0.5rem;
 }
 
+/* Accordion */
+.accordion-header {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    margin-bottom: 0 !important;
+}
+
+.accordion-header:not(.collapsed) {
+    border-bottom-color: transparent !important;
+}
+
+.accordion-icon {
+    font-size: 1rem;
+    transition: transform 0.3s ease;
+}
+
+.accordion-header:not(.collapsed) .accordion-icon {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+}
+
+.accordion-content.hidden {
+    display: none;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
 .search-container {
     position: relative;
 }

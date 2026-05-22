@@ -19,6 +19,24 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchPreApproved();
     fetchQueue();
 
+    // Accordion Logic
+    const quickPicksHeader = document.getElementById('quickPicksHeader');
+    const quickPicksContent = document.getElementById('quickPicksContent');
+    
+    // Set initial state
+    quickPicksHeader.classList.add('collapsed');
+    
+    quickPicksHeader.addEventListener('click', () => {
+        const isCollapsed = quickPicksHeader.classList.contains('collapsed');
+        if (isCollapsed) {
+            quickPicksHeader.classList.remove('collapsed');
+            quickPicksContent.classList.remove('hidden');
+        } else {
+            quickPicksHeader.classList.add('collapsed');
+            quickPicksContent.classList.add('hidden');
+        }
+    });
+
     // Refresh queue every 15 seconds to keep up with DJ actions
     setInterval(fetchQueue, 15000);
 

@@ -11,7 +11,10 @@
     <header class="dashboard-header">
         <div class="header-content">
             <h1><i class="fas fa-headphones"></i> DJ Dashboard</h1>
-            <button id="showQrBtn" class="btn btn-outline"><i class="fas fa-qrcode"></i> Show QR Code</button>
+            <div style="display: flex; gap: 1rem;">
+                <button id="uploadPicksBtn" class="btn btn-outline"><i class="fas fa-file-upload"></i> Update Quick Picks</button>
+                <button id="showQrBtn" class="btn btn-outline"><i class="fas fa-qrcode"></i> Show QR Code</button>
+            </div>
         </div>
     </header>
 
@@ -49,6 +52,20 @@
             </div>
         </section>
     </main>
+
+    <!-- Upload Quick Picks Modal -->
+    <div id="uploadModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; text-align: left;">
+            <button class="close-btn" id="closeUploadBtn"><i class="fas fa-times"></i></button>
+            <h2>Update Quick Picks</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Upload a text file with one song per line (e.g. "Uptown Funk - Bruno Mars"). We will search iTunes to grab the track details automatically.
+            </p>
+            <input type="file" id="picksFileInput" accept=".txt,.csv,.md" style="margin-bottom: 1.5rem; display: block; width: 100%;">
+            <div id="uploadProgress" class="hidden" style="margin-bottom: 1.5rem; font-weight: bold; color: var(--accent);"></div>
+            <button id="processUploadBtn" class="btn btn-success btn-block">Process & Update</button>
+        </div>
+    </div>
 
     <!-- QR Code Modal -->
     <div id="qrModal" class="modal hidden">

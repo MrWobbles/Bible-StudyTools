@@ -1,31 +1,72 @@
 {
   "preApprovedList": [
     {
-      "id": "1",
-      "title": "Uptown Funk",
-      "artist": "Mark Ronson ft. Bruno Mars",
-      "url": "https://music.apple.com/us/album/uptown-funk-feat-bruno-mars/939783739?i=939783748"
+      "id": "911190618",
+      "title": "King Jesus",
+      "artist": "Laura Hackett Park",
+      "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/18/cb/89/18cb89b8-fc81-ca71-3fbe-14ebab999e53/FM095_2400x2400_Cover.jpg/100x100bb.jpg",
+      "url": "https://music.apple.com/us/album/king-jesus/911190472?i=911190618&uo=4"
     },
     {
-      "id": "2",
-      "title": "September",
-      "artist": "Earth, Wind & Fire",
-      "url": "https://music.apple.com/us/album/september/1456448051?i=1456448057"
+      "id": "715556742",
+      "title": "Hero",
+      "artist": "Abandon",
+      "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/7e/cb/4f/7ecb4fff-e085-d965-7ceb-a5f393772286/05099921235757.jpg/100x100bb.jpg",
+      "url": "https://music.apple.com/us/album/hero/715556450?i=715556742&uo=4"
     },
     {
-      "id": "3",
-      "title": "Dancing Queen",
-      "artist": "ABBA",
-      "url": "https://music.apple.com/us/album/dancing-queen/1422623458?i=1422623697"
+      "id": "1555151803",
+      "title": "What Do I Know of Holy",
+      "artist": "Addison Road",
+      "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/f4/63/b0/f463b0eb-700b-4cf7-0178-0d3ad7fde60f/888880507129.jpg/100x100bb.jpg",
+      "url": "https://music.apple.com/us/album/what-do-i-know-of-holy/1555150429?i=1555151803&uo=4"
+    },
+    {
+      "id": "1305443305",
+      "title": "Psalm 79",
+      "artist": "Sons of Korah",
+      "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Music118/v4/1a/fc/a8/1afca8fa-b06e-0bb5-4823-a31b51244d08/859714488600_cover.jpg/100x100bb.jpg",
+      "url": "https://music.apple.com/us/album/psalm-79/1305442998?i=1305443305&uo=4"
+    },
+    {
+      "id": "1444058913",
+      "title": "Lazarus",
+      "artist": "Bellarive",
+      "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Music118/v4/86/2e/11/862e113f-978f-d5e7-52a6-8c7bd6767cb2/00602537807789.rgb.jpg/100x100bb.jpg",
+      "url": "https://music.apple.com/us/album/lazarus/1444058634?i=1444058913&uo=4"
+    },
+    {
+      "id": "1029199666",
+      "title": "Abide",
+      "artist": "Liz Vice",
+      "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/30/51/fb/3051fbb3-59fd-77a8-e678-05f74365ddbd/886445438543.jpg/100x100bb.jpg",
+      "url": "https://music.apple.com/us/album/abide/1029199664?i=1029199666&uo=4"
+    },
+    {
+      "id": "1088569157",
+      "title": "Skeletons",
+      "artist": "TAL",
+      "thumbnail": "https://is1-ssl.mzstatic.com/image/thumb/Music49/v4/21/12/ea/2112ea8e-0ee3-3f70-85a4-a3858411b4c3/859716737812_cover.jpg/100x100bb.jpg",
+      "url": "https://music.apple.com/us/album/skeletons/1088569153?i=1088569157&uo=4"
     }
   ],
   "queue": [
     {
-      "id": "1",
-      "title": "Uptown Funk",
-      "artist": "Mark Ronson ft. Bruno Mars",
-      "url": "https://music.apple.com/us/album/uptown-funk-feat-bruno-mars/939783739?i=939783748",
-      "requestedBy": "Ray",
+      "id": "1440827492",
+      "title": "Tennessee Whiskey",
+      "artist": "Chris Stapleton",
+      "url": "https://music.apple.com/us/album/tennessee-whiskey/1440827477?i=1440827492&uo=4",
+      "requestedBy": "Sean",
+      "dedication": "",
+      "status": "played",
+      "votes": 1
+    },
+    {
+      "id": "1088569157",
+      "title": "Skeletons",
+      "artist": "TAL",
+      "url": "https://music.apple.com/us/album/skeletons/1088569153?i=1088569157&uo=4",
+      "requestedBy": "Sean",
       "dedication": "",
       "status": "approved",
       "votes": 0
