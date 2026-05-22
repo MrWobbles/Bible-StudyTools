@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJ Song Requests</title>
+    <link rel="stylesheet" href="/assets/css/requests.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-header">
+        <h1><i class="fas fa-music"></i> Request a Song</h1>
+        <p>Pick a track to get the party going!</p>
+    </header>
+
+    <main class="container">
+        <!-- Search Section -->
+        <section class="card">
+            <h2>Custom Request</h2>
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search by song or artist..." autocomplete="off">
+                </div>
+                <div id="searchResults" class="search-results hidden"></div>
+            </div>
+        </section>
+
+        <!-- Pre-approved Section -->
+        <section class="card">
+            <h2>Quick Picks</h2>
+            <div id="preApprovedList" class="track-list">
+                <div class="loading">Loading quick picks...</div>
+            </div>
+        </section>
+
+        <!-- Current Queue Section -->
+        <section class="card queue-card">
+            <h2>Upcoming Tracks</h2>
+            <div id="queueList" class="track-list">
+                <div class="loading">Loading queue...</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Request Modal -->
+    <div id="requestModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Submit Request</h3>
+                <button class="close-btn" id="closeModalBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="selected-track" id="selectedTrackDisplay">
+                    <!-- Track details will be injected here -->
+                </div>
+                <form id="requestForm">
+                    <div class="form-group">
+                        <label for="guestName">Your Name</label>
+                        <input type="text" id="guestName" required placeholder="Who is requesting this?">
+                    </div>
+                    <div class="form-group">
+                        <label for="dedication">Dedication / Shoutout (Optional)</label>
+                        <textarea id="dedication" rows="2" placeholder="Happy birthday to..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Send to DJ</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="/assets/js/requests.js"></script>
+</body>
+</html>

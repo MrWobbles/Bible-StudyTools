@@ -1,0 +1,34 @@
+{
+  "preApprovedList": [
+    {
+      "id": "1",
+      "title": "Uptown Funk",
+      "artist": "Mark Ronson ft. Bruno Mars",
+      "url": "https://music.apple.com/us/album/uptown-funk-feat-bruno-mars/939783739?i=939783748"
+    },
+    {
+      "id": "2",
+      "title": "September",
+      "artist": "Earth, Wind & Fire",
+      "url": "https://music.apple.com/us/album/september/1456448051?i=1456448057"
+    },
+    {
+      "id": "3",
+      "title": "Dancing Queen",
+      "artist": "ABBA",
+      "url": "https://music.apple.com/us/album/dancing-queen/1422623458?i=1422623697"
+    }
+  ],
+  "queue": [
+    {
+      "id": "1",
+      "title": "Uptown Funk",
+      "artist": "Mark Ronson ft. Bruno Mars",
+      "url": "https://music.apple.com/us/album/uptown-funk-feat-bruno-mars/939783739?i=939783748",
+      "requestedBy": "Ray",
+      "dedication": "",
+      "status": "approved",
+      "votes": 0
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJ Dashboard</title>
+    <link rel="stylesheet" href="/assets/css/dj-dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="dashboard-header">
+        <div class="header-content">
+            <h1><i class="fas fa-headphones"></i> DJ Dashboard</h1>
+            <button id="showQrBtn" class="btn btn-outline"><i class="fas fa-qrcode"></i> Show QR Code</button>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <!-- Pending Requests Column -->
+        <section class="column pending-column">
+            <div class="column-header">
+                <h2>Pending Requests <span id="pendingCount" class="badge">0</span></h2>
+                <p class="subtitle">Needs your approval</p>
+            </div>
+            <div id="pendingList" class="track-list">
+                <div class="loading">Loading requests...</div>
+            </div>
+        </section>
+
+        <!-- Active Queue Column -->
+        <section class="column active-column">
+            <div class="column-header">
+                <h2>Active Queue <span id="activeCount" class="badge">0</span></h2>
+                <p class="subtitle">Sorted by votes</p>
+            </div>
+            <div id="activeList" class="track-list">
+                <div class="loading">Loading queue...</div>
+            </div>
+        </section>
+        
+        <!-- History Column -->
+        <section class="column history-column">
+            <div class="column-header">
+                <h2>History <span id="historyCount" class="badge">0</span></h2>
+                <p class="subtitle">Recently played</p>
+            </div>
+            <div id="historyList" class="track-list">
+                <div class="loading">Loading history...</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="modal hidden">
+        <div class="modal-content qr-content">
+            <button class="close-btn" id="closeQrBtn"><i class="fas fa-times"></i></button>
+            <h2>Scan to Request Songs!</h2>
+            <div id="qrcode" class="qr-container"></div>
+            <p id="qrUrl" class="qr-url"></p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <script src="/assets/js/dj-dashboard.js"></script>
+</body>
+</html>

@@ -145,9 +145,9 @@ const DATA_DOC_MAP = {
   lessonplans: 'lessonPlans',
   notes: 'notes'
 };
-const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html'];
+const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html', 'dj-dashboard.html', 'requests.html'];
 const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
-const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html']);
+const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html']);
 const ADMIN_HTML_FILES = new Set(['user-admin.html']);
 
 const supabaseServiceClient = SUPABASE_SERVICE_ENABLED
@@ -2136,6 +2136,128 @@ app.post('/api/download/youtube', requireAdminAccess, async (req, res) => {
     res.status(500).json({
       error: 'Failed to download video',
     });
+  }
+});
+
+// ===== DJ SONG REQUEST API =====
+const QUEUE_FILE = path.join(__dirname, 'queue.json');
+
+async function getQueueData() {
+  try {
+    const data = await fs.readFile(QUEUE_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    // Return default structure if file doesn't exist
+    return { preApprovedList: [], queue: [] };
+  }
+}
+
+async function saveQueueData(data) {
+  await fs.writeFile(QUEUE_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
+
+app.get('/api/dj/pre-approved', async (req, res) => {
+  try {
+    const data = await getQueueData();
+    res.json(data.preApprovedList || []);
+  } catch (err) {
+    sendApiError(res, err, 'Failed to fetch pre-approved list');
+  }
+});
+
+app.get('/api/dj/queue', async (req, res) => {
+  try {
+    const data = await getQueueData();
+    res.json(data.queue || []);
+  } catch (err) {
+    sendApiError(res, err, 'Failed to fetch queue');
+  }
+});
+
+app.post('/api/dj/request', async (req, res) => {
+  try {
+    const { id, title, artist, url, requestedBy, dedication, status } = req.body;
+    if (!title || !artist) {
+      return res.status(400).json({ error: 'Title and artist are required' });
+    }
+    const data = await getQueueData();
+    const newRequest = {
+      id: id || crypto.randomUUID(),
+      title,
+      artist,
+      url: url || null,
+      requestedBy: requestedBy || 'Guest',
+      dedication: dedication || '',
+      status: status || 'pending',
+      votes: 0
+    };
+    data.queue = data.queue || [];
+    data.queue.push(newRequest);
+    await saveQueueData(data);
+    res.json({ success: true, request: newRequest });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to submit request');
+  }
+});
+
+app.post('/api/dj/queue/:id/upvote', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await getQueueData();
+    const song = (data.queue || []).find(q => q.id === id);
+    if (!song) {
+      return res.status(404).json({ error: 'Song not found in queue' });
+    }
+    song.votes = (song.votes || 0) + 1;
+    await saveQueueData(data);
+    res.json({ success: true, votes: song.votes });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to upvote');
+  }
+});
+
+app.put('/api/dj/queue/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!['pending', 'approved', 'played', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const data = await getQueueData();
+    const song = (data.queue || []).find(q => q.id === id);
+    if (!song) {
+      return res.status(404).json({ error: 'Song not found in queue' });
+    }
+    song.status = status;
+    await saveQueueData(data);
+    res.json({ success: true, song });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to update status');
+  }
+});
+
+app.get('/api/music/search', async (req, res) => {
+  try {
+    const query = String(req.query.q || '').trim();
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=10`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to fetch from iTunes' });
+    }
+    const data = await response.json();
+    const results = (data.results || []).map(track => ({
+      id: String(track.trackId),
+      title: track.trackName,
+      artist: track.artistName,
+      thumbnail: track.artworkUrl100 || track.artworkUrl60,
+      url: track.trackViewUrl
+    }));
+    res.json({ results });
+  } catch (err) {
+    sendApiError(res, err, 'Search failed');
   }
 });
 
