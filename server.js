@@ -1360,7 +1360,7 @@ app.get('/api/bible/passages', async (req, res) => {
   }
 
   try {
-    const url = `${API_BIBLE_BASE_URL}/bibles/${encodeURIComponent(bibleId)}/passages?reference=${encodeURIComponent(reference)}`;
+    const url = `${API_BIBLE_BASE_URL}/bibles/${encodeURIComponent(bibleId)}/search?query=${encodeURIComponent(reference)}`;
     const response = await fetch(url, {
       headers: { 'api-key': API_BIBLE_KEY }
     });

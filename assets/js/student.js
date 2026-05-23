@@ -876,7 +876,6 @@ async function fetchVerseData(reference, preferredTranslations) {
     if (apiBibleMap[normTrans]) {
       const apiBible = await fetchFromApiBible(reference, apiBibleMap[normTrans], normTrans);
       if (apiBible) return apiBible;
-      continue;
     }
 
     if (API_BIBLE_FALLBACKS.has(normTrans)) {

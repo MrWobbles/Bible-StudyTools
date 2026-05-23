@@ -1020,13 +1020,70 @@ async function fetchVerseFromBibleApi(reference, translation) {
 }
 
 async function fetchVerseText(reference, translation) {
-  // Try labs.bible.org first (better formatting)
-  const labs = await fetchVerseFromLabs(reference, translation);
-  if (labs) return labs;
+  const normTrans = String(translation || 'nkjv').toLowerCase();
+
+  // Try API.Bible proxy first
+  try {
+    const mapRes = await fetch('/api/bible/bibles');
+    if (mapRes.ok) {
+      const mapData = await mapRes.json();
+      let bibleId = null;
+      if (mapData && mapData.data) {
+        for (const b of mapData.data) {
+          if (
+            (b.abbreviation && b.abbreviation.toLowerCase() === normTrans) ||
+            (b.abbreviationLocal && b.abbreviationLocal.toLowerCase() === normTrans) ||
+            (b.name && b.name.toLowerCase() === normTrans)
+          ) {
+            bibleId = b.id;
+            break;
+          }
+        }
+      }
+      // hardcoded fallbacks if API list fails
+      if (!bibleId) {
+        const hardcoded = { 'nkjv': '63097d2a0a2f7db3-01', 'kjv': 'de4e12af7f28f599-01', 'csb': 'a556c5305ee15c3f-01' };
+        bibleId = hardcoded[normTrans];
+      }
+
+      if (bibleId) {
+        const url = `/api/bible/passages?bibleId=${encodeURIComponent(bibleId)}&reference=${encodeURIComponent(reference)}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const passage = Array.isArray(data?.data) ? data.data[0] : data?.data?.passages?.[0] || data?.data;
+          if (passage && passage.content) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = passage.content;
+            tempDiv.querySelectorAll('.f, .x').forEach(el => el.remove());
+            let text = tempDiv.textContent.replace(/\s+/g, ' ').trim();
+            if (text) {
+              return { title: passage.reference || reference, text, translation: normTrans.toUpperCase() };
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('API.Bible fetch failed in editor:', err);
+  }
 
   // Fallback to bible-api.com
-  const bibleApi = await fetchVerseFromBibleApi(reference, translation);
+  const bibleApi = await fetchVerseFromBibleApi(reference, normTrans);
   if (bibleApi) return bibleApi;
+
+  // Fallback to labs.bible.org (NET only)
+  if (normTrans === 'net') {
+    const labs = await fetchVerseFromLabs(reference, normTrans);
+    if (labs) return labs;
+  }
+
+  // Final fallback to WEB if everything else fails
+  const fallbackWeb = await fetchVerseFromBibleApi(reference, 'web');
+  if (fallbackWeb) {
+    fallbackWeb.translation = 'WEB';
+    return fallbackWeb;
+  }
 
   return null;
 }
