@@ -970,24 +970,29 @@ function renderGeneratedOutline() {
 
 document.addEventListener('click', (e) => {
   const link = e.target.closest('a[href]');
-  if (!link) return;
+  const img = e.target.closest('img');
   
-  const inNotes = notesEl && notesEl.contains(link);
-  const inDisplay = document.querySelector('.editor-content-display')?.contains(link);
-  const inGuide = document.getElementById('guide-content')?.contains(link);
+  if (!link && !img) return;
+  
+  const targetEl = link || img;
+  const inNotes = notesEl && notesEl.contains(targetEl);
+  const inDisplay = document.querySelector('.editor-content-display')?.contains(targetEl);
+  const inGuide = document.getElementById('guide-content')?.contains(targetEl);
   
   if (inNotes || inDisplay || inGuide) {
-    handleTeacherLinkClick(e, link);
+    handleTeacherLinkClick(e, targetEl);
   }
 });
 
-function handleTeacherLinkClick(e, link) {
-  if (link.classList.contains('editor-media-tile')) {
+function handleTeacherLinkClick(e, element) {
+  if (element.classList.contains('editor-media-tile')) {
     return;
   }
 
-  const href = link.getAttribute('href') || '';
-  if (href.startsWith('bst-media:') || href === '#' || href.startsWith('#')) {
+  const isImg = element.tagName.toLowerCase() === 'img';
+  const href = isImg ? (element.getAttribute('src') || '') : (element.getAttribute('href') || '');
+  
+  if (!href || href.startsWith('bst-media:') || href === '#' || href.startsWith('#')) {
     return;
   }
 
@@ -1000,21 +1005,29 @@ function handleTeacherLinkClick(e, link) {
   }
 
   // Otherwise, determine media type and send to display
-  let mediaType = 'link';
+  let mediaType = isImg ? 'image' : 'link';
   const lowerUrl = href.toLowerCase();
-  if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
-    mediaType = 'video';
-  } else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
-    mediaType = 'video';
-  } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
-    mediaType = 'image';
-  } else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
-    mediaType = 'audio';
-  } else if (lowerUrl.match(/\.(pdf)$/)) {
-    mediaType = 'pdf';
+  
+  if (!isImg) {
+    if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+      mediaType = 'video';
+    } else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
+      mediaType = 'video';
+    } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
+      mediaType = 'image';
+    } else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
+      mediaType = 'audio';
+    } else if (lowerUrl.match(/\.(pdf)$/)) {
+      mediaType = 'pdf';
+    } else if (lowerUrl.includes('drive.google.com/thumbnail')) {
+      mediaType = 'image';
+    }
   }
 
-  const title = String(link.textContent || '').trim() || href;
+  const title = isImg 
+    ? (String(element.getAttribute('alt') || '').trim() || href) 
+    : (String(element.textContent || '').trim() || href);
+
   sendCommand('displayMedia', {
     media: {
       type: mediaType,
@@ -1025,12 +1038,21 @@ function handleTeacherLinkClick(e, link) {
   });
 
   // Visual feedback
-  const originalColor = link.style.color;
-  link.style.color = '#4CAF50';
-  link.title = 'Sent to display screen (Hold Alt to open locally)';
+  const originalStyle = isImg ? element.style.outline : element.style.color;
+  if (isImg) {
+    element.style.outline = '3px solid #4CAF50';
+  } else {
+    element.style.color = '#4CAF50';
+  }
+  
+  element.title = 'Sent to display screen (Hold Alt to open locally)';
   setTimeout(() => {
-    link.style.color = originalColor;
-    link.title = '';
+    if (isImg) {
+      element.style.outline = originalStyle;
+    } else {
+      element.style.color = originalStyle;
+    }
+    element.title = '';
   }, 1500);
 }
 

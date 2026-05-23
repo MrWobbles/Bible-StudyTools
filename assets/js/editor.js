@@ -226,11 +226,13 @@ function initializeEditor() {
 
 async function handleEditorLinkClick(e) {
   const link = e.target.closest('a[href]');
-  if (!link) {
+  const img = e.target.closest('img');
+  
+  if (!link && !img) {
     return;
   }
 
-  const href = String(link.getAttribute('href') || '').trim();
+  const href = link ? String(link.getAttribute('href') || '').trim() : String(img.getAttribute('src') || '').trim();
   if (!href || href === '#' || href.startsWith('#') || href.startsWith('bst-media:')) {
     return;
   }
@@ -238,8 +240,9 @@ async function handleEditorLinkClick(e) {
   e.preventDefault();
   markEditorInteraction();
 
-  const title = String(link.textContent || '').trim() || href;
-  const routed = await sendEditorLinkToDisplay(href, title);
+  const title = link ? String(link.textContent || '').trim() : String(img.getAttribute('alt') || '').trim();
+  const isExplicitImage = !!img;
+  const routed = await sendEditorLinkToDisplay(href, title || href, isExplicitImage);
   if (!routed) {
     const fallbackUrl = normalizeEditorLinkUrl(href);
     if (fallbackUrl) {
@@ -315,7 +318,7 @@ function getOrCreateDisplayChannel() {
   return null;
 }
 
-async function sendEditorLinkToDisplay(rawUrl, title) {
+async function sendEditorLinkToDisplay(rawUrl, title, isExplicitImage = false) {
   const linkUrl = normalizeEditorLinkUrl(rawUrl);
   if (!linkUrl) {
     return false;
@@ -325,18 +328,23 @@ async function sendEditorLinkToDisplay(rawUrl, title) {
     window.open(`student.html?class=${currentClassId}`, 'display-screen', 'width=1280,height=720');
   }
 
-  let mediaType = 'link';
+  let mediaType = isExplicitImage ? 'image' : 'link';
   const lowerUrl = linkUrl.toLowerCase();
-  if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
-    mediaType = 'video';
-  } else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
-    mediaType = 'video';
-  } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
-    mediaType = 'image';
-  } else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
-    mediaType = 'audio';
-  } else if (lowerUrl.match(/\.(pdf)$/)) {
-    mediaType = 'pdf';
+  
+  if (!isExplicitImage) {
+    if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+      mediaType = 'video';
+    } else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
+      mediaType = 'video';
+    } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
+      mediaType = 'image';
+    } else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
+      mediaType = 'audio';
+    } else if (lowerUrl.match(/\.(pdf)$/)) {
+      mediaType = 'pdf';
+    } else if (lowerUrl.includes('drive.google.com/thumbnail')) {
+      mediaType = 'image';
+    }
   }
 
   const message = {
@@ -1176,12 +1184,19 @@ async function insertVerseReference() {
 
 // Insert Image
 function insertImage() {
-  const imageUrl = document.getElementById('image-url').value.trim();
+  let imageUrl = document.getElementById('image-url').value.trim();
   const imageAlt = document.getElementById('image-alt').value.trim();
 
   if (!imageUrl) {
     alert('Please enter an image URL or upload an image');
     return;
+  }
+
+  // Convert Google Drive share links to thumbnail/direct image links
+  const gdriveRegex = /(?:https?:\/\/)?(?:drive|docs)\.google\.com\/(?:file\/d\/|open\?id=)([\w-]+)/i;
+  const match = imageUrl.match(gdriveRegex);
+  if (match && match[1]) {
+    imageUrl = `https://drive.google.com/thumbnail?id=${match[1]}`;
   }
 
   editor.chain()
@@ -1710,6 +1725,8 @@ function extractText(node) {
 }
 
 // Code View Toggle Function
+let codeMirrorInstance = null;
+
 function toggleCodeView() {
   if (!editor) return;
 
@@ -1723,16 +1740,58 @@ function toggleCodeView() {
 
   if (isCodeView) {
     // Switch to Code View
-    const currentHtml = editor.getHTML();
+    let currentHtml = editor.getHTML();
+    
+    // Format HTML if js-beautify is available
+    if (window.html_beautify) {
+      currentHtml = window.html_beautify(currentHtml, {
+        indent_size: 2,
+        wrap_attributes: 'auto',
+        preserve_newlines: false
+      });
+    }
+    
     codeTextarea.value = currentHtml;
     editorDiv.style.display = 'none';
     codeTextarea.style.display = 'block';
     codeBtn.classList.add('is-active');
+    
+    // Initialize CodeMirror if available
+    if (window.CodeMirror && !codeMirrorInstance) {
+      codeMirrorInstance = window.CodeMirror.fromTextArea(codeTextarea, {
+        mode: 'htmlmixed',
+        theme: 'material-darker',
+        lineNumbers: true,
+        lineWrapping: true,
+        viewportMargin: Infinity
+      });
+      
+      // Sync changes from CodeMirror back to textarea
+      codeMirrorInstance.on('change', () => {
+        codeTextarea.value = codeMirrorInstance.getValue();
+        isDirty = true;
+        updateSaveStatus('Modified');
+        startAutoSave();
+      });
+    }
+    
+    if (codeMirrorInstance) {
+      codeMirrorInstance.getWrapperElement().style.display = 'block';
+      codeMirrorInstance.setValue(currentHtml);
+      // Wait for display to take effect before refreshing
+      setTimeout(() => codeMirrorInstance.refresh(), 10);
+    }
   } else {
     // Switch back to Rich Text View
-    const newHtml = codeTextarea.value;
+    const newHtml = codeMirrorInstance ? codeMirrorInstance.getValue() : codeTextarea.value;
     editor.commands.setContent(newHtml);
-    codeTextarea.style.display = 'none';
+    
+    if (codeMirrorInstance) {
+      codeMirrorInstance.getWrapperElement().style.display = 'none';
+    } else {
+      codeTextarea.style.display = 'none';
+    }
+    
     editorDiv.style.display = 'block';
     codeBtn.classList.remove('is-active');
     
