@@ -964,36 +964,147 @@ function renderGeneratedOutline() {
   // Add stopped-here markers with line numbers
   addStoppedMarkersToEditorContent(displayContainer);
 
-  // Add click handlers to external links - require Alt key to open
-  const links = displayContainer.querySelectorAll('a[href]');
-  links.forEach(link => {
-    if (link.classList.contains('editor-media-tile')) {
-      return;
-    }
-
-    if ((link.getAttribute('href') || '').startsWith('bst-media:')) {
-      return;
-    }
-
-    link.addEventListener('click', (e) => {
-      // Only allow opening if Alt key is held
-      if (!e.altKey) {
-        e.preventDefault();
-        // Show visual feedback that Alt is required
-        const originalColor = link.style.color;
-        link.style.color = '#ffc107';
-        link.title = 'Hold Alt while clicking to open link';
-        setTimeout(() => {
-          link.style.color = originalColor;
-          link.title = '';
-        }, 1000);
-      }
-    });
-  });
-
   // Set up click handlers for Q&A pause markers (from TipTap editor)
   setupQAPauseMarkerHandlers();
 }
+
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('a[href]');
+  if (!link) return;
+  
+  const inNotes = notesEl && notesEl.contains(link);
+  const inDisplay = document.querySelector('.editor-content-display')?.contains(link);
+  const inGuide = document.getElementById('guide-content')?.contains(link);
+  
+  if (inNotes || inDisplay || inGuide) {
+    handleTeacherLinkClick(e, link);
+  }
+});
+
+function handleTeacherLinkClick(e, link) {
+  if (link.classList.contains('editor-media-tile')) {
+    return;
+  }
+
+  const href = link.getAttribute('href') || '';
+  if (href.startsWith('bst-media:') || href === '#' || href.startsWith('#')) {
+    return;
+  }
+
+  e.preventDefault();
+
+  // If Alt is held, open locally
+  if (e.altKey) {
+    window.open(href, '_blank', 'noopener,noreferrer');
+    return;
+  }
+
+  // Otherwise, determine media type and send to display
+  let mediaType = 'link';
+  const lowerUrl = href.toLowerCase();
+  if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+    mediaType = 'video';
+  } else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
+    mediaType = 'video';
+  } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
+    mediaType = 'image';
+  } else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
+    mediaType = 'audio';
+  } else if (lowerUrl.match(/\.(pdf)$/)) {
+    mediaType = 'pdf';
+  }
+
+  const title = String(link.textContent || '').trim() || href;
+  sendCommand('displayMedia', {
+    media: {
+      type: mediaType,
+      title: title,
+      url: href,
+      sources: [{ url: href }]
+    }
+  });
+
+  // Visual feedback
+  const originalColor = link.style.color;
+  link.style.color = '#4CAF50';
+  link.title = 'Sent to display screen (Hold Alt to open locally)';
+  setTimeout(() => {
+    link.style.color = originalColor;
+    link.title = '';
+  }, 1500);
+}
+
+// Custom Context Menu for Text Selection
+let customContextMenu = null;
+function createContextMenu() {
+  if (customContextMenu) return;
+  customContextMenu = document.createElement('div');
+  customContextMenu.id = 'custom-context-menu';
+  customContextMenu.style.position = 'fixed';
+  customContextMenu.style.zIndex = '10000';
+  customContextMenu.style.background = '#1e1e1e';
+  customContextMenu.style.border = '1px solid #333';
+  customContextMenu.style.borderRadius = '4px';
+  customContextMenu.style.padding = '4px 0';
+  customContextMenu.style.minWidth = '200px';
+  customContextMenu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+  customContextMenu.style.display = 'none';
+  customContextMenu.innerHTML = `
+    <style>
+      .context-menu-item {
+        padding: 10px 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #fff;
+        font-size: 14px;
+        user-select: none;
+      }
+      .context-menu-item:hover {
+        background: rgba(255,255,255,0.1);
+      }
+    </style>
+    <div class="context-menu-item" id="ctx-display">
+      <span class="material-symbols-outlined" style="font-size:18px; color: var(--accent);">cast</span> Display on Student Screen
+    </div>
+  `;
+  document.body.appendChild(customContextMenu);
+
+  document.getElementById('ctx-display').addEventListener('click', () => {
+    const text = window.getSelection().toString().trim();
+    if (text) {
+      sendTextToStudent('Highlighted Note', text);
+      flashStatus('Displayed highlighted text to student screen');
+    }
+    customContextMenu.style.display = 'none';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (customContextMenu.style.display !== 'none' && !customContextMenu.contains(e.target)) {
+      customContextMenu.style.display = 'none';
+    }
+  });
+}
+
+document.addEventListener('contextmenu', (e) => {
+  const selection = window.getSelection().toString().trim();
+  if (selection && !e.shiftKey) { // Allow shift+right click for default menu
+    e.preventDefault();
+    createContextMenu();
+    
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    customContextMenu.style.display = 'block';
+    const rect = customContextMenu.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width;
+    if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height;
+    
+    customContextMenu.style.left = `${x}px`;
+    customContextMenu.style.top = `${y}px`;
+  }
+});
 
 function decodeEditorMediaPayload(encodedPayload) {
   if (!encodedPayload) return null;

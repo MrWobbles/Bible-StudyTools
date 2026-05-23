@@ -325,10 +325,24 @@ async function sendEditorLinkToDisplay(rawUrl, title) {
     window.open(`student.html?class=${currentClassId}`, 'display-screen', 'width=1280,height=720');
   }
 
+  let mediaType = 'link';
+  const lowerUrl = linkUrl.toLowerCase();
+  if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+    mediaType = 'video';
+  } else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
+    mediaType = 'video';
+  } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
+    mediaType = 'image';
+  } else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
+    mediaType = 'audio';
+  } else if (lowerUrl.match(/\.(pdf)$/)) {
+    mediaType = 'pdf';
+  }
+
   const message = {
     type: 'displayMedia',
     media: {
-      type: 'link',
+      type: mediaType,
       title: title || 'External Link',
       url: linkUrl,
       sources: [{ url: linkUrl }]
@@ -660,6 +674,24 @@ function setupEventListeners() {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       openModal('search-modal');
+    }
+    
+    // Ctrl+K to open verse linking modal with highlighted text
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      const selection = editor.state.selection;
+      if (selection && !selection.empty) {
+        const selectedText = editor.state.doc.textBetween(selection.from, selection.to, ' ');
+        const verseInput = document.getElementById('verse-input');
+        if (verseInput) verseInput.value = selectedText;
+      }
+      openModal('verse-modal');
+    }
+
+    // Ctrl+I to open image insertion modal
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      openModal('image-modal');
     }
 
     // Alt+B to insert verse text after highlighted address

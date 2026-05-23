@@ -724,7 +724,7 @@ function renderQuestionMedia(media) {
 
   playerDiv.innerHTML = `
     <div class="question-frame" style="padding:60px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"none\" stroke=\"rgba(240,180,41,0.1)\" stroke-width=\"0.5\"/></svg>') repeat;opacity:0.3;"></div>
+      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2240%22%20fill%3D%22none%22%20stroke%3D%22rgba(240%2C180%2C41%2C0.1)%22%20stroke-width%3D%220.5%22%2F%3E%3C%2Fsvg%3E') repeat;opacity:0.3;"></div>
       <div style="text-align:center;max-width:85%;position:relative;z-index:1;">
         <div style="font-size:48px;margin-bottom:24px;"><span class="material-symbols-outlined" style="font-size: 48px;">help</span></div>
         <h1 class="question-prompt" style="color:#fff;font-size:52px;line-height:1.4;font-weight:600;margin:0;text-shadow:2px 2px 4px rgba(0,0,0,0.3);">${escapeHtml(prompt)}</h1>
@@ -752,7 +752,7 @@ function renderTextMedia(media) {
 
   playerDiv.innerHTML = `
     <div class="text-frame" style="padding:60px;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"none\" stroke=\"rgba(240,180,41,0.1)\" stroke-width=\"0.5\"/></svg>') repeat;opacity:0.3;"></div>
+      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2240%22%20fill%3D%22none%22%20stroke%3D%22rgba(240%2C180%2C41%2C0.1)%22%20stroke-width%3D%220.5%22%2F%3E%3C%2Fsvg%3E') repeat;opacity:0.3;"></div>
       <div style="text-align:left;max-width:85%;position:relative;z-index:1;background:rgba(0,0,0,0.3);padding:40px 60px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);">
         ${media.title ? `<h1 style="color:var(--brand);font-size:36px;margin:0 0 30px 0;border-bottom:2px solid rgba(240,180,41,0.3);padding-bottom:15px;">${escapeHtml(media.title)}</h1>` : ''}
         <div class="text-content" style="color:#fff;font-size:42px;line-height:1.5;font-weight:400;text-shadow:1px 1px 2px rgba(0,0,0,0.5);">
