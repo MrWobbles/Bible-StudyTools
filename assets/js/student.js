@@ -920,7 +920,7 @@ async function fetchFromApiBible(reference, bibleId, translation = '') {
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         const text = await res.text();
-        console.error(`API.Bible auth failed (${res.status}):`, text || res.statusText);
+        console.warn(`API.Bible auth failed (${res.status}). Your API_BIBLE_KEY may be invalid. Falling back...`);
       }
       return null;
     }

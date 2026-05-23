@@ -1065,7 +1065,7 @@ async function fetchVerseText(reference, translation) {
       }
     }
   } catch (err) {
-    console.warn('API.Bible fetch failed in editor:', err);
+    console.warn('API.Bible fetch failed in editor, your API_BIBLE_KEY may be invalid. Falling back...', err);
   }
 
   // Fallback to bible-api.com

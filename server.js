@@ -61,7 +61,7 @@ const SMTP_USER = String(process.env.SMTP_USER || '').trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
 const SMTP_FROM = String(process.env.SMTP_FROM || SMTP_USER || `Bible Study Tools <${SIGNUP_NOTIFICATION_EMAIL}>`).trim();
 const API_BIBLE_KEY = String(process.env.API_BIBLE_KEY || '').trim();
-const API_BIBLE_BASE_URL = 'https://api.scripture.api.bible/v1';
+const API_BIBLE_BASE_URL = 'https://rest.api.bible/v1';
 const AUTH_COOKIE_NAME = 'bst_access_token';
 
 app.disable('x-powered-by');
