@@ -333,7 +333,7 @@ function renderOutlineWithQuestions() {
         }
 
         // Check if the point text looks like a Bible verse reference and make it clickable
-        const versePattern = /^([1-3]?\s?[A-Za-z]+)\s+(\d+)(:\d+(-\d+)?)?$/;
+        const versePattern = /^([1-3]?\s?[A-Za-z]+)\s+(\d+(?::\d+(?:[–-]\d+(?::\d+)?)?)?)$/;
         const verseMatch = pointText.match(versePattern);
         if (verseMatch || pointType === 'verse') {
           pointDiv.classList.add('clickable-mark');
