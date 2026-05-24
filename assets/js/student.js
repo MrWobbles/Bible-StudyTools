@@ -1210,7 +1210,11 @@ function buildVersePages(lines) {
 
     // Add all chunks from this line
     linesToAdd.forEach((chunk, chunkIdx) => {
-      if (currentHeight + paraHeight > pageHeightThreshold && currentPage.childNodes.length > 0) {
+      measurer.innerHTML = `<p style="margin:0; padding:0;">${chunk}</p>`;
+      const chunkPara = measurer.firstElementChild;
+      const chunkHeight = chunkPara ? chunkPara.getBoundingClientRect().height : 0;
+
+      if (currentHeight + chunkHeight > pageHeightThreshold && currentPage.childNodes.length > 0) {
         console.log(`[Verse] Page ${versePages.length} finalized with ${currentPage.childNodes.length} lines, height ${currentHeight}/${pageHeightThreshold}`);
         finalizePage();
       }
@@ -1220,22 +1224,19 @@ function buildVersePages(lines) {
       p.style.padding = '0';
       p.innerHTML = chunk;
       currentPage.appendChild(p);
-
-      // Measure the actual rendered height of this chunk
-      measurer.innerHTML = `<p style="margin:0; padding:0;">${chunk}</p>`;
-      const chunkPara = measurer.firstElementChild;
-      const chunkHeight = chunkPara ? chunkPara.getBoundingClientRect().height : 0;
       currentHeight += chunkHeight;
     });
   });
 
-  console.log(`[Verse] Total pages created: ${versePages.length + (currentPage.childNodes.length > 0 ? 1 : 0)}`);
-
   finalizePage();
+  console.log(`[Verse] Total pages created: ${versePages.length}`);
   document.body.removeChild(measurer);
 
   if (versePages.length > 0) {
-    versePages[0].style.display = 'block';
+    currentVersePageIndex = 0;
+    versePages.forEach((page, index) => {
+      page.style.display = index === 0 ? 'block' : 'none';
+    });
   }
 }
 
@@ -1293,29 +1294,43 @@ function pageOverflows(page, containerHeight) {
 }
 
 function nextVersePage() {
+  if (!versePages.length && currentVerseLines.length) {
+    buildVersePages(currentVerseLines);
+    ensureVersePagesFit();
+  }
   if (!versePages.length) return;
+
   const nextIndex = Math.min(versePages.length - 1, currentVersePageIndex + 1);
   console.log(`[Verse Nav] Next: current=${currentVersePageIndex}, next=${nextIndex}, total pages=${versePages.length}`);
   if (nextIndex === currentVersePageIndex) {
     console.log(`[Verse Nav] Already at last page`);
     return;
   }
-  versePages[currentVersePageIndex].style.display = 'none';
-  versePages[nextIndex].style.display = 'block';
+
+  versePages.forEach((page, index) => {
+    page.style.display = index === nextIndex ? 'block' : 'none';
+  });
   currentVersePageIndex = nextIndex;
   console.log(`[Verse Nav] Displaying page ${currentVersePageIndex}`);
 }
 
 function previousVersePage() {
+  if (!versePages.length && currentVerseLines.length) {
+    buildVersePages(currentVerseLines);
+    ensureVersePagesFit();
+  }
   if (!versePages.length) return;
+
   const prevIndex = Math.max(0, currentVersePageIndex - 1);
   console.log(`[Verse Nav] Previous: current=${currentVersePageIndex}, prev=${prevIndex}, total pages=${versePages.length}`);
   if (prevIndex === currentVersePageIndex) {
     console.log(`[Verse Nav] Already at first page`);
     return;
   }
-  versePages[currentVersePageIndex].style.display = 'none';
-  versePages[prevIndex].style.display = 'block';
+
+  versePages.forEach((page, index) => {
+    page.style.display = index === prevIndex ? 'block' : 'none';
+  });
   currentVersePageIndex = prevIndex;
   console.log(`[Verse Nav] Displaying page ${currentVersePageIndex}`);
 }
