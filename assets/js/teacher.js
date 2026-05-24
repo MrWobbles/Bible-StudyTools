@@ -1019,7 +1019,7 @@ function handleTeacherLinkClick(e, element) {
       mediaType = 'audio';
     } else if (lowerUrl.match(/\.(pdf)$/)) {
       mediaType = 'pdf';
-    } else if (lowerUrl.includes('drive.google.com/thumbnail')) {
+    } else if (lowerUrl.includes('lh3.googleusercontent.com/d/')) {
       mediaType = 'image';
     }
   }

@@ -3,6 +3,7 @@ let monitorId = null;
 let nextPauseIndex = 0;
 let channel = null;
 let VIDEO_ID = '';
+let VIDEO_START = 0;
 let pausePoints = [];
 let CHANNEL_KEY = 'class1-control';
 let STORAGE_FALLBACK_KEY = 'class1-control-storage';
@@ -36,7 +37,9 @@ function initConfig() {
   const classId = new URLSearchParams(window.location.search).get('class') || '1';
   const config = window.BIBLE_STUDY_CONFIG || {};
   VIDEO_ID = config.videoId || '';
+  VIDEO_START = 0;
   window.VIDEO_ID = VIDEO_ID;
+  window.VIDEO_START = VIDEO_START;
   // Normalize pausePoints: allow seconds (number) or "MM:SS" strings
   pausePoints = Array.isArray(config.pausePoints)
     ? config.pausePoints.map((p) => ({
@@ -86,6 +89,9 @@ function onYouTubeIframeAPIReady() {
         modestbranding: 1,
         color: 'white',
         playsinline: 1,
+        controls: 1,
+        fs: 1,
+        start: VIDEO_START,
         mute: isInIframe ? 1 : 0
       },
       events: {
@@ -585,12 +591,15 @@ function handlePendingMedia() {
       return;
     }
 
-    const newVideoId = videoId || extractVideoId(videoUrl);
-    console.log('[Student] Extracted video ID:', newVideoId, 'from URL:', videoUrl);
+    const videoInfo = extractVideoInfo(videoUrl || videoId);
+    const newVideoId = videoId || videoInfo.id;
+    VIDEO_START = videoInfo.start || 0;
+    window.VIDEO_ID = newVideoId;
+    window.VIDEO_START = VIDEO_START;
+    console.log('[Student] Extracted video ID:', newVideoId, 'from URL:', videoUrl, 'start:', VIDEO_START);
 
     if (newVideoId) {
       VIDEO_ID = newVideoId;
-      window.VIDEO_ID = VIDEO_ID;
       // Destroy existing player if any
       if (player) {
         player.destroy();
@@ -609,6 +618,9 @@ function handlePendingMedia() {
           modestbranding: 1,
           color: 'white',
           playsinline: 1,
+          controls: 1,
+          fs: 1,
+          start: VIDEO_START,
           mute: isInIframe ? 1 : 0
         },
         events: {
@@ -1308,17 +1320,39 @@ function previousVersePage() {
   console.log(`[Verse Nav] Displaying page ${currentVersePageIndex}`);
 }
 
-function extractVideoId(url) {
+function extractVideoInfo(url) {
   const input = String(url || '').trim();
-  if (!input) return '';
+  if (!input) return { id: '', start: 0 };
 
-  const directId = input.match(/^[A-Za-z0-9_-]{11}$/);
-  if (directId) {
-    return directId[0];
+  const directIdMatch = input.match(/^[A-Za-z0-9_-]{11}$/);
+  if (directIdMatch) {
+    return { id: directIdMatch[0], start: 0 };
   }
 
   const match = input.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|shorts\/|embed\/))([^&\?\/]+)/);
-  return match ? match[1] : '';
+  const id = match ? match[1] : '';
+
+  let start = 0;
+  const timeMatch = input.match(/[?&](?:t|start)=([^&\s]+)/);
+  if (timeMatch && timeMatch[1]) {
+    const timeStr = timeMatch[1];
+    if (/^\d+$/.test(timeStr)) {
+      start = parseInt(timeStr, 10);
+    } else {
+      const h = timeStr.match(/(\d+)h/i);
+      const m = timeStr.match(/(\d+)m/i);
+      const s = timeStr.match(/(\d+)s/i);
+      start = (h ? parseInt(h[1], 10) * 3600 : 0) + 
+              (m ? parseInt(m[1], 10) * 60 : 0) + 
+              (s ? parseInt(s[1], 10) : 0);
+    }
+  }
+
+  return { id, start };
+}
+
+function extractVideoId(value) {
+  return extractVideoInfo(value).id;
 }
 
 window.addEventListener('resize', () => {

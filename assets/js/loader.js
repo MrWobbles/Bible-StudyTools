@@ -244,6 +244,7 @@ function openMediaInViewer(media) {
           }
         }
 
+        const videoInfo = extractYoutubeVideoInfo(rawUrl);
         const newPlayer = new YT.Player('player', {
           height: '100%',
           width: '100%',
@@ -252,7 +253,10 @@ function openMediaInViewer(media) {
             rel: 0,
             modestbranding: 1,
             color: 'white',
-            playsinline: 1
+            playsinline: 1,
+            controls: 1,
+            fs: 1,
+            start: videoInfo.start || 0
           },
           events: {
             onReady: function (event) {
@@ -272,7 +276,7 @@ function openMediaInViewer(media) {
 
         // Update the global VIDEO_ID so pause points work if this video has them
         window.VIDEO_ID = videoId;
-        console.log('[Loader] Initialized new YouTube player with video:', videoId);
+        console.log('[Loader] Initialized new YouTube player with video:', videoId, 'start:', videoInfo.start || 0);
       }
     }
   } else if (media.type === 'image' || media.type === 'images') {
@@ -302,17 +306,34 @@ function openMediaInViewer(media) {
   }
 }
 
-function extractYoutubeVideoId(value) {
+function extractYoutubeVideoInfo(value) {
   const input = String(value || '').trim();
-  if (!input) return '';
+  if (!input) return { id: '', start: 0 };
 
-  const directId = input.match(/^[A-Za-z0-9_-]{11}$/);
-  if (directId) {
-    return directId[0];
+  const directIdMatch = input.match(/^[A-Za-z0-9_-]{11}$/);
+  const id = directIdMatch ? directIdMatch[0] : (input.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|shorts\/|embed\/))([^&\?\/]+)/)?.[1] || '');
+
+  let start = 0;
+  const timeMatch = input.match(/[?&](?:t|start)=([^&\s]+)/);
+  if (timeMatch && timeMatch[1]) {
+    const timeStr = timeMatch[1];
+    if (/^\d+$/.test(timeStr)) {
+      start = parseInt(timeStr, 10);
+    } else {
+      const h = timeStr.match(/(\d+)h/i);
+      const m = timeStr.match(/(\d+)m/i);
+      const s = timeStr.match(/(\d+)s/i);
+      start = (h ? parseInt(h[1], 10) * 3600 : 0) +
+              (m ? parseInt(m[1], 10) * 60 : 0) +
+              (s ? parseInt(s[1], 10) : 0);
+    }
   }
 
-  const match = input.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|shorts\/|embed\/))([^&\?\/]+)/);
-  return match ? match[1] : '';
+  return { id, start };
+}
+
+function extractYoutubeVideoId(value) {
+  return extractYoutubeVideoInfo(value).id;
 }
 
 function sanitizeMediaUrl(url) {

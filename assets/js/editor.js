@@ -342,7 +342,7 @@ async function sendEditorLinkToDisplay(rawUrl, title, isExplicitImage = false) {
       mediaType = 'audio';
     } else if (lowerUrl.match(/\.(pdf)$/)) {
       mediaType = 'pdf';
-    } else if (lowerUrl.includes('drive.google.com/thumbnail')) {
+    } else if (lowerUrl.includes('lh3.googleusercontent.com/d/')) {
       mediaType = 'image';
     }
   }
@@ -1196,7 +1196,7 @@ function insertImage() {
   const gdriveRegex = /(?:https?:\/\/)?(?:drive|docs)\.google\.com\/(?:file\/d\/|open\?id=)([\w-]+)/i;
   const match = imageUrl.match(gdriveRegex);
   if (match && match[1]) {
-    imageUrl = `https://drive.google.com/thumbnail?id=${match[1]}`;
+    imageUrl = `https://lh3.googleusercontent.com/d/${match[1]}`;
   }
 
   editor.chain()
