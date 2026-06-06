@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VBS Media Player</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: sans-serif;
+    }
+    
+    #video-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      font-size: 2rem;
+      transition: opacity 0.5s;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading-overlay">Waiting for signal...</div>
+  <div id="video-container"></div>
+  <audio id="sfx-player"></audio>
+
+  <script>
+    const videoContainer = document.getElementById('video-container');
+    const sfxPlayer = document.getElementById('sfx-player');
+    const overlay = document.getElementById('loading-overlay');
+    let currentVideo = null;
+
+    function playVideo(url) {
+      if (currentVideo) {
+        currentVideo.pause();
+        currentVideo.remove();
+      }
+      
+      overlay.style.opacity = '0';
+      setTimeout(() => { overlay.style.display = 'none'; }, 500);
+
+      const video = document.createElement('video');
+      video.src = url;
+      video.autoplay = true;
+      video.loop = true;
+      video.muted = false; // ensure sound plays if needed
+      
+      videoContainer.appendChild(video);
+      currentVideo = video;
+    }
+
+    function playSfx(url) {
+      sfxPlayer.src = url;
+      sfxPlayer.play().catch(e => console.error('Failed to play SFX:', e));
+    }
+
+    function stopAll() {
+      if (currentVideo) {
+        currentVideo.pause();
+        currentVideo.remove();
+        currentVideo = null;
+      }
+      sfxPlayer.pause();
+      sfxPlayer.src = '';
+      
+      overlay.style.display = 'flex';
+      setTimeout(() => { overlay.style.opacity = '1'; }, 10);
+    }
+
+    // Connect to Server-Sent Events for VBS Control
+    function connectSSE() {
+      const source = new EventSource('/api/vbs/events');
+      
+      source.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'play_video') {
+            playVideo(data.payload.url);
+          } else if (data.type === 'play_sfx') {
+            playSfx(data.payload.url);
+          } else if (data.type === 'stop_all') {
+            stopAll();
+          }
+        } catch (e) {
+          console.error('Error parsing SSE message:', e);
+        }
+      };
+
+      source.onerror = (error) => {
+        console.error('SSE Error:', error);
+        source.close();
+        setTimeout(connectSSE, 3000); // Reconnect after 3s
+      };
+    }
+
+    // Start SSE connection
+    connectSSE();
+  </script>
+</body>
+</html>

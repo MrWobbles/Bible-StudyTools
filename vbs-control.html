@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VBS Media Controller</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --card-bg: #1f2937;
+      --text: #f9fafb;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --success: #10b981;
+      --success-hover: #059669;
+      --warning: #f59e0b;
+      --warning-hover: #d97706;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background: #000;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .container {
+      padding: 1rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .section {
+      background: var(--card-bg);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-header h2 {
+      margin: 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.75rem 1rem;
+      border-radius: 0.25rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      width: 100%;
+      word-wrap: break-word;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: var(--danger-hover); }
+    .btn-success { background: var(--success); }
+    .btn-success:hover { background: var(--success-hover); }
+    .btn-warning { background: var(--warning); color: #000; }
+    .btn-warning:hover { background: var(--warning-hover); }
+
+    .btn-sm {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.875rem;
+      width: auto;
+    }
+
+    #status {
+      text-align: center;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+      border-radius: 0.25rem;
+      display: none;
+    }
+
+    .scene-card {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .scene-card h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+    }
+
+    .scene-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .sfx-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.75);
+      z-index: 50;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal.active { display: flex; }
+
+    .modal-content {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      border: 1px solid #4b5563;
+      background: #374151;
+      color: white;
+      box-sizing: border-box;
+    }
+
+    .sfx-item {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>VBS Controller</h1>
+    <button class="btn-danger" style="width: auto;" onclick="sendCommand('stop_all')">STOP ALL</button>
+  </header>
+
+  <div class="container">
+    <div id="status"></div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>Scenes</h2>
+        <button class="btn-success btn-sm" onclick="openSceneModal()">+ Add Scene</button>
+      </div>
+      <div id="scenes-container">
+        <p>Loading scenes...</p>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-header">
+        <h2>Raw Media (Fallback)</h2>
+      </div>
+      <div style="margin-bottom: 1rem;">
+        <h3>Background Videos</h3>
+        <div class="grid" id="video-grid"><p>Loading videos...</p></div>
+      </div>
+      <div>
+        <h3>Sound Effects</h3>
+        <div class="grid" id="sfx-grid"><p>Loading sound effects...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene Modal -->
+  <div class="modal" id="scene-modal">
+    <div class="modal-content">
+      <h2 id="modal-title">Add Scene</h2>
+      <input type="hidden" id="scene-id">
+      
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="scene-title" placeholder="e.g. Day 1 - Jungle">
+      </div>
+      
+      <div class="form-group">
+        <label>Video (URL or Asset Path)</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <input type="text" id="scene-video" placeholder="/assets/video/file.mp4">
+          <select id="video-select" style="width: auto;" onchange="document.getElementById('scene-video').value = this.value">
+            <option value="">Select...</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Sound Effects</label>
+        <div id="sfx-list"></div>
+        <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addSfxRow()">+ Add SFX</button>
+      </div>
+
+      <div class="form-group" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+        <button type="button" class="btn-danger btn-sm" onclick="closeSceneModal()">Cancel</button>
+        <button type="button" class="btn-success btn-sm" onclick="saveScene()">Save Scene</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('bst_access_token') || sessionStorage.getItem('bst_access_token');
+    
+    let rawMedia = { videos: [], audio: [] };
+    let scenes = [];
+
+    const getHeaders = () => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    };
+
+    function showStatus(message, isError = false) {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = message;
+      statusEl.style.display = 'block';
+      statusEl.style.backgroundColor = isError ? '#7f1d1d' : '#065f46';
+      setTimeout(() => statusEl.style.display = 'none', 3000);
+    }
+
+    async function sendCommand(type, payload = {}) {
+      try {
+        const response = await fetch('/api/vbs/command', {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ type, payload })
+        });
+        if (!response.ok) {
+          if (response.status === 401) return window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
+          throw new Error('Command failed');
+        }
+        showStatus('Command sent!');
+      } catch (err) {
+        console.error(err);
+        showStatus('Error sending command.', true);
+      }
+    }
+
+    async function loadData() {
+      try {
+        const [mediaRes, scenesRes] = await Promise.all([
+          fetch('/api/vbs/media', { headers: getHeaders() }),
+          fetch('/api/vbs/scenes', { headers: getHeaders() }).catch(() => null)
+        ]);
+        
+        if (mediaRes.status === 401 || (scenesRes && scenesRes.status === 401)) {
+          window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
+          return;
+        }
+
+        const mediaData = await mediaRes.json();
+        rawMedia = mediaData;
+        
+        if (scenesRes && scenesRes.ok) {
+          const scenesData = await scenesRes.json();
+          scenes = scenesData.scenes || [];
+        } else {
+          showStatus('Could not load scenes from Supabase.', true);
+        }
+
+        renderRawMedia();
+        renderScenes();
+        populateVideoDropdown();
+      } catch (err) {
+        console.error(err);
+        showStatus('Error loading data.', true);
+      }
+    }
+
+    function renderRawMedia() {
+      const videoGrid = document.getElementById('video-grid');
+      const sfxGrid = document.getElementById('sfx-grid');
+      
+      videoGrid.innerHTML = '';
+      sfxGrid.innerHTML = '';
+
+      if (rawMedia.videos && rawMedia.videos.length > 0) {
+        rawMedia.videos.forEach(file => {
+          const btn = document.createElement('button');
+          btn.textContent = file;
+          btn.onclick = () => sendCommand('play_video', { url: `/assets/video/${file}` });
+          videoGrid.appendChild(btn);
+        });
+      } else {
+        videoGrid.innerHTML = '<p>No videos found.</p>';
+      }
+
+      if (rawMedia.audio && rawMedia.audio.length > 0) {
+        rawMedia.audio.forEach(file => {
+          const btn = document.createElement('button');
+          btn.textContent = file;
+          btn.onclick = () => sendCommand('play_sfx', { url: `/assets/audio/${file}` });
+          sfxGrid.appendChild(btn);
+        });
+      } else {
+        sfxGrid.innerHTML = '<p>No audio found.</p>';
+      }
+    }
+
+    function renderScenes() {
+      const container = document.getElementById('scenes-container');
+      container.innerHTML = '';
+
+      if (scenes.length === 0) {
+        container.innerHTML = '<p>No scenes configured yet.</p>';
+        return;
+      }
+
+      scenes.forEach(scene => {
+        const card = document.createElement('div');
+        card.className = 'scene-card';
+        
+        let sfxHtml = '';
+        if (scene.sound_effects && scene.sound_effects.length > 0) {
+          sfxHtml = `<div class="sfx-grid">
+            ${scene.sound_effects.map(sfx => `
+              <button type="button" class="btn-warning" onclick="sendCommand('play_sfx', { url: '${sfx.url}' })">
+                ${sfx.label || 'SFX'}
+              </button>
+            `).join('')}
+          </div>`;
+        }
+
+        card.innerHTML = `
+          <h3>${scene.title}</h3>
+          <div class="scene-actions">
+            ${scene.video_url ? `<button class="btn-success" onclick="sendCommand('play_video', { url: '${scene.video_url}' })">Play Background</button>` : ''}
+            <button class="btn-sm" style="background:#4b5563;" onclick="editScene('${scene.id}')">Edit</button>
+            <button class="btn-sm btn-danger" onclick="deleteScene('${scene.id}')">Delete</button>
+          </div>
+          ${sfxHtml}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // --- Modal Logic ---
+    function openSceneModal(scene = null) {
+      const modal = document.getElementById('scene-modal');
+      const sfxList = document.getElementById('sfx-list');
+      
+      document.getElementById('modal-title').textContent = scene ? 'Edit Scene' : 'Add Scene';
+      document.getElementById('scene-id').value = scene ? scene.id : '';
+      document.getElementById('scene-title').value = scene ? scene.title : '';
+      document.getElementById('scene-video').value = scene ? (scene.video_url || '') : '';
+      sfxList.innerHTML = '';
+      
+      if (scene && scene.sound_effects) {
+        scene.sound_effects.forEach(sfx => addSfxRow(sfx.label, sfx.url));
+      } else {
+        addSfxRow();
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closeSceneModal() {
+      document.getElementById('scene-modal').classList.remove('active');
+    }
+
+    function addSfxRow(label = '', url = '') {
+      const sfxList = document.getElementById('sfx-list');
+      const div = document.createElement('div');
+      div.className = 'sfx-item';
+      
+      // Select dropdown for available audio
+      let options = '<option value="">Select...</option>';
+      if (rawMedia.audio) {
+        rawMedia.audio.forEach(a => {
+          options += `<option value="/assets/audio/${a}">/assets/audio/${a}</option>`;
+        });
+      }
+
+      div.innerHTML = `
+        <input type="text" placeholder="Label" value="${label}" style="width: 30%;">
+        <input type="text" placeholder="URL / Path" value="${url}" style="width: 40%;">
+        <select style="width: 20%;" onchange="this.previousElementSibling.value = this.value">${options}</select>
+        <button type="button" class="btn-danger btn-sm" style="width: 10%;" onclick="this.parentElement.remove()">X</button>
+      `;
+      sfxList.appendChild(div);
+    }
+
+    function populateVideoDropdown() {
+      const select = document.getElementById('video-select');
+      select.innerHTML = '<option value="">Select...</option>';
+      if (rawMedia.videos) {
+        rawMedia.videos.forEach(v => {
+          const val = `/assets/video/${v}`;
+          select.innerHTML += `<option value="${val}">${val}</option>`;
+        });
+      }
+    }
+
+    async function saveScene() {
+      const id = document.getElementById('scene-id').value;
+      const title = document.getElementById('scene-title').value.trim();
+      const video_url = document.getElementById('scene-video').value.trim();
+      
+      const sfxItems = document.querySelectorAll('.sfx-item');
+      const sound_effects = [];
+      sfxItems.forEach(item => {
+        const inputs = item.querySelectorAll('input');
+        if (inputs[0].value.trim() && inputs[1].value.trim()) {
+          sound_effects.push({
+            label: inputs[0].value.trim(),
+            url: inputs[1].value.trim()
+          });
+        }
+      });
+
+      if (!title) return alert('Title is required');
+
+      const payload = { title, video_url, sound_effects };
+      const url = id ? `/api/vbs/scenes/${id}` : '/api/vbs/scenes';
+      const method = id ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: getHeaders(),
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Save failed');
+        closeSceneModal();
+        loadData(); // reload
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save scene. Make sure Supabase is connected.');
+      }
+    }
+
+    function editScene(id) {
+      const scene = scenes.find(s => s.id === id);
+      if (scene) openSceneModal(scene);
+    }
+
+    async function deleteScene(id) {
+      if (!confirm('Are you sure you want to delete this scene?')) return;
+      
+      try {
+        const res = await fetch(`/api/vbs/scenes/${id}`, {
+          method: 'DELETE',
+          headers: getHeaders()
+        });
+        if (!res.ok) throw new Error('Delete failed');
+        loadData();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to delete scene.');
+      }
+    }
+
+    // Initialize
+    loadData();
+  </script>
+</body>
+</html>

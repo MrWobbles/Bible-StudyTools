@@ -2457,9 +2457,12 @@ PUBLIC_ASSET_DIRS.forEach((dirName) => {
 // VBS Domain Host Routing
 app.use((req, res, next) => {
   const host = String(req.get('host') || '').toLowerCase().split(':')[0];
-  const vbsDomain = String(process.env.VBS_DOMAIN || 'vbs.yourdomain.com').trim().toLowerCase();
+  const vbsDomains = String(process.env.VBS_DOMAIN || 'vbc.mrwobbles.dev,vbs.mrwobbles.dev')
+    .split(',')
+    .map(d => d.trim().toLowerCase())
+    .filter(Boolean);
   
-  if (host === vbsDomain && req.method === 'GET') {
+  if (vbsDomains.includes(host) && req.method === 'GET') {
     // If the path isn't specifically requesting another known file/API, serve vbs.html
     const isApiOrAsset = req.path.startsWith('/api/') || req.path.startsWith('/assets/');
     if (!isApiOrAsset) {
