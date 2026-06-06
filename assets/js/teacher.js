@@ -939,10 +939,10 @@ function renderGeneratedOutline() {
   // Add click handlers to verse references
   const verseRefs = displayContainer.querySelectorAll('.verse-reference');
   verseRefs.forEach(ref => {
-    ref.addEventListener('click', () => {
-      const verse = ref.dataset.verse;
+    ref.addEventListener('click', (event) => {
+      event.preventDefault();
+      const verse = (ref.dataset.verse || ref.textContent || '').trim();
       if (verse) {
-        // Use configured Bible translation from config
         const translation = classConfig?.bibleTranslation || window.BIBLE_STUDY_CONFIG?.bibleTranslation || 'nkjv';
         sendVerseToStudent(verse, translation);
         // Visual feedback

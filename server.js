@@ -145,9 +145,9 @@ const DATA_DOC_MAP = {
   lessonplans: 'lessonPlans',
   notes: 'notes'
 };
-const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html', 'dj-dashboard.html', 'requests.html'];
+const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html', 'dj-dashboard.html', 'requests.html', 'vbs.html', 'vbs-control.html'];
 const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
-const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html']);
+const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html', 'vbs.html']);
 const ADMIN_HTML_FILES = new Set(['user-admin.html']);
 
 const supabaseServiceClient = SUPABASE_SERVICE_ENABLED
@@ -2139,6 +2139,163 @@ app.post('/api/download/youtube', requireAdminAccess, async (req, res) => {
   }
 });
 
+// ===== VBS CONTROL API =====
+let vbsClients = [];
+
+const TABLE_VBS_SCENES = String(process.env.SUPABASE_VBS_SCENES_TABLE || 'bst_vbs_scenes').trim();
+
+app.get('/api/vbs/scenes', requireAuthenticatedAccess, async (req, res) => {
+  if (!supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase is disconnected. Cannot fetch VBS scenes.' });
+  }
+  
+  try {
+    const { data, error } = await supabaseServiceClient
+      .from(TABLE_VBS_SCENES)
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Supabase query failed: ${error.message}`);
+    }
+    
+    res.json({ success: true, scenes: data || [] });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to fetch scenes');
+  }
+});
+
+app.post('/api/vbs/scenes', requireAuthenticatedAccess, async (req, res) => {
+  if (!supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase is disconnected.' });
+  }
+  
+  try {
+    const { title, video_url, sound_effects, sort_order } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Scene title is required' });
+    }
+    
+    const { data, error } = await supabaseServiceClient
+      .from(TABLE_VBS_SCENES)
+      .insert([{
+        title,
+        video_url: video_url || null,
+        sound_effects: Array.isArray(sound_effects) ? sound_effects : [],
+        sort_order: typeof sort_order === 'number' ? sort_order : 0
+      }])
+      .select()
+      .maybeSingle();
+      
+    if (error) throw new Error(error.message);
+    
+    res.json({ success: true, scene: data });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to create scene');
+  }
+});
+
+app.put('/api/vbs/scenes/:id', requireAuthenticatedAccess, async (req, res) => {
+  if (!supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase is disconnected.' });
+  }
+  
+  try {
+    const { id } = req.params;
+    const { title, video_url, sound_effects, sort_order } = req.body;
+    
+    const updateData = { updated_at: new Date().toISOString() };
+    if (title !== undefined) updateData.title = title;
+    if (video_url !== undefined) updateData.video_url = video_url;
+    if (sound_effects !== undefined) updateData.sound_effects = Array.isArray(sound_effects) ? sound_effects : [];
+    if (typeof sort_order === 'number') updateData.sort_order = sort_order;
+    
+    const { data, error } = await supabaseServiceClient
+      .from(TABLE_VBS_SCENES)
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+      
+    if (error) throw new Error(error.message);
+    if (!data) return res.status(404).json({ error: 'Scene not found' });
+    
+    res.json({ success: true, scene: data });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to update scene');
+  }
+});
+
+app.delete('/api/vbs/scenes/:id', requireAuthenticatedAccess, async (req, res) => {
+  if (!supabaseServiceClient) {
+    return res.status(503).json({ error: 'Supabase is disconnected.' });
+  }
+  
+  try {
+    const { id } = req.params;
+    const { error } = await supabaseServiceClient
+      .from(TABLE_VBS_SCENES)
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw new Error(error.message);
+    
+    res.json({ success: true });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to delete scene');
+  }
+});
+
+app.get('/api/vbs/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  vbsClients.push(res);
+  
+  req.on('close', () => {
+    vbsClients = vbsClients.filter(client => client !== res);
+  });
+});
+
+app.post('/api/vbs/command', requireAuthenticatedAccess, (req, res) => {
+  const { type, payload } = req.body;
+  if (!type) return res.status(400).json({ error: 'Command type required' });
+
+  const eventData = JSON.stringify({ type, payload });
+  vbsClients.forEach(client => {
+    client.write(`data: ${eventData}\n\n`);
+  });
+
+  res.json({ success: true, clientsNotified: vbsClients.length });
+});
+
+app.get('/api/vbs/media', requireAuthenticatedAccess, async (req, res) => {
+  try {
+    const videoDir = path.join(__dirname, 'assets', 'video');
+    const audioDir = path.join(__dirname, 'assets', 'audio');
+    
+    let videos = [];
+    let audio = [];
+    
+    try {
+      const vFiles = await fs.readdir(videoDir);
+      videos = vFiles.filter(f => f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.ogg'));
+    } catch(e) {}
+    
+    try {
+      const aFiles = await fs.readdir(audioDir);
+      audio = aFiles.filter(f => f.endsWith('.mp3') || f.endsWith('.wav') || f.endsWith('.ogg') || f.endsWith('.m4a'));
+    } catch(e) {}
+    
+    res.json({ success: true, videos, audio });
+  } catch (err) {
+    sendApiError(res, err, 'Failed to fetch media');
+  }
+});
+
 // ===== DJ SONG REQUEST API =====
 const QUEUE_FILE = path.join(__dirname, 'queue.json');
 
@@ -2295,6 +2452,21 @@ app.get('/api/music/search', async (req, res) => {
 // ===== STATIC FILES (must be after API routes) =====
 PUBLIC_ASSET_DIRS.forEach((dirName) => {
   app.use(`/assets/${dirName}`, express.static(path.join(__dirname, 'assets', dirName)));
+});
+
+// VBS Domain Host Routing
+app.use((req, res, next) => {
+  const host = String(req.get('host') || '').toLowerCase().split(':')[0];
+  const vbsDomain = String(process.env.VBS_DOMAIN || 'vbs.yourdomain.com').trim().toLowerCase();
+  
+  if (host === vbsDomain && req.method === 'GET') {
+    // If the path isn't specifically requesting another known file/API, serve vbs.html
+    const isApiOrAsset = req.path.startsWith('/api/') || req.path.startsWith('/assets/');
+    if (!isApiOrAsset) {
+      return res.sendFile(path.join(__dirname, 'vbs.html'));
+    }
+  }
+  next();
 });
 
 ['auth.html', ...PUBLIC_HTML_FILES].forEach((fileName) => {
