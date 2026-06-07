@@ -25,12 +25,14 @@
       top: 0;
       left: 0;
       z-index: 1;
+      background-color: transparent;
     }
 
     video {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block; /* removes bottom spacing in some browsers */
     }
 
     #loading-overlay {
@@ -75,14 +77,32 @@
       video.src = url;
       video.autoplay = true;
       video.loop = true;
-      video.muted = false; // ensure sound plays if needed
+      video.muted = true; // Mute the background video
+      video.playsInline = true;
+      video.setAttribute('playsinline', ''); // Required for iOS/iPadOS
       
+      video.onerror = function() {
+        const err = video.error;
+        let msg = 'Unknown Error';
+        if (err) {
+          switch (err.code) {
+            case 1: msg = 'MEDIA_ERR_ABORTED'; break;
+            case 2: msg = 'MEDIA_ERR_NETWORK'; break;
+            case 3: msg = 'MEDIA_ERR_DECODE (Codec not supported by this browser)'; break;
+            case 4: msg = 'MEDIA_ERR_SRC_NOT_SUPPORTED (File not found or format not supported)'; break;
+          }
+        }
+        console.error('Video Error:', msg, url);
+        alert('Video Error: ' + msg + '\\nURL: ' + url);
+      };
+
       videoContainer.appendChild(video);
       currentVideo = video;
     }
 
-    function playSfx(url) {
+    function playSfx(url, loop = false) {
       sfxPlayer.src = url;
+      sfxPlayer.loop = loop;
       sfxPlayer.play().catch(e => console.error('Failed to play SFX:', e));
     }
 
@@ -110,7 +130,7 @@
           if (data.type === 'play_video') {
             playVideo(data.payload.url);
           } else if (data.type === 'play_sfx') {
-            playSfx(data.payload.url);
+            playSfx(data.payload.url, data.payload.loop);
           } else if (data.type === 'stop_all') {
             stopAll();
           }

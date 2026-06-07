@@ -2282,7 +2282,7 @@ app.get('/api/vbs/media', requireAuthenticatedAccess, async (req, res) => {
     
     try {
       const vFiles = await fs.readdir(videoDir);
-      videos = vFiles.filter(f => f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.ogg'));
+      videos = vFiles.filter(f => f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.ogg') || f.endsWith('.mov'));
     } catch(e) {}
     
     try {

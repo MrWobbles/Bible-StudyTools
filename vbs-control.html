@@ -229,9 +229,15 @@
       <h2 id="modal-title">Add Scene</h2>
       <input type="hidden" id="scene-id">
       
-      <div class="form-group">
-        <label>Title</label>
-        <input type="text" id="scene-title" placeholder="e.g. Day 1 - Jungle">
+      <div style="display: flex; gap: 1rem;">
+        <div class="form-group" style="flex: 1;">
+          <label>Title</label>
+          <input type="text" id="scene-title" placeholder="e.g. Day 1 - Jungle">
+        </div>
+        <div class="form-group" style="width: 100px;">
+          <label>Sort Order</label>
+          <input type="number" id="scene-sort-order" value="0">
+        </div>
       </div>
       
       <div class="form-group">
@@ -373,15 +379,18 @@
         if (scene.sound_effects && scene.sound_effects.length > 0) {
           sfxHtml = `<div class="sfx-grid">
             ${scene.sound_effects.map(sfx => `
-              <button type="button" class="btn-warning" onclick="sendCommand('play_sfx', { url: '${sfx.url}' })">
-                ${sfx.label || 'SFX'}
+              <button type="button" class="btn-warning" onclick="sendCommand('play_sfx', { url: '${sfx.url}', loop: ${!!sfx.loop} })">
+                ${sfx.label || 'SFX'}${sfx.loop ? ' ↻' : ''}
               </button>
             `).join('')}
           </div>`;
         }
 
         card.innerHTML = `
-          <h3>${scene.title}</h3>
+          <div style="display:flex; justify-content:space-between;">
+            <h3>${scene.title}</h3>
+            <span style="color:#9ca3af; font-size:0.875rem;">Order: ${scene.sort_order}</span>
+          </div>
           <div class="scene-actions">
             ${scene.video_url ? `<button class="btn-success" onclick="sendCommand('play_video', { url: '${scene.video_url}' })">Play Background</button>` : ''}
             <button class="btn-sm" style="background:#4b5563;" onclick="editScene('${scene.id}')">Edit</button>
@@ -401,11 +410,12 @@
       document.getElementById('modal-title').textContent = scene ? 'Edit Scene' : 'Add Scene';
       document.getElementById('scene-id').value = scene ? scene.id : '';
       document.getElementById('scene-title').value = scene ? scene.title : '';
+      document.getElementById('scene-sort-order').value = scene && scene.sort_order !== undefined ? scene.sort_order : 0;
       document.getElementById('scene-video').value = scene ? (scene.video_url || '') : '';
       sfxList.innerHTML = '';
       
       if (scene && scene.sound_effects) {
-        scene.sound_effects.forEach(sfx => addSfxRow(sfx.label, sfx.url));
+        scene.sound_effects.forEach(sfx => addSfxRow(sfx.label, sfx.url, sfx.loop));
       } else {
         addSfxRow();
       }
@@ -417,7 +427,7 @@
       document.getElementById('scene-modal').classList.remove('active');
     }
 
-    function addSfxRow(label = '', url = '') {
+    function addSfxRow(label = '', url = '', loop = false) {
       const sfxList = document.getElementById('sfx-list');
       const div = document.createElement('div');
       div.className = 'sfx-item';
@@ -430,10 +440,15 @@
         });
       }
 
+      const loopChecked = loop ? 'checked' : '';
+
       div.innerHTML = `
-        <input type="text" placeholder="Label" value="${label}" style="width: 30%;">
-        <input type="text" placeholder="URL / Path" value="${url}" style="width: 40%;">
-        <select style="width: 20%;" onchange="this.previousElementSibling.value = this.value">${options}</select>
+        <input type="text" placeholder="Label" value="${label}" style="width: 25%;">
+        <input type="text" placeholder="URL / Path" value="${url}" style="width: 35%;">
+        <select style="width: 15%;" onchange="this.previousElementSibling.value = this.value">${options}</select>
+        <label style="display:flex; align-items:center; width:15%; margin:0; cursor:pointer;">
+          <input type="checkbox" style="width:auto; margin-right:4px;" class="sfx-loop-cb" ${loopChecked}> Loop
+        </label>
         <button type="button" class="btn-danger btn-sm" style="width: 10%;" onclick="this.parentElement.remove()">X</button>
       `;
       sfxList.appendChild(div);
@@ -453,23 +468,26 @@
     async function saveScene() {
       const id = document.getElementById('scene-id').value;
       const title = document.getElementById('scene-title').value.trim();
+      const sort_order = parseInt(document.getElementById('scene-sort-order').value, 10) || 0;
       const video_url = document.getElementById('scene-video').value.trim();
       
       const sfxItems = document.querySelectorAll('.sfx-item');
       const sound_effects = [];
       sfxItems.forEach(item => {
-        const inputs = item.querySelectorAll('input');
+        const inputs = item.querySelectorAll('input[type="text"]');
+        const loopCb = item.querySelector('.sfx-loop-cb');
         if (inputs[0].value.trim() && inputs[1].value.trim()) {
           sound_effects.push({
             label: inputs[0].value.trim(),
-            url: inputs[1].value.trim()
+            url: inputs[1].value.trim(),
+            loop: loopCb ? loopCb.checked : false
           });
         }
       });
 
       if (!title) return alert('Title is required');
 
-      const payload = { title, video_url, sound_effects };
+      const payload = { title, video_url, sound_effects, sort_order };
       const url = id ? `/api/vbs/scenes/${id}` : '/api/vbs/scenes';
       const method = id ? 'PUT' : 'POST';
 
