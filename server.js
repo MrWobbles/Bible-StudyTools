@@ -2463,9 +2463,15 @@ app.use((req, res, next) => {
     .filter(Boolean);
   
   if (vbsDomains.includes(host) && req.method === 'GET') {
-    // If the path isn't specifically requesting another known file/API, serve vbs.html
-    const isApiOrAsset = req.path.startsWith('/api/') || req.path.startsWith('/assets/');
-    if (!isApiOrAsset) {
+    // Let API, assets, the control page, and the auth page pass through to normal routing
+    const pathStr = req.path;
+    const isPassthrough = 
+      pathStr.startsWith('/api/') || 
+      pathStr.startsWith('/assets/') || 
+      pathStr.includes('control') || 
+      pathStr.includes('auth');
+    
+    if (!isPassthrough) {
       return res.sendFile(path.join(__dirname, 'vbs.html'));
     }
   }
