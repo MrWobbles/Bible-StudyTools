@@ -50,11 +50,34 @@
       font-size: 2rem;
       transition: opacity 0.5s;
     }
+
+    #text-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 5;
+      font-size: 15vw; /* Very large text */
+      font-weight: 900;
+      text-transform: uppercase;
+      color: #fff;
+      -webkit-text-stroke: 4px #000; /* Black outline */
+      text-shadow: 6px 6px 0 #000, 10px 10px 20px rgba(0,0,0,0.8);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
 
   <div id="loading-overlay">Waiting for signal...</div>
+  <div id="text-overlay"></div>
   <div id="video-container"></div>
   <audio id="sfx-player"></audio>
 
@@ -62,7 +85,17 @@
     const videoContainer = document.getElementById('video-container');
     const sfxPlayer = document.getElementById('sfx-player');
     const overlay = document.getElementById('loading-overlay');
+    const textOverlay = document.getElementById('text-overlay');
     let currentVideo = null;
+
+    function showText(text) {
+      textOverlay.textContent = text;
+      textOverlay.style.opacity = '1';
+    }
+
+    function hideText() {
+      textOverlay.style.opacity = '0';
+    }
 
     function playVideo(url) {
       if (currentVideo) {
@@ -114,6 +147,7 @@
       }
       sfxPlayer.pause();
       sfxPlayer.src = '';
+      hideText();
       
       overlay.style.display = 'flex';
       setTimeout(() => { overlay.style.opacity = '1'; }, 10);
@@ -133,6 +167,10 @@
             playSfx(data.payload.url, data.payload.loop);
           } else if (data.type === 'stop_all') {
             stopAll();
+          } else if (data.type === 'show_text') {
+            showText(data.payload.text);
+          } else if (data.type === 'hide_text') {
+            hideText();
           }
         } catch (e) {
           console.error('Error parsing SSE message:', e);

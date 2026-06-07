@@ -251,6 +251,12 @@
       </div>
 
       <div class="form-group">
+        <label>Display Texts (Words to show on screen)</label>
+        <div id="text-list"></div>
+        <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addTextRow()">+ Add Text</button>
+      </div>
+
+      <div class="form-group">
         <label>Sound Effects</label>
         <div id="sfx-list"></div>
         <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addSfxRow()">+ Add SFX</button>
@@ -375,6 +381,18 @@
         const card = document.createElement('div');
         card.className = 'scene-card';
         
+        let textsHtml = '';
+        if (scene.display_texts && scene.display_texts.length > 0) {
+          textsHtml = `<div class="sfx-grid" style="margin-bottom: 0.5rem;">
+            ${scene.display_texts.map(textObj => `
+              <button type="button" class="btn-primary" onclick="sendCommand('show_text', { text: '${textObj.text}' })">
+                ${textObj.label || 'Text'}
+              </button>
+            `).join('')}
+            <button type="button" class="btn-danger" onclick="sendCommand('hide_text')">Hide Text</button>
+          </div>`;
+        }
+
         let sfxHtml = '';
         if (scene.sound_effects && scene.sound_effects.length > 0) {
           sfxHtml = `<div class="sfx-grid">
@@ -396,6 +414,7 @@
             <button class="btn-sm" style="background:#4b5563;" onclick="editScene('${scene.id}')">Edit</button>
             <button class="btn-sm btn-danger" onclick="deleteScene('${scene.id}')">Delete</button>
           </div>
+          ${textsHtml}
           ${sfxHtml}
         `;
         container.appendChild(card);
@@ -406,6 +425,7 @@
     function openSceneModal(scene = null) {
       const modal = document.getElementById('scene-modal');
       const sfxList = document.getElementById('sfx-list');
+      const textList = document.getElementById('text-list');
       
       document.getElementById('modal-title').textContent = scene ? 'Edit Scene' : 'Add Scene';
       document.getElementById('scene-id').value = scene ? scene.id : '';
@@ -413,6 +433,7 @@
       document.getElementById('scene-sort-order').value = scene && scene.sort_order !== undefined ? scene.sort_order : 0;
       document.getElementById('scene-video').value = scene ? (scene.video_url || '') : '';
       sfxList.innerHTML = '';
+      textList.innerHTML = '';
       
       if (scene && scene.sound_effects) {
         scene.sound_effects.forEach(sfx => addSfxRow(sfx.label, sfx.url, sfx.loop));
@@ -420,11 +441,29 @@
         addSfxRow();
       }
 
+      if (scene && scene.display_texts) {
+        scene.display_texts.forEach(t => addTextRow(t.label, t.text));
+      } else {
+        addTextRow();
+      }
+
       modal.classList.add('active');
     }
 
     function closeSceneModal() {
       document.getElementById('scene-modal').classList.remove('active');
+    }
+
+    function addTextRow(label = '', text = '') {
+      const textList = document.getElementById('text-list');
+      const div = document.createElement('div');
+      div.className = 'sfx-item'; // reuse same styling class
+      div.innerHTML = `
+        <input type="text" placeholder="Button Label" value="${label}" style="width: 30%;">
+        <input type="text" placeholder="Actual Text to Display" value="${text}" style="width: 60%;">
+        <button type="button" class="btn-danger btn-sm" style="width: 10%;" onclick="this.parentElement.remove()">X</button>
+      `;
+      textList.appendChild(div);
     }
 
     function addSfxRow(label = '', url = '', loop = false) {
@@ -471,7 +510,7 @@
       const sort_order = parseInt(document.getElementById('scene-sort-order').value, 10) || 0;
       const video_url = document.getElementById('scene-video').value.trim();
       
-      const sfxItems = document.querySelectorAll('.sfx-item');
+      const sfxItems = document.querySelectorAll('#sfx-list .sfx-item');
       const sound_effects = [];
       sfxItems.forEach(item => {
         const inputs = item.querySelectorAll('input[type="text"]');
@@ -485,9 +524,21 @@
         }
       });
 
+      const textItems = document.querySelectorAll('#text-list .sfx-item');
+      const display_texts = [];
+      textItems.forEach(item => {
+        const inputs = item.querySelectorAll('input[type="text"]');
+        if (inputs[0].value.trim() && inputs[1].value.trim()) {
+          display_texts.push({
+            label: inputs[0].value.trim(),
+            text: inputs[1].value.trim()
+          });
+        }
+      });
+
       if (!title) return alert('Title is required');
 
-      const payload = { title, video_url, sound_effects, sort_order };
+      const payload = { title, video_url, sound_effects, display_texts, sort_order };
       const url = id ? `/api/vbs/scenes/${id}` : '/api/vbs/scenes';
       const method = id ? 'PUT' : 'POST';
 

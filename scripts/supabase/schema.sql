@@ -98,6 +98,7 @@ create table if not exists public.bst_vbs_scenes (
   title text not null,
   video_url text,
   sound_effects jsonb not null default '[]'::jsonb,
+  display_texts jsonb not null default '[]'::jsonb,
   sort_order integer not null default 0,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
@@ -105,6 +106,9 @@ create table if not exists public.bst_vbs_scenes (
 
 create index if not exists bst_vbs_scenes_sort_order_idx
   on public.bst_vbs_scenes (sort_order);
+
+alter table public.bst_vbs_scenes
+  add column if not exists display_texts jsonb not null default '[]'::jsonb;
 
 alter table public.bst_signup_requests
   add column if not exists invite_code text;

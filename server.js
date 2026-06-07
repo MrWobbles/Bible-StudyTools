@@ -2172,7 +2172,7 @@ app.post('/api/vbs/scenes', requireAuthenticatedAccess, async (req, res) => {
   }
   
   try {
-    const { title, video_url, sound_effects, sort_order } = req.body;
+    const { title, video_url, sound_effects, display_texts, sort_order } = req.body;
     if (!title) {
       return res.status(400).json({ error: 'Scene title is required' });
     }
@@ -2183,6 +2183,7 @@ app.post('/api/vbs/scenes', requireAuthenticatedAccess, async (req, res) => {
         title,
         video_url: video_url || null,
         sound_effects: Array.isArray(sound_effects) ? sound_effects : [],
+        display_texts: Array.isArray(display_texts) ? display_texts : [],
         sort_order: typeof sort_order === 'number' ? sort_order : 0
       }])
       .select()
@@ -2203,12 +2204,13 @@ app.put('/api/vbs/scenes/:id', requireAuthenticatedAccess, async (req, res) => {
   
   try {
     const { id } = req.params;
-    const { title, video_url, sound_effects, sort_order } = req.body;
+    const { title, video_url, sound_effects, display_texts, sort_order } = req.body;
     
     const updateData = { updated_at: new Date().toISOString() };
     if (title !== undefined) updateData.title = title;
     if (video_url !== undefined) updateData.video_url = video_url;
     if (sound_effects !== undefined) updateData.sound_effects = Array.isArray(sound_effects) ? sound_effects : [];
+    if (display_texts !== undefined) updateData.display_texts = Array.isArray(display_texts) ? display_texts : [];
     if (typeof sort_order === 'number') updateData.sort_order = sort_order;
     
     const { data, error } = await supabaseServiceClient
