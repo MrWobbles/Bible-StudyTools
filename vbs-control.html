@@ -352,6 +352,101 @@
       display: flex;
     }
 
+    /* Fullscreen Script View */
+    #fullscreen-script-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: white;
+      z-index: 9999;
+      overflow-y: auto;
+      padding: 2rem;
+    }
+
+    #fullscreen-script-overlay.active {
+      display: block;
+    }
+
+    #fullscreen-script-header {
+      position: sticky;
+      top: 0;
+      background: white;
+      padding: 1rem 0;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10000;
+    }
+
+    #fullscreen-script-content {
+      max-width: 900px;
+      margin: 0 auto;
+      font-size: 1.1rem;
+      line-height: 1.8;
+      color: #1f2937;
+    }
+
+    #fullscreen-script-content p {
+      margin-bottom: 1rem;
+    }
+
+    .fullscreen-script-link {
+      background: #3b82f6;
+      color: white;
+      padding: 0.3rem 0.6rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-weight: 500;
+      white-space: normal;
+    }
+
+    .fullscreen-script-link:hover {
+      background: #2563eb;
+    }
+
+    .fullscreen-sfx-trigger {
+      background: #f59e0b;
+      color: #000;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.25rem;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 0.9em;
+      margin: 0 0.25rem;
+      display: inline-block;
+      transition: background 0.2s;
+    }
+
+    .fullscreen-sfx-trigger:hover {
+      background: #d97706;
+    }
+
+    #close-fullscreen-btn {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #close-fullscreen-btn:hover {
+      background: #dc2626;
+    }
+
+
+    .tab-content.active {
+      display: flex;
+    }
+
     /* TipTap Editor Styles */
     .editor-toolbar {
       background: #374151;
@@ -462,6 +557,15 @@
 </head>
 
 <body>
+
+  <!-- Fullscreen Script View Overlay -->
+  <div id="fullscreen-script-overlay">
+    <div id="fullscreen-script-header">
+      <h1 style="margin: 0;">Script View</h1>
+      <button id="close-fullscreen-btn" onclick="closeFullscriptView()">✕ Close</button>
+    </div>
+    <div id="fullscreen-script-content"></div>
+  </div>
 
   <div class="app-layout">
     <div class="sidebar-main">
@@ -601,6 +705,9 @@
                     <div class="divider"></div>
                     <button type="button" onclick="previewScript()" class="editor-btn"
                       style="background: #10b981; border-color: #059669;">👁️ Preview</button>
+                    <button type="button" onclick="showFullscriptView()" class="editor-btn"
+                      style="background: #8b5cf6; border-color: #7c3aed;" title="Fullscreen Script View">⛶
+                      Fullscreen</button>
                   </div>
                   <div id="script-editor-container"
                     style="border: 1px solid #4b5563; border-radius: 0.25rem; overflow: hidden; display: flex; flex-direction: column; min-height: 400px; background: #374151;">
@@ -1313,6 +1420,71 @@
       });
     }
 
+    function showFullscriptView() {
+      if (!editor) {
+        alert('No script content yet.');
+        return;
+      }
+
+      const scriptHtml = editor.getHTML();
+      if (!scriptHtml || scriptHtml === '<p></p>') {
+        alert('No script content yet.');
+        return;
+      }
+
+      // Create a copy of the HTML and replace text with links
+      let displayHtml = scriptHtml;
+
+      // Sort links by text length (longest first) to avoid partial replacements
+      const sortedLinks = (window.currentScriptLinks || []).sort((a, b) =>
+        b.text_selection.length - a.text_selection.length
+      );
+
+      sortedLinks.forEach(link => {
+        // Escape the text for use in regex
+        const escapedText = link.text_selection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Replace text with span that includes link styling
+        const sfxUrl = findSfxUrl(link.sfx_label);
+        // Use a more careful replacement that preserves HTML structure
+        const linkSpan = `<span class="fullscreen-script-link" onclick="sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
+        // Only replace in text nodes, not in tags
+        displayHtml = displayHtml.replace(new RegExp(`(?<![><])${escapedText}(?![^<]*>)`, 'g'), linkSpan);
+      });
+
+      // Show the fullscreen overlay
+      const overlay = document.getElementById('fullscreen-script-overlay');
+      const content = document.getElementById('fullscreen-script-content');
+      content.innerHTML = displayHtml;
+
+      // Attach event listeners for inline SFX triggers (from the TipTap custom node)
+      const triggers = content.querySelectorAll('.sfx-trigger-btn');
+      triggers.forEach(btn => {
+        const label = btn.getAttribute('data-sfx-label');
+        if (label) {
+          const sfxUrl = findSfxUrl(label);
+          if (sfxUrl) {
+            btn.className = 'fullscreen-sfx-trigger';
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              sendCommand('play_sfx', { url: sfxUrl });
+            };
+            btn.title = "Click to play: " + label;
+          } else {
+            btn.className = 'fullscreen-sfx-trigger';
+            btn.style.opacity = '0.5';
+            btn.title = "SFX not found: " + label;
+          }
+        }
+      });
+
+      overlay.classList.add('active');
+    }
+
+    function closeFullscriptView() {
+      const overlay = document.getElementById('fullscreen-script-overlay');
+      overlay.classList.remove('active');
+    }
+
     function createLink() {
       const selection = window.currentSelection;
       const sfxLabel = document.getElementById('link-sfx-select').value;
@@ -1450,6 +1622,16 @@
       originalOpenSceneModal(scene);
       setTimeout(() => attachScriptSelectionHandler(), 100);
     }
+
+    // Close fullscreen view with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const overlay = document.getElementById('fullscreen-script-overlay');
+        if (overlay.classList.contains('active')) {
+          closeFullscriptView();
+        }
+      }
+    });
 
     // Initialize
     loadData();
