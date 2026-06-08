@@ -429,44 +429,35 @@
     }
   </style>
 
-  <!-- TipTap ES Modules from CDN with import map -->
-  <script type="importmap">
-    {
-      "imports": {
-        "@tiptap/core": "https://cdn.jsdelivr.net/npm/@tiptap/core@2.4.0/+esm",
-        "@tiptap/pm": "https://cdn.jsdelivr.net/npm/@tiptap/pm@2.4.0/+esm",
-        "@tiptap/starter-kit": "https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@2.4.0/+esm",
-        "@tiptap/extension-highlight": "https://cdn.jsdelivr.net/npm/@tiptap/extension-highlight@2.4.0/+esm",
-        "@tiptap/extension-text-style": "https://cdn.jsdelivr.net/npm/@tiptap/extension-text-style@2.4.0/+esm",
-        "@tiptap/extension-color": "https://cdn.jsdelivr.net/npm/@tiptap/extension-color@2.4.0/+esm"
-      }
-    }
-  </script>
+  <!-- TipTap ES Modules from esm.sh CDN (handles dependencies properly) -->
   <script type="module">
     async function initTiptap() {
-      const { Editor } = await import('@tiptap/core');
-      const { StarterKit } = await import('@tiptap/starter-kit');
-      const { Highlight } = await import('@tiptap/extension-highlight');
-      const { TextStyle } = await import('@tiptap/extension-text-style');
-      const { Color } = await import('@tiptap/extension-color');
-      const { Node } = await import('@tiptap/core');
+      try {
+        const { Editor } = await import('https://esm.sh/@tiptap/core@2.4.0');
+        const { StarterKit } = await import('https://esm.sh/@tiptap/starter-kit@2.4.0');
+        const { Highlight } = await import('https://esm.sh/@tiptap/extension-highlight@2.4.0');
+        const { TextStyle } = await import('https://esm.sh/@tiptap/extension-text-style@2.4.0');
+        const { Color } = await import('https://esm.sh/@tiptap/extension-color@2.4.0');
+        const { Node } = await import('https://esm.sh/@tiptap/core@2.4.0');
 
-      window.tiptapEditor = {
-        Editor,
-        StarterKit,
-        Highlight,
-        TextStyle,
-        Color,
-        Node
-      };
+        window.tiptapEditor = {
+          Editor,
+          StarterKit,
+          Highlight,
+          TextStyle,
+          Color,
+          Node
+        };
 
-      document.dispatchEvent(new CustomEvent('tiptapReady'));
+        console.log('✓ Tiptap modules loaded successfully');
+        document.dispatchEvent(new CustomEvent('tiptapReady'));
+      } catch (err) {
+        console.error('✗ Failed to load Tiptap:', err);
+        document.dispatchEvent(new CustomEvent('tiptapError'));
+      }
     }
 
-    initTiptap().catch(err => {
-      console.error('Failed to load Tiptap:', err);
-      document.dispatchEvent(new CustomEvent('tiptapError'));
-    });
+    initTiptap();
   </script>
 </head>
 
