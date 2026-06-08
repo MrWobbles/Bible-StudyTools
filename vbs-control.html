@@ -1421,61 +1421,19 @@
     }
 
     function showFullscriptView() {
-      if (!editor) {
-        alert('No script content yet.');
+      const preview = document.getElementById('script-preview');
+
+      if (!preview || !preview.innerHTML || preview.innerHTML.includes('No script content')) {
+        alert('No script content yet. First preview your script in the Link Text to SFX tab.');
         return;
       }
 
-      const scriptHtml = editor.getHTML();
-      if (!scriptHtml || scriptHtml === '<p></p>') {
-        alert('No script content yet.');
-        return;
-      }
-
-      // Create a copy of the HTML and replace text with links
-      let displayHtml = scriptHtml;
-
-      // Sort links by text length (longest first) to avoid partial replacements
-      const sortedLinks = (window.currentScriptLinks || []).sort((a, b) =>
-        b.text_selection.length - a.text_selection.length
-      );
-
-      sortedLinks.forEach(link => {
-        // Escape the text for use in regex
-        const escapedText = link.text_selection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // Replace text with span that includes link styling
-        const sfxUrl = findSfxUrl(link.sfx_label);
-        // Use a more careful replacement that preserves HTML structure
-        const linkSpan = `<span class="fullscreen-script-link" onclick="sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
-        // Only replace in text nodes, not in tags
-        displayHtml = displayHtml.replace(new RegExp(`(?<![><])${escapedText}(?![^<]*>)`, 'g'), linkSpan);
-      });
-
-      // Show the fullscreen overlay
+      // Clone the preview content with all its event handlers
       const overlay = document.getElementById('fullscreen-script-overlay');
       const content = document.getElementById('fullscreen-script-content');
-      content.innerHTML = displayHtml;
 
-      // Attach event listeners for inline SFX triggers (from the TipTap custom node)
-      const triggers = content.querySelectorAll('.sfx-trigger-btn');
-      triggers.forEach(btn => {
-        const label = btn.getAttribute('data-sfx-label');
-        if (label) {
-          const sfxUrl = findSfxUrl(label);
-          if (sfxUrl) {
-            btn.className = 'fullscreen-sfx-trigger';
-            btn.onclick = (e) => {
-              e.stopPropagation();
-              sendCommand('play_sfx', { url: sfxUrl });
-            };
-            btn.title = "Click to play: " + label;
-          } else {
-            btn.className = 'fullscreen-sfx-trigger';
-            btn.style.opacity = '0.5';
-            btn.title = "SFX not found: " + label;
-          }
-        }
-      });
+      // Clone the preview element (this preserves all event listeners)
+      content.innerHTML = preview.innerHTML;
 
       overlay.classList.add('active');
     }
