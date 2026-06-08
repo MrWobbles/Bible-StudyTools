@@ -1407,14 +1407,10 @@
           }
         }
       });
-    }
-    e.stopPropagation();
-    sendCommand('play_sfx', { url: sfxUrl });
-            };
-          }
-        }
-      });
-    }
+
+      e.stopPropagation();
+      sendCommand('play_sfx', { url: sfxUrl });
+    };
 
     function findSfxUrl(sfxLabel) {
       // Get all SFX items and find the URL for this label
