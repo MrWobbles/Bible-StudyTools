@@ -298,7 +298,92 @@
     .tab-content.active {
       display: block;
     }
+
+    /* TipTap Editor Styles */
+    .editor-toolbar {
+      background: #374151;
+      border: 1px solid #4b5563;
+      border-bottom: none;
+      border-radius: 0.25rem 0.25rem 0 0;
+      padding: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      align-items: center;
+    }
+
+    .editor-toolbar button {
+      padding: 0.4rem 0.6rem;
+      background: #4b5563;
+      border: 1px solid #6b7280;
+      color: white;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: background 0.2s;
+    }
+
+    .editor-toolbar button:hover {
+      background: #6b7280;
+    }
+
+    .editor-toolbar button.is-active {
+      background: #3b82f6;
+      border-color: #2563eb;
+    }
+
+    .editor-toolbar .divider {
+      width: 1px;
+      height: 24px;
+      background: #6b7280;
+      margin: 0 0.25rem;
+    }
+
+    .ProseMirror {
+      padding: 0.5rem;
+      background: #374151;
+      color: white;
+      border: 1px solid #4b5563;
+      border-radius: 0 0 0.25rem 0.25rem;
+      min-height: 200px;
+      max-height: 400px;
+      overflow-y: auto;
+      outline: none;
+    }
+
+    .ProseMirror p {
+      margin: 0.25rem 0;
+    }
+
+    .ProseMirror em {
+      font-style: italic;
+      color: #f5d547;
+    }
+
+    .ProseMirror strong {
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .ProseMirror mark {
+      background-color: #fbbf24;
+      color: #000;
+      padding: 0.1rem 0.2rem;
+      border-radius: 0.15rem;
+    }
+
+    .ProseMirror u {
+      text-decoration: underline;
+    }
   </style>
+
+  <!-- TipTap from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/core@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/pm@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-highlight@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-text-style@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-color@latest"></script>
 </head>
 
 <body>
@@ -390,11 +475,28 @@
 
         <div class="tab-content active" id="tab-content">
           <div style="margin-bottom: 0.5rem;">
-            <label style="font-size: 0.875rem; color: #d1d5db;">Script Text (paste formatted text or copy from Google
-              Doc)</label>
-            <textarea id="script-editor" placeholder="Paste your script here..."></textarea>
+            <label style="font-size: 0.875rem; color: #d1d5db;">Script Text (with formatting & highlighting)</label>
+            <div class="editor-toolbar">
+              <button type="button" onclick="editor.chain().focus().toggleBold().run()" class="editor-btn" data-cmd="bold" title="Bold (Cmd+B)">🅱️ Bold</button>
+              <button type="button" onclick="editor.chain().focus().toggleItalic().run()" class="editor-btn" data-cmd="italic" title="Italic (Cmd+I)"><i>I</i></button>
+              <button type="button" onclick="editor.chain().focus().toggleUnderline().run()" class="editor-btn" data-cmd="underline" title="Underline (Cmd+U)"><u>U</u></button>
+              <div class="divider"></div>
+              <button type="button" onclick="highlightText('#fbbf24')" class="editor-btn" data-cmd="highlight-yellow" title="Highlight Yellow">🟨 Yellow</button>
+              <button type="button" onclick="highlightText('#86efac')" class="editor-btn" data-cmd="highlight-green" title="Highlight Green">🟩 Green</button>
+              <button type="button" onclick="highlightText('#7dd3fc')" class="editor-btn" data-cmd="highlight-blue" title="Highlight Blue">🟦 Blue</button>
+              <button type="button" onclick="highlightText('#f472b6')" class="editor-btn" data-cmd="highlight-pink" title="Highlight Pink">🟩 Pink</button>
+              <button type="button" onclick="editor.chain().focus().clearNodes().run()" class="editor-btn" data-cmd="clear-highlight" title="Clear Highlight">✖️ Clear</button>
+              <div class="divider"></div>
+              <select id="editor-sfx-select" style="margin-left: 0.25rem; padding: 0.4rem; background: #374151; color: white; border: 1px solid #6b7280; border-radius: 0.25rem;" onfocus="updateEditorSfxDropdown()">
+                <option value="">-- Insert SFX --</option>
+              </select>
+              <button type="button" onclick="insertSfxFromDropdown()" class="editor-btn" title="Insert inline SFX button">🔊 Insert SFX</button>
+              <div class="divider"></div>
+              <button type="button" onclick="previewScript()" class="editor-btn" style="background: #10b981; border-color: #059669;">👁️ Preview</button>
+            </div>
+            <div id="script-editor-container" style="border: 1px solid #4b5563; border-radius: 0.25rem; overflow: hidden;"></div>
+            <input type="hidden" id="script-editor-html">
           </div>
-          <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="previewScript()">Preview</button>
         </div>
 
         <div class="tab-content" id="tab-links">
@@ -445,6 +547,134 @@
 
     let rawMedia = { videos: [], audio: [] };
     let scenes = [];
+    let editor = null;
+
+    // Initialize TipTap editor
+    function initializeEditor() {
+      if (editor) editor.destroy();
+      
+      const SfxNode = tiptap.Node.create({
+        name: 'sfxTrigger',
+        group: 'inline',
+        inline: true,
+        selectable: true,
+        atom: true,
+
+        addAttributes() {
+          return {
+            sfxLabel: { default: null },
+          }
+        },
+
+        parseHTML() {
+          return [{ tag: 'span[data-sfx-label]' }]
+        },
+
+        renderHTML({ node, HTMLAttributes }) {
+          return ['span', { 
+            ...HTMLAttributes, 
+            'data-sfx-label': node.attrs.sfxLabel,
+            class: 'sfx-trigger-btn script-link',
+            style: 'background: #f59e0b; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8em; margin: 0 4px; display: inline-block;'
+          }, `🔊 ${node.attrs.sfxLabel}`]
+        },
+      });
+
+      editor = new tiptap.Editor({
+        element: document.querySelector('#script-editor-container'),
+        extensions: [
+          tiptap.StarterKit,
+          tiptap.Highlight.configure({
+            multicolor: true
+          }),
+          tiptap.TextStyle,
+          tiptap.Color,
+          SfxNode
+        ],
+        content: '<p></p>',
+        autofocus: false,
+        editable: true,
+        onUpdate: () => {
+          updateEditorToolbarStates();
+        },
+        onSelectionUpdate: () => {
+          updateEditorToolbarStates();
+        }
+      });
+
+      updateEditorToolbarStates();
+    }
+
+    function updateEditorSfxDropdown() {
+      const select = document.getElementById('editor-sfx-select');
+      if (!select) return;
+      
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">-- Insert SFX --</option>';
+      
+      const sfxItems = document.querySelectorAll('#sfx-list .sfx-item');
+      sfxItems.forEach(item => {
+        const labelInput = item.querySelector('input[type="text"]:first-of-type');
+        if (labelInput && labelInput.value.trim()) {
+          const val = labelInput.value.trim();
+          const option = document.createElement('option');
+          option.value = val;
+          option.textContent = val;
+          select.appendChild(option);
+        }
+      });
+      
+      // Restore previous selection if it still exists
+      if (Array.from(select.options).some(o => o.value === currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function insertSfxFromDropdown() {
+      const select = document.getElementById('editor-sfx-select');
+      if (!select) return;
+      const label = select.value;
+      
+      if (!label) {
+        alert('Please select an SFX from the dropdown to insert.');
+        return;
+      }
+      
+      if (editor) {
+        editor.chain().focus().insertContent({
+          type: 'sfxTrigger',
+          attrs: { sfxLabel: label }
+        }).insertContent(' ').run();
+      }
+      
+      select.value = ''; // Reset dropdown after insert
+    }
+
+    function updateEditorToolbarStates() {
+      if (!editor) return;
+      document.querySelectorAll('.editor-toolbar button[data-cmd]').forEach(btn => {
+        const cmd = btn.dataset.cmd;
+        let isActive = false;
+        
+        if (cmd === 'bold') isActive = editor.isActive('bold');
+        else if (cmd === 'italic') isActive = editor.isActive('italic');
+        else if (cmd === 'underline') isActive = editor.isActive('underline');
+        
+        btn.classList.toggle('is-active', isActive);
+      });
+    }
+
+    function highlightText(color) {
+      if (!editor) return;
+      const colorMap = {
+        '#fbbf24': 'yellow',
+        '#86efac': 'green',
+        '#7dd3fc': 'blue',
+        '#f472b6': 'pink'
+      };
+      editor.chain().focus().toggleHighlight({ color: colorMap[color] || color }).run();
+      setTimeout(() => updateEditorToolbarStates(), 0);
+    }
 
     const getHeaders = () => {
       const headers = { 'Content-Type': 'application/json' };
@@ -610,33 +840,43 @@
       const displayEl = document.getElementById(`script-display-${scene.id}`);
       if (!displayEl) return;
 
-      let html = '';
-      let lastIndex = 0;
-      const scriptContent = scene.script_content;
+      let html = scene.script_content || '';
 
-      // Sort links by position
-      const sortedLinks = (scene.script_links || []).sort((a, b) => {
-        const aStart = scriptContent.indexOf(a.text_selection);
-        const bStart = scriptContent.indexOf(b.text_selection);
-        return aStart - bStart;
-      });
+      // Sort links by text length (longest first) to avoid partial replacements
+      const sortedLinks = (scene.script_links || []).sort((a, b) => 
+        b.text_selection.length - a.text_selection.length
+      );
 
+      // Replace text with clickable spans
       sortedLinks.forEach(link => {
-        const startIdx = scriptContent.indexOf(link.text_selection, lastIndex);
-        if (startIdx !== -1) {
-          // Add text before link
-          html += escapeHtml(scriptContent.substring(lastIndex, startIdx));
-          // Add linked text as button
-          const sfxUrl = findSfxUrlInScene(scene, link.sfx_label);
-          html += `<span class="script-link" onclick="event.stopPropagation(); sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${escapeHtml(link.text_selection)}</span>`;
-          lastIndex = startIdx + link.text_selection.length;
-        }
+        const sfxUrl = findSfxUrlInScene(scene, link.sfx_label);
+        // Carefully replace text while preserving HTML tags
+        const escapedText = link.text_selection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const linkSpan = `<span class="script-link" onclick="event.stopPropagation(); sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
+        // Replace only text not within tags
+        html = html.replace(new RegExp(`(?<![><])${escapedText}(?![^<]*>)`, 'g'), linkSpan);
       });
-
-      // Add remaining text
-      html += escapeHtml(scriptContent.substring(lastIndex));
 
       displayEl.innerHTML = html;
+
+      // Attach event listeners for inline SFX triggers (from the TipTap custom node)
+      const triggers = displayEl.querySelectorAll('.sfx-trigger-btn');
+      triggers.forEach(btn => {
+        const label = btn.getAttribute('data-sfx-label');
+        if (label) {
+          const sfxUrl = findSfxUrlInScene(scene, label);
+          if (sfxUrl) {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              sendCommand('play_sfx', { url: sfxUrl });
+            };
+            btn.title = "Click to play: " + label;
+          } else {
+            btn.style.opacity = '0.5';
+            btn.title = "SFX not found: " + label;
+          }
+        }
+      });
     }
 
     function findSfxUrlInScene(scene, sfxLabel) {
@@ -655,8 +895,15 @@
       document.getElementById('scene-title').value = scene ? scene.title : '';
       document.getElementById('scene-sort-order').value = scene && scene.sort_order !== undefined ? scene.sort_order : 0;
       document.getElementById('scene-video').value = scene ? (scene.video_url || '') : '';
-      document.getElementById('script-editor').value = scene ? (scene.script_content || '') : '';
       document.getElementById('google-doc-url').value = scene ? (scene.google_doc_url || '') : '';
+
+      // Initialize TipTap editor with content
+      setTimeout(() => {
+        initializeEditor();
+        if (scene && scene.script_content) {
+          editor.commands.setContent(scene.script_content);
+        }
+      }, 0);
 
       sfxList.innerHTML = '';
       textList.innerHTML = '';
@@ -682,7 +929,7 @@
 
       // Show preview
       if (scene && scene.script_content) {
-        previewScript();
+        setTimeout(() => previewScript(), 100);
         renderActiveLinks();
       }
 
@@ -775,7 +1022,7 @@
         }
       });
 
-      const script_content = document.getElementById('script-editor').value.trim();
+      const script_content = editor ? editor.getHTML() : '';
       const script_links = window.currentScriptLinks || [];
       const google_doc_url = document.getElementById('google-doc-url').value.trim();
 
@@ -836,40 +1083,58 @@
     }
 
     function previewScript() {
-      const scriptContent = document.getElementById('script-editor').value;
+      if (!editor) {
+        document.getElementById('script-preview').innerHTML = '<p style="color: #9ca3af;">No script content yet.</p>';
+        return;
+      }
+
+      const scriptHtml = editor.getHTML();
       const preview = document.getElementById('script-preview');
 
-      if (!scriptContent.trim()) {
+      if (!scriptHtml || scriptHtml === '<p></p>') {
         preview.innerHTML = '<p style="color: #9ca3af;">No script content yet.</p>';
         return;
       }
 
-      // Render script with clickable regions for links
-      let html = '';
-      let lastIndex = 0;
-
-      // Sort links by start position
-      const sortedLinks = (window.currentScriptLinks || []).sort((a, b) => {
-        const aStart = scriptContent.indexOf(a.text_selection);
-        const bStart = scriptContent.indexOf(b.text_selection);
-        return aStart - bStart;
-      });
+      // Create a copy of the HTML and replace text with links
+      let displayHtml = scriptHtml;
+      
+      // Sort links by text length (longest first) to avoid partial replacements
+      const sortedLinks = (window.currentScriptLinks || []).sort((a, b) => 
+        b.text_selection.length - a.text_selection.length
+      );
 
       sortedLinks.forEach(link => {
-        const startIdx = scriptContent.indexOf(link.text_selection, lastIndex);
-        if (startIdx !== -1) {
-          // Add text before link
-          html += escapeHtml(scriptContent.substring(lastIndex, startIdx));
-          // Add linked text
-          html += `<span class="script-link" onclick="sendCommand('play_sfx', { url: '${findSfxUrl(link.sfx_label)}' })">${escapeHtml(link.text_selection)}</span>`;
-          lastIndex = startIdx + link.text_selection.length;
-        }
+        // Escape the text for use in regex
+        const escapedText = link.text_selection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Replace text with span that includes link styling
+        const sfxUrl = findSfxUrl(link.sfx_label);
+        // Use a more careful replacement that preserves HTML structure
+        const linkSpan = `<span class="script-link" onclick="sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
+        // Only replace in text nodes, not in tags
+        displayHtml = displayHtml.replace(new RegExp(`(?<![><])${escapedText}(?![^<]*>)`, 'g'), linkSpan);
       });
 
-      // Add remaining text
-      html += escapeHtml(scriptContent.substring(lastIndex));
+      preview.innerHTML = displayHtml;
 
-      preview.innerHTML = html.replace(/\n/g, '<br>');
+      // Attach event listeners for inline SFX triggers (from the TipTap custom node)
+      const triggers = preview.querySelectorAll('.sfx-trigger-btn');
+      triggers.forEach(btn => {
+        const label = btn.getAttribute('data-sfx-label');
+        if (label) {
+          const sfxUrl = findSfxUrl(label); // Uses the modal's findSfxUrl
+          if (sfxUrl) {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              sendCommand('play_sfx', { url: sfxUrl });
+            };
+            btn.title = "Click to play: " + label;
+          } else {
+            btn.style.opacity = '0.5';
+            btn.title = "SFX not found: " + label;
+          }
+        }
+      });
     }
 
     function findSfxUrl(sfxLabel) {
@@ -994,9 +1259,13 @@
         if (!response.ok) throw new Error('Failed to fetch document');
 
         const text = await response.text();
-        document.getElementById('script-editor').value = text;
+        
+        if (editor) {
+          editor.commands.setContent(`<p>${text.split('\n').join('</p><p>')}</p>`);
+        }
+        
         switchScriptTab('content');
-        showStatus('Document loaded! Adjust formatting as needed.');
+        showStatus('Document loaded! Add formatting as needed.');
       } catch (err) {
         console.error(err);
         showStatus('Error fetching Google Doc. Make sure the link is public/shared.', true);
