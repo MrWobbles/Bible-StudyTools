@@ -430,12 +430,12 @@
   </style>
 
   <!-- TipTap from CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@tiptap/core@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tiptap/pm@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-highlight@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-text-style@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-color@latest"></script>
+  <script src="https://unpkg.com/@tiptap/core@latest"></script>
+  <script src="https://unpkg.com/@tiptap/pm@latest"></script>
+  <script src="https://unpkg.com/@tiptap/starter-kit@latest"></script>
+  <script src="https://unpkg.com/@tiptap/extension-highlight@latest"></script>
+  <script src="https://unpkg.com/@tiptap/extension-text-style@latest"></script>
+  <script src="https://unpkg.com/@tiptap/extension-color@latest"></script>
 </head>
 
 <body>
@@ -524,7 +524,8 @@
             <div class="form-group">
               <label>Display Texts (Words to show on screen)</label>
               <div id="text-list"></div>
-              <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addTextRow()">+ Add Text</button>
+              <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addTextRow()">+ Add
+                Text</button>
             </div>
 
             <div class="form-group">
@@ -538,40 +539,57 @@
             <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
               <label>Script & Text Links</label>
               <div class="script-tabs">
-                <button type="button" class="tab-btn active" onclick="switchScriptTab('content')">Script Content</button>
+                <button type="button" class="tab-btn active" onclick="switchScriptTab('content')">Script
+                  Content</button>
                 <button type="button" class="tab-btn" onclick="switchScriptTab('links')">Link Text to SFX</button>
                 <button type="button" class="tab-btn" onclick="switchScriptTab('googledoc')">Google Doc</button>
               </div>
 
               <div class="tab-content active" id="tab-content">
                 <div style="margin-bottom: 0.5rem; flex: 1; display: flex; flex-direction: column;">
-                  <label style="font-size: 0.875rem; color: #d1d5db;">Script Text (with formatting & highlighting)</label>
+                  <label style="font-size: 0.875rem; color: #d1d5db;">Script Text (with formatting &
+                    highlighting)</label>
                   <div class="editor-toolbar">
-                    <button type="button" onclick="editor.chain().focus().toggleBold().run()" class="editor-btn" data-cmd="bold" title="Bold (Cmd+B)">🅱️ Bold</button>
-                    <button type="button" onclick="editor.chain().focus().toggleItalic().run()" class="editor-btn" data-cmd="italic" title="Italic (Cmd+I)"><i>I</i></button>
-                    <button type="button" onclick="editor.chain().focus().toggleUnderline().run()" class="editor-btn" data-cmd="underline" title="Underline (Cmd+U)"><u>U</u></button>
+                    <button type="button" onclick="editor.chain().focus().toggleBold().run()" class="editor-btn"
+                      data-cmd="bold" title="Bold (Cmd+B)">🅱️ Bold</button>
+                    <button type="button" onclick="editor.chain().focus().toggleItalic().run()" class="editor-btn"
+                      data-cmd="italic" title="Italic (Cmd+I)"><i>I</i></button>
+                    <button type="button" onclick="editor.chain().focus().toggleUnderline().run()" class="editor-btn"
+                      data-cmd="underline" title="Underline (Cmd+U)"><u>U</u></button>
                     <div class="divider"></div>
-                    <button type="button" onclick="highlightText('#fbbf24')" class="editor-btn" data-cmd="highlight-yellow" title="Highlight Yellow">🟨 Yellow</button>
-                    <button type="button" onclick="highlightText('#86efac')" class="editor-btn" data-cmd="highlight-green" title="Highlight Green">🟩 Green</button>
-                    <button type="button" onclick="highlightText('#7dd3fc')" class="editor-btn" data-cmd="highlight-blue" title="Highlight Blue">🟦 Blue</button>
-                    <button type="button" onclick="highlightText('#f472b6')" class="editor-btn" data-cmd="highlight-pink" title="Highlight Pink">🟩 Pink</button>
-                    <button type="button" onclick="editor.chain().focus().clearNodes().run()" class="editor-btn" data-cmd="clear-highlight" title="Clear Highlight">✖️ Clear</button>
+                    <button type="button" onclick="highlightText('#fbbf24')" class="editor-btn"
+                      data-cmd="highlight-yellow" title="Highlight Yellow">🟨 Yellow</button>
+                    <button type="button" onclick="highlightText('#86efac')" class="editor-btn"
+                      data-cmd="highlight-green" title="Highlight Green">🟩 Green</button>
+                    <button type="button" onclick="highlightText('#7dd3fc')" class="editor-btn"
+                      data-cmd="highlight-blue" title="Highlight Blue">🟦 Blue</button>
+                    <button type="button" onclick="highlightText('#f472b6')" class="editor-btn"
+                      data-cmd="highlight-pink" title="Highlight Pink">🟩 Pink</button>
+                    <button type="button" onclick="editor.chain().focus().clearNodes().run()" class="editor-btn"
+                      data-cmd="clear-highlight" title="Clear Highlight">✖️ Clear</button>
                     <div class="divider"></div>
-                    <select id="editor-sfx-select" style="margin-left: 0.25rem; padding: 0.4rem; background: #374151; color: white; border: 1px solid #6b7280; border-radius: 0.25rem;" onfocus="updateEditorSfxDropdown()">
+                    <select id="editor-sfx-select"
+                      style="margin-left: 0.25rem; padding: 0.4rem; background: #374151; color: white; border: 1px solid #6b7280; border-radius: 0.25rem;"
+                      onfocus="updateEditorSfxDropdown()">
                       <option value="">-- Insert SFX --</option>
                     </select>
-                    <button type="button" onclick="insertSfxFromDropdown()" class="editor-btn" title="Insert inline SFX button">🔊 Insert SFX</button>
+                    <button type="button" onclick="insertSfxFromDropdown()" class="editor-btn"
+                      title="Insert inline SFX button">🔊 Insert SFX</button>
                     <div class="divider"></div>
-                    <button type="button" onclick="previewScript()" class="editor-btn" style="background: #10b981; border-color: #059669;">👁️ Preview</button>
+                    <button type="button" onclick="previewScript()" class="editor-btn"
+                      style="background: #10b981; border-color: #059669;">👁️ Preview</button>
                   </div>
-                  <div id="script-editor-container" style="border: 1px solid #4b5563; border-radius: 0.25rem; overflow: hidden; display: flex; flex-direction: column; min-height: 400px; background: #374151;"></div>
+                  <div id="script-editor-container"
+                    style="border: 1px solid #4b5563; border-radius: 0.25rem; overflow: hidden; display: flex; flex-direction: column; min-height: 400px; background: #374151;">
+                  </div>
                   <input type="hidden" id="script-editor-html">
                 </div>
               </div>
 
               <div class="tab-content" id="tab-links">
                 <div style="margin-bottom: 1rem;">
-                  <label style="font-size: 0.875rem; color: #d1d5db;">Select text below to link it to an SFX button</label>
+                  <label style="font-size: 0.875rem; color: #d1d5db;">Select text below to link it to an SFX
+                    button</label>
                   <div id="script-preview" style="margin-top: 0.5rem;"></div>
                 </div>
                 <div class="link-editor">
@@ -584,7 +602,8 @@
                       <option value="">-- Select SFX --</option>
                     </select>
                   </div>
-                  <button type="button" class="btn-sm btn-success" onclick="createLink()" style="margin-right: 0.5rem;">Create
+                  <button type="button" class="btn-sm btn-success" onclick="createLink()"
+                    style="margin-right: 0.5rem;">Create
                     Link</button>
                   <button type="button" class="btn-sm btn-danger" onclick="clearLinkSelection()">Clear</button>
                 </div>
@@ -599,8 +618,10 @@
                   <label>Google Doc URL (share link - make it readable)</label>
                   <input type="text" id="google-doc-url" placeholder="https://docs.google.com/document/d/...">
                 </div>
-                <button type="button" class="btn-sm btn-success" onclick="fetchGoogleDoc()">Load from Google Doc</button>
-                <p style="font-size: 0.875rem; color: #9ca3af; margin-top: 1rem;">Note: Currently supports public Google Docs.
+                <button type="button" class="btn-sm btn-success" onclick="fetchGoogleDoc()">Load from Google
+                  Doc</button>
+                <p style="font-size: 0.875rem; color: #9ca3af; margin-top: 1rem;">Note: Currently supports public Google
+                  Docs.
                   The content will be fetched and placed in the Script Content tab.</p>
               </div>
             </div> <!-- End of form-group for script -->
@@ -620,7 +641,7 @@
     // Initialize TipTap editor
     function initializeEditor() {
       if (editor) editor.destroy();
-      
+
       const SfxNode = tiptap.Node.create({
         name: 'sfxTrigger',
         group: 'inline',
@@ -639,8 +660,8 @@
         },
 
         renderHTML({ node, HTMLAttributes }) {
-          return ['span', { 
-            ...HTMLAttributes, 
+          return ['span', {
+            ...HTMLAttributes,
             'data-sfx-label': node.attrs.sfxLabel,
             class: 'sfx-trigger-btn script-link',
             style: 'background: #f59e0b; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8em; margin: 0 4px; display: inline-block;'
@@ -676,10 +697,10 @@
     function updateEditorSfxDropdown() {
       const select = document.getElementById('editor-sfx-select');
       if (!select) return;
-      
+
       const currentVal = select.value;
       select.innerHTML = '<option value="">-- Insert SFX --</option>';
-      
+
       const sfxItems = document.querySelectorAll('#sfx-list .sfx-item');
       sfxItems.forEach(item => {
         const labelInput = item.querySelector('input[type="text"]:first-of-type');
@@ -691,7 +712,7 @@
           select.appendChild(option);
         }
       });
-      
+
       // Restore previous selection if it still exists
       if (Array.from(select.options).some(o => o.value === currentVal)) {
         select.value = currentVal;
@@ -702,19 +723,19 @@
       const select = document.getElementById('editor-sfx-select');
       if (!select) return;
       const label = select.value;
-      
+
       if (!label) {
         alert('Please select an SFX from the dropdown to insert.');
         return;
       }
-      
+
       if (editor) {
         editor.chain().focus().insertContent({
           type: 'sfxTrigger',
           attrs: { sfxLabel: label }
         }).insertContent(' ').run();
       }
-      
+
       select.value = ''; // Reset dropdown after insert
     }
 
@@ -723,11 +744,11 @@
       document.querySelectorAll('.editor-toolbar button[data-cmd]').forEach(btn => {
         const cmd = btn.dataset.cmd;
         let isActive = false;
-        
+
         if (cmd === 'bold') isActive = editor.isActive('bold');
         else if (cmd === 'italic') isActive = editor.isActive('italic');
         else if (cmd === 'underline') isActive = editor.isActive('underline');
-        
+
         btn.classList.toggle('is-active', isActive);
       });
     }
@@ -914,7 +935,7 @@
       let html = scene.script_content || '';
 
       // Sort links by text length (longest first) to avoid partial replacements
-      const sortedLinks = (scene.script_links || []).sort((a, b) => 
+      const sortedLinks = (scene.script_links || []).sort((a, b) =>
         b.text_selection.length - a.text_selection.length
       );
 
@@ -961,7 +982,7 @@
       document.getElementById('editor-pane').classList.add('active');
       currentEditingSceneId = scene ? scene.id : null;
       renderScenes();
-      
+
       const sfxList = document.getElementById('sfx-list');
       const textList = document.getElementById('text-list');
 
@@ -1008,7 +1029,7 @@
         renderActiveLinks();
       }
 
-      
+
     }
 
     function closeSceneEditor() {
@@ -1176,9 +1197,9 @@
 
       // Create a copy of the HTML and replace text with links
       let displayHtml = scriptHtml;
-      
+
       // Sort links by text length (longest first) to avoid partial replacements
-      const sortedLinks = (window.currentScriptLinks || []).sort((a, b) => 
+      const sortedLinks = (window.currentScriptLinks || []).sort((a, b) =>
         b.text_selection.length - a.text_selection.length
       );
 
@@ -1337,11 +1358,11 @@
         if (!response.ok) throw new Error('Failed to fetch document');
 
         const text = await response.text();
-        
+
         if (editor) {
           editor.commands.setContent(`<p>${text.split('\n').join('</p><p>')}</p>`);
         }
-        
+
         switchScriptTab('content');
         showStatus('Document loaded! Add formatting as needed.');
       } catch (err) {
