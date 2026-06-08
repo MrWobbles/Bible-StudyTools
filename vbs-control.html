@@ -1344,57 +1344,72 @@
         return;
       }
 
-      // Create a copy of the HTML and replace text with links
-      let displayHtml = scriptHtml;
-
-      // Sort links by text length (longest first) to avoid partial replacements
+      // Get sorted links by length (longest first)
       const sortedLinks = (window.currentScriptLinks || []).sort((a, b) =>
         b.text_selection.length - a.text_selection.length
       );
 
+      // Start with the raw HTML from editor
+      let displayHtml = scriptHtml;
+
+      // Replace text with spans using string replacement
       sortedLinks.forEach(link => {
-        // Escape the text for use in regex
-        const escapedText = link.text_selection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // Replace text with span that includes link styling
         const sfxUrl = findSfxUrl(link.sfx_label);
-        // Use a more careful replacement that preserves HTML structure
-        const linkSpan = `<span class="script-link" data-sfx-label="${link.sfx_label}" onclick="event.stopPropagation(); sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
-        // Only replace in text nodes, not in tags
-        displayHtml = displayHtml.replace(new RegExp(`(?<![><])${escapedText}(?![^<]*>)`, 'g'), linkSpan);
+        if (!sfxUrl) return;
+
+        // Escape special regex characters
+        const escapedText = link.text_selection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Create a replacement span with inline style (can't rely on classes with Tiptap)
+        const linkSpan = `<span data-sfx-label="${link.sfx_label}" style="background: #3b82f6; padding: 0.2rem 0.4rem; border-radius: 0.25rem; cursor: pointer; transition: background 0.2s; white-space: normal; color: white;">${link.text_selection}</span>`;
+
+        // Replace all occurrences of the text with the linked span
+        displayHtml = displayHtml.replace(new RegExp(escapedText, 'g'), linkSpan);
       });
 
       preview.innerHTML = displayHtml;
+
+      // Attach event listeners to all SFX links
+      const links = preview.querySelectorAll('[data-sfx-label]');
+      links.forEach(link => {
+        const label = link.getAttribute('data-sfx-label');
+        if (label) {
+          const sfxUrl = findSfxUrl(label);
+          if (sfxUrl) {
+            link.style.cursor = 'pointer';
+            link.onmouseover = () => link.style.backgroundColor = '#2563eb';
+            link.onmouseout = () => link.style.backgroundColor = '#3b82f6';
+            link.onclick = (e) => {
+              e.stopPropagation();
+              sendCommand('play_sfx', { url: sfxUrl });
+            };
+            link.title = `Click to play: ${label}`;
+          }
+        }
+      });
 
       // Attach event listeners for inline SFX triggers (from the TipTap custom node)
       const triggers = preview.querySelectorAll('.sfx-trigger-btn');
       triggers.forEach(btn => {
         const label = btn.getAttribute('data-sfx-label');
         if (label) {
-          const sfxUrl = findSfxUrl(label); // Uses the modal's findSfxUrl
+          const sfxUrl = findSfxUrl(label);
           if (sfxUrl) {
+            btn.style.cursor = 'pointer';
             btn.onclick = (e) => {
               e.stopPropagation();
               sendCommand('play_sfx', { url: sfxUrl });
             };
-            btn.title = "Click to play: " + label;
+            btn.title = `Click to play: ${label}`;
           } else {
             btn.style.opacity = '0.5';
-            btn.title = "SFX not found: " + label;
+            btn.title = `SFX not found: ${label}`;
           }
         }
       });
-      
-      // Attach event listeners for text links to guarantee clickability in preview
-      const textLinks = preview.querySelectorAll('.script-link:not(.sfx-trigger-btn)');
-      textLinks.forEach(link => {
-        const label = link.getAttribute('data-sfx-label');
-        if (label) {
-          const sfxUrl = findSfxUrl(label);
-          if (sfxUrl) {
-            link.style.cursor = 'pointer';
-            link.onclick = (e) => {
-              e.stopPropagation();
-              sendCommand('play_sfx', { url: sfxUrl });
+    }
+    e.stopPropagation();
+    sendCommand('play_sfx', { url: sfxUrl });
             };
           }
         }
@@ -1440,7 +1455,7 @@
       const preview = document.getElementById('script-preview');
 
       if (!preview || !preview.innerHTML || preview.innerHTML.includes('No script content')) {
-        alert('No script content yet. First preview your script in the Link Text to SFX tab.');
+        alert('No script content yet. First create text-to-SFX links in the Link Text to SFX tab.');
         return;
       }
 
@@ -1450,43 +1465,21 @@
 
       content.innerHTML = preview.innerHTML;
 
-      // Re-attach event listeners to script-link elements
-      const links = content.querySelectorAll('.script-link');
+      // Re-attach event listeners to all SFX links with data-sfx-label
+      const links = content.querySelectorAll('[data-sfx-label]');
       links.forEach(link => {
-        let sfxLabel = link.getAttribute('data-sfx-label');
-        if (!sfxLabel) {
-          const title = link.getAttribute('title');
-          sfxLabel = title ? title.replace('Click to play: ', '') : '';
-        }
-        const sfxUrl = findSfxUrl(sfxLabel);
-
-        if (sfxUrl) {
-          link.style.cursor = 'pointer';
-          link.onclick = (e) => {
-            e.stopPropagation();
-            sendCommand('play_sfx', { url: sfxUrl });
-          };
-        }
-      });
-
-      // Re-attach event listeners for inline SFX triggers
-      const triggers = content.querySelectorAll('.sfx-trigger-btn');
-      triggers.forEach(btn => {
-        const label = btn.getAttribute('data-sfx-label');
+        const label = link.getAttribute('data-sfx-label');
         if (label) {
           const sfxUrl = findSfxUrl(label);
           if (sfxUrl) {
-            btn.className = 'fullscreen-sfx-trigger';
-            btn.style.cursor = 'pointer';
-            btn.onclick = (e) => {
+            link.style.cursor = 'pointer';
+            link.onmouseover = () => link.style.backgroundColor = '#2563eb';
+            link.onmouseout = () => link.style.backgroundColor = '#3b82f6';
+            link.onclick = (e) => {
               e.stopPropagation();
               sendCommand('play_sfx', { url: sfxUrl });
             };
-            btn.title = "Click to play: " + label;
-          } else {
-            btn.className = 'fullscreen-sfx-trigger';
-            btn.style.opacity = '0.5';
-            btn.title = "SFX not found: " + label;
+            link.title = `Click to play: ${label}`;
           }
         }
       });
