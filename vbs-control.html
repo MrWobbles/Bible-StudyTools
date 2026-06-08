@@ -429,13 +429,45 @@
     }
   </style>
 
-  <!-- TipTap from CDN -->
-  <script src="https://unpkg.com/@tiptap/core@latest"></script>
-  <script src="https://unpkg.com/@tiptap/pm@latest"></script>
-  <script src="https://unpkg.com/@tiptap/starter-kit@latest"></script>
-  <script src="https://unpkg.com/@tiptap/extension-highlight@latest"></script>
-  <script src="https://unpkg.com/@tiptap/extension-text-style@latest"></script>
-  <script src="https://unpkg.com/@tiptap/extension-color@latest"></script>
+  <!-- TipTap ES Modules from CDN with import map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "@tiptap/core": "https://cdn.jsdelivr.net/npm/@tiptap/core@2.4.0/+esm",
+        "@tiptap/pm": "https://cdn.jsdelivr.net/npm/@tiptap/pm@2.4.0/+esm",
+        "@tiptap/starter-kit": "https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@2.4.0/+esm",
+        "@tiptap/extension-highlight": "https://cdn.jsdelivr.net/npm/@tiptap/extension-highlight@2.4.0/+esm",
+        "@tiptap/extension-text-style": "https://cdn.jsdelivr.net/npm/@tiptap/extension-text-style@2.4.0/+esm",
+        "@tiptap/extension-color": "https://cdn.jsdelivr.net/npm/@tiptap/extension-color@2.4.0/+esm"
+      }
+    }
+  </script>
+  <script type="module">
+    async function initTiptap() {
+      const { Editor } = await import('@tiptap/core');
+      const { StarterKit } = await import('@tiptap/starter-kit');
+      const { Highlight } = await import('@tiptap/extension-highlight');
+      const { TextStyle } = await import('@tiptap/extension-text-style');
+      const { Color } = await import('@tiptap/extension-color');
+      const { Node } = await import('@tiptap/core');
+
+      window.tiptapEditor = {
+        Editor,
+        StarterKit,
+        Highlight,
+        TextStyle,
+        Color,
+        Node
+      };
+
+      document.dispatchEvent(new CustomEvent('tiptapReady'));
+    }
+
+    initTiptap().catch(err => {
+      console.error('Failed to load Tiptap:', err);
+      document.dispatchEvent(new CustomEvent('tiptapError'));
+    });
+  </script>
 </head>
 
 <body>
@@ -642,7 +674,9 @@
     function initializeEditor() {
       if (editor) editor.destroy();
 
-      const SfxNode = tiptap.Node.create({
+      const { Node, Editor, StarterKit, Highlight, TextStyle, Color } = window.tiptapEditor;
+
+      const SfxNode = Node.create({
         name: 'sfxTrigger',
         group: 'inline',
         inline: true,
@@ -669,15 +703,15 @@
         },
       });
 
-      editor = new tiptap.Editor({
+      editor = new Editor({
         element: document.querySelector('#script-editor-container'),
         extensions: [
-          tiptap.StarterKit,
-          tiptap.Highlight.configure({
+          StarterKit,
+          Highlight.configure({
             multicolor: true
           }),
-          tiptap.TextStyle,
-          tiptap.Color,
+          TextStyle,
+          Color,
           SfxNode
         ],
         content: '<p></p>',
@@ -693,6 +727,11 @@
 
       updateEditorToolbarStates();
     }
+
+    // Wait for Tiptap to load before initializing
+    document.addEventListener('tiptapReady', () => {
+      // Now safe to use initializeEditor
+    });
 
     function updateEditorSfxDropdown() {
       const select = document.getElementById('editor-sfx-select');
@@ -994,12 +1033,24 @@
       document.getElementById('google-doc-url').value = scene ? (scene.google_doc_url || '') : '';
 
       // Initialize TipTap editor with content
-      setTimeout(() => {
-        initializeEditor();
-        if (scene && scene.script_content) {
-          editor.commands.setContent(scene.script_content);
-        }
-      }, 0);
+      if (window.tiptapEditor) {
+        setTimeout(() => {
+          initializeEditor();
+          if (scene && scene.script_content) {
+            editor.commands.setContent(scene.script_content);
+          }
+        }, 0);
+      } else {
+        // Wait for Tiptap to load
+        document.addEventListener('tiptapReady', () => {
+          setTimeout(() => {
+            initializeEditor();
+            if (scene && scene.script_content) {
+              editor.commands.setContent(scene.script_content);
+            }
+          }, 0);
+        }, { once: true });
+      }
 
       sfxList.innerHTML = '';
       textList.innerHTML = '';
