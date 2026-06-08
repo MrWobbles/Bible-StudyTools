@@ -1428,12 +1428,49 @@
         return;
       }
 
-      // Clone the preview content with all its event handlers
+      // Clone the preview content
       const overlay = document.getElementById('fullscreen-script-overlay');
       const content = document.getElementById('fullscreen-script-content');
 
-      // Clone the preview element (this preserves all event listeners)
       content.innerHTML = preview.innerHTML;
+
+      // Re-attach event listeners to script-link elements
+      const links = content.querySelectorAll('.script-link');
+      links.forEach(link => {
+        const title = link.getAttribute('title');
+        const sfxLabel = title ? title.replace('Click to play: ', '') : '';
+        const sfxUrl = findSfxUrl(sfxLabel);
+
+        if (sfxUrl) {
+          link.style.cursor = 'pointer';
+          link.onclick = (e) => {
+            e.stopPropagation();
+            sendCommand('play_sfx', { url: sfxUrl });
+          };
+        }
+      });
+
+      // Re-attach event listeners for inline SFX triggers
+      const triggers = content.querySelectorAll('.sfx-trigger-btn');
+      triggers.forEach(btn => {
+        const label = btn.getAttribute('data-sfx-label');
+        if (label) {
+          const sfxUrl = findSfxUrl(label);
+          if (sfxUrl) {
+            btn.className = 'fullscreen-sfx-trigger';
+            btn.style.cursor = 'pointer';
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              sendCommand('play_sfx', { url: sfxUrl });
+            };
+            btn.title = "Click to play: " + label;
+          } else {
+            btn.className = 'fullscreen-sfx-trigger';
+            btn.style.opacity = '0.5';
+            btn.title = "SFX not found: " + label;
+          }
+        }
+      });
 
       overlay.classList.add('active');
     }
