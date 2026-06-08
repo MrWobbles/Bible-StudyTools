@@ -1081,7 +1081,7 @@
         const sfxUrl = findSfxUrlInScene(scene, link.sfx_label);
         // Carefully replace text while preserving HTML tags
         const escapedText = link.text_selection.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const linkSpan = `<span class="script-link" onclick="event.stopPropagation(); sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
+        const linkSpan = `<span class="script-link" data-sfx-label="${link.sfx_label}" onclick="event.stopPropagation(); sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
         // Replace only text not within tags
         html = html.replace(new RegExp(`(?<![><])${escapedText}(?![^<]*>)`, 'g'), linkSpan);
       });
@@ -1358,7 +1358,7 @@
         // Replace text with span that includes link styling
         const sfxUrl = findSfxUrl(link.sfx_label);
         // Use a more careful replacement that preserves HTML structure
-        const linkSpan = `<span class="script-link" onclick="sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
+        const linkSpan = `<span class="script-link" data-sfx-label="${link.sfx_label}" onclick="event.stopPropagation(); sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${link.text_selection}</span>`;
         // Only replace in text nodes, not in tags
         displayHtml = displayHtml.replace(new RegExp(`(?<![><])${escapedText}(?![^<]*>)`, 'g'), linkSpan);
       });
@@ -1380,6 +1380,22 @@
           } else {
             btn.style.opacity = '0.5';
             btn.title = "SFX not found: " + label;
+          }
+        }
+      });
+      
+      // Attach event listeners for text links to guarantee clickability in preview
+      const textLinks = preview.querySelectorAll('.script-link:not(.sfx-trigger-btn)');
+      textLinks.forEach(link => {
+        const label = link.getAttribute('data-sfx-label');
+        if (label) {
+          const sfxUrl = findSfxUrl(label);
+          if (sfxUrl) {
+            link.style.cursor = 'pointer';
+            link.onclick = (e) => {
+              e.stopPropagation();
+              sendCommand('play_sfx', { url: sfxUrl });
+            };
           }
         }
       });
@@ -1437,8 +1453,11 @@
       // Re-attach event listeners to script-link elements
       const links = content.querySelectorAll('.script-link');
       links.forEach(link => {
-        const title = link.getAttribute('title');
-        const sfxLabel = title ? title.replace('Click to play: ', '') : '';
+        let sfxLabel = link.getAttribute('data-sfx-label');
+        if (!sfxLabel) {
+          const title = link.getAttribute('title');
+          sfxLabel = title ? title.replace('Click to play: ', '') : '';
+        }
         const sfxUrl = findSfxUrl(sfxLabel);
 
         if (sfxUrl) {
