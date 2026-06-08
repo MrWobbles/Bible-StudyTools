@@ -26,6 +26,30 @@
       font-family: system-ui, -apple-system, sans-serif;
       background-color: var(--bg);
       color: var(--text);
+      overflow: hidden;
+    }
+
+    .app-layout {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .sidebar-main {
+      width: 445px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #374151;
+      background: var(--bg);
+    }
+
+    .editor-main-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #0f172a;
+      overflow: hidden;
     }
 
     header {
@@ -48,8 +72,8 @@
 
     .container {
       padding: 1rem;
-      max-width: 800px;
-      margin: 0 auto;
+      overflow-y: auto;
+      flex: 1;
     }
 
     .section {
@@ -147,6 +171,11 @@
       margin-bottom: 1rem;
     }
 
+    .scene-card.active-editing {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    }
+
     .scene-card h3 {
       margin-top: 0;
       margin-bottom: 1rem;
@@ -165,31 +194,55 @@
       margin-top: 1rem;
     }
 
-    /* Modal Styles */
-    .modal {
+    /* Editor Layout Styles */
+    .editor-pane {
       display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
+      flex: 1;
+      flex-direction: column;
       height: 100%;
-      background: rgba(0, 0, 0, 0.75);
-      z-index: 50;
-      justify-content: center;
-      align-items: center;
     }
 
-    .modal.active {
+    .editor-pane.active {
       display: flex;
     }
 
-    .modal-content {
+    .editor-placeholder {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      font-size: 1.25rem;
+    }
+
+    .editor-header-bar {
+      padding: 1rem;
       background: var(--card-bg);
+      border-bottom: 1px solid #374151;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .editor-body-layout {
+      display: flex;
+      gap: 2rem;
+      flex: 1;
+      overflow: hidden;
       padding: 1.5rem;
-      border-radius: 0.5rem;
-      width: 90%;
-      max-width: 500px;
-      max-height: 90vh;
+    }
+
+    .editor-left-col {
+      width: 400px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      padding-right: 1rem;
+    }
+
+    .editor-right-col {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
       overflow-y: auto;
     }
 
@@ -293,10 +346,12 @@
 
     .tab-content {
       display: none;
+      flex: 1;
+      flex-direction: column;
     }
 
     .tab-content.active {
-      display: block;
+      display: flex;
     }
 
     /* TipTap Editor Styles */
@@ -345,8 +400,7 @@
       color: white;
       border: 1px solid #4b5563;
       border-radius: 0 0 0.25rem 0.25rem;
-      min-height: 200px;
-      max-height: 400px;
+      flex: 1;
       overflow-y: auto;
       outline: none;
     }
@@ -388,166 +442,182 @@
 
 <body>
 
-  <header>
-    <h1>VBS Controller</h1>
-    <button class="btn-danger" style="width: auto;" onclick="sendCommand('stop_all')">STOP ALL</button>
-  </header>
+  <div class="app-layout">
+    <div class="sidebar-main">
+      <header>
+        <h1>VBS Controller</h1>
+        <button class="btn-danger" style="width: auto;" onclick="sendCommand('stop_all')">STOP ALL</button>
+      </header>
 
-  <div class="container">
-    <div id="status"></div>
+      <div class="container">
+        <div id="status"></div>
 
-    <div class="section">
-      <div class="section-header">
-        <h2>Scenes</h2>
-        <button class="btn-success btn-sm" onclick="openSceneModal()">+ Add Scene</button>
-      </div>
-      <div id="scenes-container">
-        <p>Loading scenes...</p>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-header">
-        <h2>Raw Media (Fallback)</h2>
-      </div>
-      <div style="margin-bottom: 1rem;">
-        <h3>Background Videos</h3>
-        <div class="grid" id="video-grid">
-          <p>Loading videos...</p>
-        </div>
-      </div>
-      <div>
-        <h3>Sound Effects</h3>
-        <div class="grid" id="sfx-grid">
-          <p>Loading sound effects...</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scene Modal -->
-  <div class="modal" id="scene-modal">
-    <div class="modal-content">
-      <h2 id="modal-title">Add Scene</h2>
-      <input type="hidden" id="scene-id">
-
-      <div style="display: flex; gap: 1rem;">
-        <div class="form-group" style="flex: 1;">
-          <label>Title</label>
-          <input type="text" id="scene-title" placeholder="e.g. Day 1 - Jungle">
-        </div>
-        <div class="form-group" style="width: 100px;">
-          <label>Sort Order</label>
-          <input type="number" id="scene-sort-order" value="0">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Video (URL or Asset Path)</label>
-        <div style="display: flex; gap: 0.5rem;">
-          <input type="text" id="scene-video" placeholder="/assets/video/file.mp4">
-          <select id="video-select" style="width: auto;"
-            onchange="document.getElementById('scene-video').value = this.value">
-            <option value="">Select...</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Display Texts (Words to show on screen)</label>
-        <div id="text-list"></div>
-        <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addTextRow()">+ Add Text</button>
-      </div>
-
-      <div class="form-group">
-        <label>Sound Effects</label>
-        <div id="sfx-list"></div>
-        <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addSfxRow()">+ Add SFX</button>
-      </div>
-
-      <div class="form-group">
-        <label>Script & Text Links</label>
-        <div class="script-tabs">
-          <button type="button" class="tab-btn active" onclick="switchScriptTab('content')">Script Content</button>
-          <button type="button" class="tab-btn" onclick="switchScriptTab('links')">Link Text to SFX</button>
-          <button type="button" class="tab-btn" onclick="switchScriptTab('googledoc')">Google Doc</button>
-        </div>
-
-        <div class="tab-content active" id="tab-content">
-          <div style="margin-bottom: 0.5rem;">
-            <label style="font-size: 0.875rem; color: #d1d5db;">Script Text (with formatting & highlighting)</label>
-            <div class="editor-toolbar">
-              <button type="button" onclick="editor.chain().focus().toggleBold().run()" class="editor-btn" data-cmd="bold" title="Bold (Cmd+B)">🅱️ Bold</button>
-              <button type="button" onclick="editor.chain().focus().toggleItalic().run()" class="editor-btn" data-cmd="italic" title="Italic (Cmd+I)"><i>I</i></button>
-              <button type="button" onclick="editor.chain().focus().toggleUnderline().run()" class="editor-btn" data-cmd="underline" title="Underline (Cmd+U)"><u>U</u></button>
-              <div class="divider"></div>
-              <button type="button" onclick="highlightText('#fbbf24')" class="editor-btn" data-cmd="highlight-yellow" title="Highlight Yellow">🟨 Yellow</button>
-              <button type="button" onclick="highlightText('#86efac')" class="editor-btn" data-cmd="highlight-green" title="Highlight Green">🟩 Green</button>
-              <button type="button" onclick="highlightText('#7dd3fc')" class="editor-btn" data-cmd="highlight-blue" title="Highlight Blue">🟦 Blue</button>
-              <button type="button" onclick="highlightText('#f472b6')" class="editor-btn" data-cmd="highlight-pink" title="Highlight Pink">🟩 Pink</button>
-              <button type="button" onclick="editor.chain().focus().clearNodes().run()" class="editor-btn" data-cmd="clear-highlight" title="Clear Highlight">✖️ Clear</button>
-              <div class="divider"></div>
-              <select id="editor-sfx-select" style="margin-left: 0.25rem; padding: 0.4rem; background: #374151; color: white; border: 1px solid #6b7280; border-radius: 0.25rem;" onfocus="updateEditorSfxDropdown()">
-                <option value="">-- Insert SFX --</option>
-              </select>
-              <button type="button" onclick="insertSfxFromDropdown()" class="editor-btn" title="Insert inline SFX button">🔊 Insert SFX</button>
-              <div class="divider"></div>
-              <button type="button" onclick="previewScript()" class="editor-btn" style="background: #10b981; border-color: #059669;">👁️ Preview</button>
-            </div>
-            <div id="script-editor-container" style="border: 1px solid #4b5563; border-radius: 0.25rem; overflow: hidden;"></div>
-            <input type="hidden" id="script-editor-html">
+        <div class="section">
+          <div class="section-header">
+            <h2>Scenes</h2>
+            <button class="btn-success btn-sm" onclick="openSceneEditor()">+ Add Scene</button>
+          </div>
+          <div id="scenes-container">
+            <p>Loading scenes...</p>
           </div>
         </div>
 
-        <div class="tab-content" id="tab-links">
+        <div class="section">
+          <div class="section-header">
+            <h2>Raw Media (Fallback)</h2>
+          </div>
           <div style="margin-bottom: 1rem;">
-            <label style="font-size: 0.875rem; color: #d1d5db;">Select text below to link it to an SFX button</label>
-            <div id="script-preview" style="margin-top: 0.5rem;"></div>
-          </div>
-          <div class="link-editor">
-            <div style="margin-bottom: 1rem;">
-              <label>Selected Text: <span id="selected-text-display" style="color: #3b82f6;"></span></label>
+            <h3>Background Videos</h3>
+            <div class="grid" id="video-grid">
+              <p>Loading videos...</p>
             </div>
-            <div class="form-group">
-              <label>Link to SFX:</label>
-              <select id="link-sfx-select" style="width: 100%;">
-                <option value="">-- Select SFX --</option>
-              </select>
+          </div>
+          <div>
+            <h3>Sound Effects</h3>
+            <div class="grid" id="sfx-grid">
+              <p>Loading sound effects...</p>
             </div>
-            <button type="button" class="btn-sm btn-success" onclick="createLink()" style="margin-right: 0.5rem;">Create
-              Link</button>
-            <button type="button" class="btn-sm btn-danger" onclick="clearLinkSelection()">Clear</button>
           </div>
-          <div style="margin-top: 1rem;">
-            <label style="font-size: 0.875rem; color: #d1d5db;">Active Links:</label>
-            <div id="active-links-list" style="margin-top: 0.5rem;"></div>
-          </div>
-        </div>
-
-        <div class="tab-content" id="tab-googledoc">
-          <div class="form-group">
-            <label>Google Doc URL (share link - make it readable)</label>
-            <input type="text" id="google-doc-url" placeholder="https://docs.google.com/document/d/...">
-          </div>
-          <button type="button" class="btn-sm btn-success" onclick="fetchGoogleDoc()">Load from Google Doc</button>
-          <p style="font-size: 0.875rem; color: #9ca3af; margin-top: 1rem;">Note: Currently supports public Google Docs.
-            The content will be fetched and placed in the Script Content tab.</p>
         </div>
       </div>
+    </div>
 
-      <div class="form-group" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
-        <button type="button" class="btn-danger btn-sm" onclick="closeSceneModal()">Cancel</button>
-        <button type="button" class="btn-success btn-sm" onclick="saveScene()">Save Scene</button>
+    <!-- Editor Main Area -->
+    <div class="editor-main-container">
+      <div id="editor-placeholder" class="editor-placeholder">
+        <p>Select a scene to edit or create a new one.</p>
+      </div>
+
+      <div id="editor-pane" class="editor-pane">
+        <div class="editor-header-bar">
+          <h2 id="editor-title" style="margin: 0;">Add Scene</h2>
+          <div style="display: flex; gap: 1rem;">
+            <button type="button" class="btn-danger btn-sm" onclick="closeSceneEditor()">Cancel</button>
+            <button type="button" class="btn-success btn-sm" onclick="saveScene()">Save Scene</button>
+          </div>
+        </div>
+
+        <input type="hidden" id="scene-id">
+
+        <div class="editor-body-layout">
+          <div class="editor-left-col">
+            <div style="display: flex; gap: 1rem;">
+              <div class="form-group" style="flex: 1;">
+                <label>Title</label>
+                <input type="text" id="scene-title" placeholder="e.g. Day 1 - Jungle">
+              </div>
+              <div class="form-group" style="width: 100px;">
+                <label>Sort Order</label>
+                <input type="number" id="scene-sort-order" value="0">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Video (URL or Asset Path)</label>
+              <div style="display: flex; gap: 0.5rem;">
+                <input type="text" id="scene-video" placeholder="/assets/video/file.mp4">
+                <select id="video-select" style="width: auto;"
+                  onchange="document.getElementById('scene-video').value = this.value">
+                  <option value="">Select...</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Display Texts (Words to show on screen)</label>
+              <div id="text-list"></div>
+              <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addTextRow()">+ Add Text</button>
+            </div>
+
+            <div class="form-group">
+              <label>Sound Effects</label>
+              <div id="sfx-list"></div>
+              <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addSfxRow()">+ Add SFX</button>
+            </div>
+          </div> <!-- End of editor-left-col -->
+
+          <div class="editor-right-col">
+            <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+              <label>Script & Text Links</label>
+              <div class="script-tabs">
+                <button type="button" class="tab-btn active" onclick="switchScriptTab('content')">Script Content</button>
+                <button type="button" class="tab-btn" onclick="switchScriptTab('links')">Link Text to SFX</button>
+                <button type="button" class="tab-btn" onclick="switchScriptTab('googledoc')">Google Doc</button>
+              </div>
+
+              <div class="tab-content active" id="tab-content">
+                <div style="margin-bottom: 0.5rem; flex: 1; display: flex; flex-direction: column;">
+                  <label style="font-size: 0.875rem; color: #d1d5db;">Script Text (with formatting & highlighting)</label>
+                  <div class="editor-toolbar">
+                    <button type="button" onclick="editor.chain().focus().toggleBold().run()" class="editor-btn" data-cmd="bold" title="Bold (Cmd+B)">🅱️ Bold</button>
+                    <button type="button" onclick="editor.chain().focus().toggleItalic().run()" class="editor-btn" data-cmd="italic" title="Italic (Cmd+I)"><i>I</i></button>
+                    <button type="button" onclick="editor.chain().focus().toggleUnderline().run()" class="editor-btn" data-cmd="underline" title="Underline (Cmd+U)"><u>U</u></button>
+                    <div class="divider"></div>
+                    <button type="button" onclick="highlightText('#fbbf24')" class="editor-btn" data-cmd="highlight-yellow" title="Highlight Yellow">🟨 Yellow</button>
+                    <button type="button" onclick="highlightText('#86efac')" class="editor-btn" data-cmd="highlight-green" title="Highlight Green">🟩 Green</button>
+                    <button type="button" onclick="highlightText('#7dd3fc')" class="editor-btn" data-cmd="highlight-blue" title="Highlight Blue">🟦 Blue</button>
+                    <button type="button" onclick="highlightText('#f472b6')" class="editor-btn" data-cmd="highlight-pink" title="Highlight Pink">🟩 Pink</button>
+                    <button type="button" onclick="editor.chain().focus().clearNodes().run()" class="editor-btn" data-cmd="clear-highlight" title="Clear Highlight">✖️ Clear</button>
+                    <div class="divider"></div>
+                    <select id="editor-sfx-select" style="margin-left: 0.25rem; padding: 0.4rem; background: #374151; color: white; border: 1px solid #6b7280; border-radius: 0.25rem;" onfocus="updateEditorSfxDropdown()">
+                      <option value="">-- Insert SFX --</option>
+                    </select>
+                    <button type="button" onclick="insertSfxFromDropdown()" class="editor-btn" title="Insert inline SFX button">🔊 Insert SFX</button>
+                    <div class="divider"></div>
+                    <button type="button" onclick="previewScript()" class="editor-btn" style="background: #10b981; border-color: #059669;">👁️ Preview</button>
+                  </div>
+                  <div id="script-editor-container" style="border: 1px solid #4b5563; border-radius: 0.25rem; overflow: hidden; flex: 1; display: flex; flex-direction: column;"></div>
+                  <input type="hidden" id="script-editor-html">
+                </div>
+              </div>
+
+              <div class="tab-content" id="tab-links">
+                <div style="margin-bottom: 1rem;">
+                  <label style="font-size: 0.875rem; color: #d1d5db;">Select text below to link it to an SFX button</label>
+                  <div id="script-preview" style="margin-top: 0.5rem;"></div>
+                </div>
+                <div class="link-editor">
+                  <div style="margin-bottom: 1rem;">
+                    <label>Selected Text: <span id="selected-text-display" style="color: #3b82f6;"></span></label>
+                  </div>
+                  <div class="form-group">
+                    <label>Link to SFX:</label>
+                    <select id="link-sfx-select" style="width: 100%;">
+                      <option value="">-- Select SFX --</option>
+                    </select>
+                  </div>
+                  <button type="button" class="btn-sm btn-success" onclick="createLink()" style="margin-right: 0.5rem;">Create
+                    Link</button>
+                  <button type="button" class="btn-sm btn-danger" onclick="clearLinkSelection()">Clear</button>
+                </div>
+                <div style="margin-top: 1rem;">
+                  <label style="font-size: 0.875rem; color: #d1d5db;">Active Links:</label>
+                  <div id="active-links-list" style="margin-top: 0.5rem;"></div>
+                </div>
+              </div>
+
+              <div class="tab-content" id="tab-googledoc">
+                <div class="form-group">
+                  <label>Google Doc URL (share link - make it readable)</label>
+                  <input type="text" id="google-doc-url" placeholder="https://docs.google.com/document/d/...">
+                </div>
+                <button type="button" class="btn-sm btn-success" onclick="fetchGoogleDoc()">Load from Google Doc</button>
+                <p style="font-size: 0.875rem; color: #9ca3af; margin-top: 1rem;">Note: Currently supports public Google Docs.
+                  The content will be fetched and placed in the Script Content tab.</p>
+              </div>
+            </div> <!-- End of form-group for script -->
+          </div> <!-- End of editor-right-col -->
+        </div> <!-- End of editor-body-layout -->
       </div>
     </div>
   </div>
-
   <script>
     const token = localStorage.getItem('bst_access_token') || sessionStorage.getItem('bst_access_token');
 
     let rawMedia = { videos: [], audio: [] };
     let scenes = [];
     let editor = null;
+    let currentEditingSceneId = null;
 
     // Initialize TipTap editor
     function initializeEditor() {
@@ -781,6 +851,9 @@
       scenes.forEach(scene => {
         const card = document.createElement('div');
         card.className = 'scene-card';
+        if (scene.id === currentEditingSceneId) {
+          card.classList.add('active-editing');
+        }
 
         let textsHtml = '';
         if (scene.display_texts && scene.display_texts.length > 0) {
@@ -885,12 +958,16 @@
     }
 
     // --- Modal Logic ---
-    function openSceneModal(scene = null) {
-      const modal = document.getElementById('scene-modal');
+    function openSceneEditor(scene = null) {
+      document.getElementById('editor-placeholder').style.display = 'none';
+      document.getElementById('editor-pane').classList.add('active');
+      currentEditingSceneId = scene ? scene.id : null;
+      renderScenes();
+      
       const sfxList = document.getElementById('sfx-list');
       const textList = document.getElementById('text-list');
 
-      document.getElementById('modal-title').textContent = scene ? 'Edit Scene' : 'Add Scene';
+      document.getElementById('editor-title').textContent = scene ? 'Edit Scene' : 'Add Scene';
       document.getElementById('scene-id').value = scene ? scene.id : '';
       document.getElementById('scene-title').value = scene ? scene.title : '';
       document.getElementById('scene-sort-order').value = scene && scene.sort_order !== undefined ? scene.sort_order : 0;
@@ -933,11 +1010,14 @@
         renderActiveLinks();
       }
 
-      modal.classList.add('active');
+      
     }
 
-    function closeSceneModal() {
-      document.getElementById('scene-modal').classList.remove('active');
+    function closeSceneEditor() {
+      document.getElementById('editor-placeholder').style.display = 'flex';
+      document.getElementById('editor-pane').classList.remove('active');
+      currentEditingSceneId = null;
+      renderScenes();
     }
 
     function addTextRow(label = '', text = '') {
@@ -1039,7 +1119,7 @@
           body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error('Save failed');
-        closeSceneModal();
+        closeSceneEditor();
         loadData(); // reload
       } catch (err) {
         console.error(err);
@@ -1049,7 +1129,7 @@
 
     function editScene(id) {
       const scene = scenes.find(s => s.id === id);
-      if (scene) openSceneModal(scene);
+      if (scene) openSceneEditor(scene);
     }
 
     async function deleteScene(id) {
@@ -1292,9 +1372,9 @@
       }
     }
 
-    // Update closeSceneModal to clean up handlers
-    const originalCloseSceneModal = closeSceneModal;
-    closeSceneModal = function () {
+    // Update closeSceneEditor to clean up handlers
+    const originalCloseSceneModal = closeSceneEditor;
+    closeSceneEditor = function () {
       const preview = document.getElementById('script-preview');
       if (preview) {
         preview.removeEventListener('mouseup', selectTextForLink);
@@ -1303,9 +1383,9 @@
       originalCloseSceneModal();
     }
 
-    // Update openSceneModal to attach handler
-    const originalOpenSceneModal = openSceneModal;
-    openSceneModal = function (scene = null) {
+    // Update openSceneEditor to attach handler
+    const originalOpenSceneModal = openSceneEditor;
+    openSceneEditor = function (scene = null) {
       originalOpenSceneModal(scene);
       setTimeout(() => attachScriptSelectionHandler(), 100);
     }
