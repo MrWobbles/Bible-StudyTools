@@ -110,6 +110,15 @@ create index if not exists bst_vbs_scenes_sort_order_idx
 alter table public.bst_vbs_scenes
   add column if not exists display_texts jsonb not null default '[]'::jsonb;
 
+alter table public.bst_vbs_scenes
+  add column if not exists script_content text default ''::text;
+
+alter table public.bst_vbs_scenes
+  add column if not exists script_links jsonb not null default '[]'::jsonb;
+
+alter table public.bst_vbs_scenes
+  add column if not exists google_doc_url text default ''::text;
+
 alter table public.bst_signup_requests
   add column if not exists invite_code text;
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -99,12 +100,30 @@
       transform: scale(0.95);
     }
 
-    .btn-danger { background: var(--danger); }
-    .btn-danger:hover { background: var(--danger-hover); }
-    .btn-success { background: var(--success); }
-    .btn-success:hover { background: var(--success-hover); }
-    .btn-warning { background: var(--warning); color: #000; }
-    .btn-warning:hover { background: var(--warning-hover); }
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: var(--danger-hover);
+    }
+
+    .btn-success {
+      background: var(--success);
+    }
+
+    .btn-success:hover {
+      background: var(--success-hover);
+    }
+
+    .btn-warning {
+      background: var(--warning);
+      color: #000;
+    }
+
+    .btn-warning:hover {
+      background: var(--warning-hover);
+    }
 
     .btn-sm {
       padding: 0.25rem 0.5rem;
@@ -138,7 +157,7 @@
       gap: 0.5rem;
       margin-bottom: 1rem;
     }
-    
+
     .sfx-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -150,14 +169,19 @@
     .modal {
       display: none;
       position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.75);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
       z-index: 50;
       justify-content: center;
       align-items: center;
     }
 
-    .modal.active { display: flex; }
+    .modal.active {
+      display: flex;
+    }
 
     .modal-content {
       background: var(--card-bg);
@@ -169,9 +193,17 @@
       overflow-y: auto;
     }
 
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; }
-    .form-group input, .form-group select {
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-group input,
+    .form-group select {
       width: 100%;
       padding: 0.5rem;
       border-radius: 0.25rem;
@@ -186,8 +218,89 @@
       gap: 0.5rem;
       margin-bottom: 0.5rem;
     }
+
+    /* Script styles */
+    #script-editor {
+      width: 100%;
+      min-height: 200px;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      border: 1px solid #4b5563;
+      background: #374151;
+      color: white;
+      font-family: monospace;
+      font-size: 0.875rem;
+      resize: vertical;
+    }
+
+    #script-preview {
+      background: #0f172a;
+      border: 1px solid #4b5563;
+      border-radius: 0.25rem;
+      padding: 1rem;
+      line-height: 1.6;
+      min-height: 150px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .script-link {
+      background: #3b82f6;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: normal;
+    }
+
+    .script-link:hover {
+      background: #2563eb;
+    }
+
+    .link-editor {
+      background: #1f2937;
+      border: 1px solid #4b5563;
+      border-radius: 0.25rem;
+      padding: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .link-selection {
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #4b5563;
+    }
+
+    .script-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .tab-btn {
+      padding: 0.5rem 1rem;
+      background: #374151;
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 0.25rem;
+      transition: background 0.2s;
+    }
+
+    .tab-btn.active {
+      background: #3b82f6;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
   </style>
 </head>
+
 <body>
 
   <header>
@@ -207,18 +320,22 @@
         <p>Loading scenes...</p>
       </div>
     </div>
-    
+
     <div class="section">
       <div class="section-header">
         <h2>Raw Media (Fallback)</h2>
       </div>
       <div style="margin-bottom: 1rem;">
         <h3>Background Videos</h3>
-        <div class="grid" id="video-grid"><p>Loading videos...</p></div>
+        <div class="grid" id="video-grid">
+          <p>Loading videos...</p>
+        </div>
       </div>
       <div>
         <h3>Sound Effects</h3>
-        <div class="grid" id="sfx-grid"><p>Loading sound effects...</p></div>
+        <div class="grid" id="sfx-grid">
+          <p>Loading sound effects...</p>
+        </div>
       </div>
     </div>
   </div>
@@ -228,7 +345,7 @@
     <div class="modal-content">
       <h2 id="modal-title">Add Scene</h2>
       <input type="hidden" id="scene-id">
-      
+
       <div style="display: flex; gap: 1rem;">
         <div class="form-group" style="flex: 1;">
           <label>Title</label>
@@ -239,12 +356,13 @@
           <input type="number" id="scene-sort-order" value="0">
         </div>
       </div>
-      
+
       <div class="form-group">
         <label>Video (URL or Asset Path)</label>
         <div style="display: flex; gap: 0.5rem;">
           <input type="text" id="scene-video" placeholder="/assets/video/file.mp4">
-          <select id="video-select" style="width: auto;" onchange="document.getElementById('scene-video').value = this.value">
+          <select id="video-select" style="width: auto;"
+            onchange="document.getElementById('scene-video').value = this.value">
             <option value="">Select...</option>
           </select>
         </div>
@@ -262,6 +380,59 @@
         <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="addSfxRow()">+ Add SFX</button>
       </div>
 
+      <div class="form-group">
+        <label>Script & Text Links</label>
+        <div class="script-tabs">
+          <button type="button" class="tab-btn active" onclick="switchScriptTab('content')">Script Content</button>
+          <button type="button" class="tab-btn" onclick="switchScriptTab('links')">Link Text to SFX</button>
+          <button type="button" class="tab-btn" onclick="switchScriptTab('googledoc')">Google Doc</button>
+        </div>
+
+        <div class="tab-content active" id="tab-content">
+          <div style="margin-bottom: 0.5rem;">
+            <label style="font-size: 0.875rem; color: #d1d5db;">Script Text (paste formatted text or copy from Google
+              Doc)</label>
+            <textarea id="script-editor" placeholder="Paste your script here..."></textarea>
+          </div>
+          <button type="button" class="btn-sm" style="margin-top: 0.5rem;" onclick="previewScript()">Preview</button>
+        </div>
+
+        <div class="tab-content" id="tab-links">
+          <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.875rem; color: #d1d5db;">Select text below to link it to an SFX button</label>
+            <div id="script-preview" style="margin-top: 0.5rem;"></div>
+          </div>
+          <div class="link-editor">
+            <div style="margin-bottom: 1rem;">
+              <label>Selected Text: <span id="selected-text-display" style="color: #3b82f6;"></span></label>
+            </div>
+            <div class="form-group">
+              <label>Link to SFX:</label>
+              <select id="link-sfx-select" style="width: 100%;">
+                <option value="">-- Select SFX --</option>
+              </select>
+            </div>
+            <button type="button" class="btn-sm btn-success" onclick="createLink()" style="margin-right: 0.5rem;">Create
+              Link</button>
+            <button type="button" class="btn-sm btn-danger" onclick="clearLinkSelection()">Clear</button>
+          </div>
+          <div style="margin-top: 1rem;">
+            <label style="font-size: 0.875rem; color: #d1d5db;">Active Links:</label>
+            <div id="active-links-list" style="margin-top: 0.5rem;"></div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-googledoc">
+          <div class="form-group">
+            <label>Google Doc URL (share link - make it readable)</label>
+            <input type="text" id="google-doc-url" placeholder="https://docs.google.com/document/d/...">
+          </div>
+          <button type="button" class="btn-sm btn-success" onclick="fetchGoogleDoc()">Load from Google Doc</button>
+          <p style="font-size: 0.875rem; color: #9ca3af; margin-top: 1rem;">Note: Currently supports public Google Docs.
+            The content will be fetched and placed in the Script Content tab.</p>
+        </div>
+      </div>
+
       <div class="form-group" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
         <button type="button" class="btn-danger btn-sm" onclick="closeSceneModal()">Cancel</button>
         <button type="button" class="btn-success btn-sm" onclick="saveScene()">Save Scene</button>
@@ -271,7 +442,7 @@
 
   <script>
     const token = localStorage.getItem('bst_access_token') || sessionStorage.getItem('bst_access_token');
-    
+
     let rawMedia = { videos: [], audio: [] };
     let scenes = [];
 
@@ -313,7 +484,7 @@
           fetch('/api/vbs/media', { headers: getHeaders() }),
           fetch('/api/vbs/scenes', { headers: getHeaders() }).catch(() => null)
         ]);
-        
+
         if (mediaRes.status === 401 || (scenesRes && scenesRes.status === 401)) {
           window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
           return;
@@ -321,7 +492,7 @@
 
         const mediaData = await mediaRes.json();
         rawMedia = mediaData;
-        
+
         if (scenesRes && scenesRes.ok) {
           const scenesData = await scenesRes.json();
           scenes = scenesData.scenes || [];
@@ -341,7 +512,7 @@
     function renderRawMedia() {
       const videoGrid = document.getElementById('video-grid');
       const sfxGrid = document.getElementById('sfx-grid');
-      
+
       videoGrid.innerHTML = '';
       sfxGrid.innerHTML = '';
 
@@ -380,7 +551,7 @@
       scenes.forEach(scene => {
         const card = document.createElement('div');
         card.className = 'scene-card';
-        
+
         let textsHtml = '';
         if (scene.display_texts && scene.display_texts.length > 0) {
           textsHtml = `<div class="sfx-grid" style="margin-bottom: 0.5rem;">
@@ -404,6 +575,14 @@
           </div>`;
         }
 
+        let scriptHtml = '';
+        if (scene.script_content) {
+          scriptHtml = `<div style="margin-top: 1rem; margin-bottom: 1rem;">
+            <div style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 0.5rem;">Script:</div>
+            <div id="script-display-${scene.id}" style="background: #0f172a; border: 1px solid #4b5563; border-radius: 0.25rem; padding: 1rem; max-height: 300px; overflow-y: auto; line-height: 1.6; font-size: 0.875rem; white-space: pre-wrap;"></div>
+          </div>`;
+        }
+
         card.innerHTML = `
           <div style="display:flex; justify-content:space-between;">
             <h3>${scene.title}</h3>
@@ -415,10 +594,54 @@
             <button class="btn-sm btn-danger" onclick="deleteScene('${scene.id}')">Delete</button>
           </div>
           ${textsHtml}
+          ${scriptHtml}
           ${sfxHtml}
         `;
         container.appendChild(card);
+
+        // Render script with clickable links
+        if (scene.script_content) {
+          renderScriptDisplay(scene);
+        }
       });
+    }
+
+    function renderScriptDisplay(scene) {
+      const displayEl = document.getElementById(`script-display-${scene.id}`);
+      if (!displayEl) return;
+
+      let html = '';
+      let lastIndex = 0;
+      const scriptContent = scene.script_content;
+
+      // Sort links by position
+      const sortedLinks = (scene.script_links || []).sort((a, b) => {
+        const aStart = scriptContent.indexOf(a.text_selection);
+        const bStart = scriptContent.indexOf(b.text_selection);
+        return aStart - bStart;
+      });
+
+      sortedLinks.forEach(link => {
+        const startIdx = scriptContent.indexOf(link.text_selection, lastIndex);
+        if (startIdx !== -1) {
+          // Add text before link
+          html += escapeHtml(scriptContent.substring(lastIndex, startIdx));
+          // Add linked text as button
+          const sfxUrl = findSfxUrlInScene(scene, link.sfx_label);
+          html += `<span class="script-link" onclick="event.stopPropagation(); sendCommand('play_sfx', { url: '${sfxUrl}' })" title="Click to play: ${link.sfx_label}">${escapeHtml(link.text_selection)}</span>`;
+          lastIndex = startIdx + link.text_selection.length;
+        }
+      });
+
+      // Add remaining text
+      html += escapeHtml(scriptContent.substring(lastIndex));
+
+      displayEl.innerHTML = html;
+    }
+
+    function findSfxUrlInScene(scene, sfxLabel) {
+      const sfx = scene.sound_effects.find(s => s.label === sfxLabel);
+      return sfx ? sfx.url : '';
     }
 
     // --- Modal Logic ---
@@ -426,15 +649,18 @@
       const modal = document.getElementById('scene-modal');
       const sfxList = document.getElementById('sfx-list');
       const textList = document.getElementById('text-list');
-      
+
       document.getElementById('modal-title').textContent = scene ? 'Edit Scene' : 'Add Scene';
       document.getElementById('scene-id').value = scene ? scene.id : '';
       document.getElementById('scene-title').value = scene ? scene.title : '';
       document.getElementById('scene-sort-order').value = scene && scene.sort_order !== undefined ? scene.sort_order : 0;
       document.getElementById('scene-video').value = scene ? (scene.video_url || '') : '';
+      document.getElementById('script-editor').value = scene ? (scene.script_content || '') : '';
+      document.getElementById('google-doc-url').value = scene ? (scene.google_doc_url || '') : '';
+
       sfxList.innerHTML = '';
       textList.innerHTML = '';
-      
+
       if (scene && scene.sound_effects) {
         scene.sound_effects.forEach(sfx => addSfxRow(sfx.label, sfx.url, sfx.loop));
       } else {
@@ -445,6 +671,19 @@
         scene.display_texts.forEach(t => addTextRow(t.label, t.text));
       } else {
         addTextRow();
+      }
+
+      // Initialize script links
+      window.currentScriptLinks = scene && scene.script_links ? JSON.parse(JSON.stringify(scene.script_links)) : [];
+      window.currentSelection = null;
+
+      // Update SFX dropdown for linking
+      updateLinkSfxSelect();
+
+      // Show preview
+      if (scene && scene.script_content) {
+        previewScript();
+        renderActiveLinks();
       }
 
       modal.classList.add('active');
@@ -470,7 +709,7 @@
       const sfxList = document.getElementById('sfx-list');
       const div = document.createElement('div');
       div.className = 'sfx-item';
-      
+
       // Select dropdown for available audio
       let options = '<option value="">Select...</option>';
       if (rawMedia.audio) {
@@ -509,7 +748,7 @@
       const title = document.getElementById('scene-title').value.trim();
       const sort_order = parseInt(document.getElementById('scene-sort-order').value, 10) || 0;
       const video_url = document.getElementById('scene-video').value.trim();
-      
+
       const sfxItems = document.querySelectorAll('#sfx-list .sfx-item');
       const sound_effects = [];
       sfxItems.forEach(item => {
@@ -536,9 +775,13 @@
         }
       });
 
+      const script_content = document.getElementById('script-editor').value.trim();
+      const script_links = window.currentScriptLinks || [];
+      const google_doc_url = document.getElementById('google-doc-url').value.trim();
+
       if (!title) return alert('Title is required');
 
-      const payload = { title, video_url, sound_effects, display_texts, sort_order };
+      const payload = { title, video_url, sound_effects, display_texts, sort_order, script_content, script_links, google_doc_url };
       const url = id ? `/api/vbs/scenes/${id}` : '/api/vbs/scenes';
       const method = id ? 'PUT' : 'POST';
 
@@ -564,7 +807,7 @@
 
     async function deleteScene(id) {
       if (!confirm('Are you sure you want to delete this scene?')) return;
-      
+
       try {
         const res = await fetch(`/api/vbs/scenes/${id}`, {
           method: 'DELETE',
@@ -578,8 +821,229 @@
       }
     }
 
+    // Script Management Functions
+    window.currentScriptLinks = [];
+    window.currentSelection = null;
+
+    function switchScriptTab(tab) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+      // Show selected tab
+      document.getElementById('tab-' + tab).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    function previewScript() {
+      const scriptContent = document.getElementById('script-editor').value;
+      const preview = document.getElementById('script-preview');
+
+      if (!scriptContent.trim()) {
+        preview.innerHTML = '<p style="color: #9ca3af;">No script content yet.</p>';
+        return;
+      }
+
+      // Render script with clickable regions for links
+      let html = '';
+      let lastIndex = 0;
+
+      // Sort links by start position
+      const sortedLinks = (window.currentScriptLinks || []).sort((a, b) => {
+        const aStart = scriptContent.indexOf(a.text_selection);
+        const bStart = scriptContent.indexOf(b.text_selection);
+        return aStart - bStart;
+      });
+
+      sortedLinks.forEach(link => {
+        const startIdx = scriptContent.indexOf(link.text_selection, lastIndex);
+        if (startIdx !== -1) {
+          // Add text before link
+          html += escapeHtml(scriptContent.substring(lastIndex, startIdx));
+          // Add linked text
+          html += `<span class="script-link" onclick="sendCommand('play_sfx', { url: '${findSfxUrl(link.sfx_label)}' })">${escapeHtml(link.text_selection)}</span>`;
+          lastIndex = startIdx + link.text_selection.length;
+        }
+      });
+
+      // Add remaining text
+      html += escapeHtml(scriptContent.substring(lastIndex));
+
+      preview.innerHTML = html.replace(/\n/g, '<br>');
+    }
+
+    function findSfxUrl(sfxLabel) {
+      // Get all SFX items and find the URL for this label
+      const sfxItems = document.querySelectorAll('#sfx-list .sfx-item');
+      for (let item of sfxItems) {
+        const labelInput = item.querySelector('input[type="text"]:first-of-type');
+        if (labelInput && labelInput.value === sfxLabel) {
+          const urlInput = item.querySelector('input[type="text"]:nth-of-type(2)');
+          return urlInput.value;
+        }
+      }
+      return '';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function updateLinkSfxSelect() {
+      const select = document.getElementById('link-sfx-select');
+      select.innerHTML = '<option value="">-- Select SFX --</option>';
+
+      const sfxItems = document.querySelectorAll('#sfx-list .sfx-item');
+      sfxItems.forEach(item => {
+        const labelInput = item.querySelector('input[type="text"]:first-of-type');
+        if (labelInput && labelInput.value.trim()) {
+          const option = document.createElement('option');
+          option.value = labelInput.value;
+          option.textContent = labelInput.value;
+          select.appendChild(option);
+        }
+      });
+    }
+
+    function createLink() {
+      const selection = window.currentSelection;
+      const sfxLabel = document.getElementById('link-sfx-select').value;
+
+      if (!selection || !selection.text.trim()) {
+        alert('Please select text first');
+        return;
+      }
+
+      if (!sfxLabel) {
+        alert('Please select an SFX');
+        return;
+      }
+
+      // Check if this link already exists
+      const exists = window.currentScriptLinks.some(link => link.text_selection === selection.text);
+      if (exists) {
+        alert('This text is already linked. Remove the old link first.');
+        return;
+      }
+
+      window.currentScriptLinks.push({
+        text_selection: selection.text,
+        sfx_label: sfxLabel
+      });
+
+      showStatus(`Linked "${selection.text}" to "${sfxLabel}"`);
+      renderActiveLinks();
+      clearLinkSelection();
+      previewScript();
+    }
+
+    function removeLink(index) {
+      window.currentScriptLinks.splice(index, 1);
+      renderActiveLinks();
+      previewScript();
+    }
+
+    function renderActiveLinks() {
+      const list = document.getElementById('active-links-list');
+
+      if (!window.currentScriptLinks || window.currentScriptLinks.length === 0) {
+        list.innerHTML = '<p style="color: #9ca3af;">No links created yet.</p>';
+        return;
+      }
+
+      list.innerHTML = window.currentScriptLinks.map((link, idx) => `
+        <div style="background: #0f172a; padding: 0.5rem; border-radius: 0.25rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="color: #3b82f6;">"${link.text_selection}"</span> → <span style="color: #10b981;">${link.sfx_label}</span>
+          </div>
+          <button type="button" class="btn-danger btn-sm" onclick="removeLink(${idx})">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    function clearLinkSelection() {
+      window.currentSelection = null;
+      document.getElementById('selected-text-display').textContent = '';
+      document.getElementById('link-sfx-select').value = '';
+    }
+
+    async function fetchGoogleDoc() {
+      const url = document.getElementById('google-doc-url').value.trim();
+
+      if (!url) {
+        alert('Please enter a Google Doc URL');
+        return;
+      }
+
+      try {
+        showStatus('Fetching Google Doc...');
+
+        // Extract document ID from URL
+        const match = url.match(/\/document\/d\/([a-zA-Z0-9-_]+)/);
+        if (!match) {
+          throw new Error('Invalid Google Doc URL format');
+        }
+
+        const docId = match[1];
+        // Use Google Docs export as text
+        const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+
+        const response = await fetch(exportUrl);
+        if (!response.ok) throw new Error('Failed to fetch document');
+
+        const text = await response.text();
+        document.getElementById('script-editor').value = text;
+        switchScriptTab('content');
+        showStatus('Document loaded! Adjust formatting as needed.');
+      } catch (err) {
+        console.error(err);
+        showStatus('Error fetching Google Doc. Make sure the link is public/shared.', true);
+      }
+    }
+
+    // Make these functions available on script preview for text selection
+    function selectTextForLink() {
+      const preview = document.getElementById('script-preview');
+      const selection = window.getSelection();
+
+      if (selection.toString().length > 0) {
+        window.currentSelection = { text: selection.toString() };
+        document.getElementById('selected-text-display').textContent = `"${selection.toString()}"`;
+      }
+    }
+
+    // Attach selection handler when modal opens
+    function attachScriptSelectionHandler() {
+      const preview = document.getElementById('script-preview');
+      if (preview && !preview._hasSelectionListener) {
+        preview.addEventListener('mouseup', selectTextForLink);
+        preview._hasSelectionListener = true;
+      }
+    }
+
+    // Update closeSceneModal to clean up handlers
+    const originalCloseSceneModal = closeSceneModal;
+    closeSceneModal = function () {
+      const preview = document.getElementById('script-preview');
+      if (preview) {
+        preview.removeEventListener('mouseup', selectTextForLink);
+        preview._hasSelectionListener = false;
+      }
+      originalCloseSceneModal();
+    }
+
+    // Update openSceneModal to attach handler
+    const originalOpenSceneModal = openSceneModal;
+    openSceneModal = function (scene = null) {
+      originalOpenSceneModal(scene);
+      setTimeout(() => attachScriptSelectionHandler(), 100);
+    }
+
     // Initialize
     loadData();
   </script>
 </body>
+
 </html>
