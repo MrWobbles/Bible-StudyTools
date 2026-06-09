@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VBS Media Player</title>
   <style>
-    body, html {
+    body,
+    html {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -17,7 +19,7 @@
       align-items: center;
       font-family: sans-serif;
     }
-    
+
     #video-container {
       width: 100%;
       height: 100%;
@@ -32,7 +34,8 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      display: block; /* removes bottom spacing in some browsers */
+      display: block;
+      /* removes bottom spacing in some browsers */
     }
 
     #loading-overlay {
@@ -65,17 +68,73 @@
       font-weight: 900;
       text-transform: uppercase;
       color: #fff;
-      -webkit-text-stroke: 4px #000; /* Black outline */
-      text-shadow: 6px 6px 0 #000, 10px 10px 20px rgba(0,0,0,0.8);
+      -webkit-text-stroke: 4px #000;
+      /* Black outline */
+      text-shadow: 6px 6px 0 #000, 10px 10px 20px rgba(0, 0, 0, 0.8);
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s;
       text-align: center;
     }
+
+    #circle-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+      display: none;
+    }
+
+    @keyframes bubble-anim {
+
+      0%,
+      100% {
+        border-radius: 40% 60% 50% 50% / 50% 50% 60% 40%;
+        transform: translate3d(0, 15px, 0) scale3d(0.95, 1.05, 1);
+      }
+
+      25% {
+        border-radius: 50% 50% 40% 60% / 40% 60% 50% 50%;
+        transform: translate3d(10px, 0px, 0) scale3d(1.05, 0.95, 1);
+      }
+
+      50% {
+        border-radius: 60% 40% 50% 50% / 50% 50% 40% 60%;
+        transform: translate3d(0, -15px, 0) scale3d(0.95, 1.05, 1);
+      }
+
+      75% {
+        border-radius: 50% 50% 60% 40% / 60% 40% 50% 50%;
+        transform: translate3d(-10px, 0px, 0) scale3d(1.05, 0.95, 1);
+      }
+    }
+
+    .magic-circle {
+      position: absolute;
+      opacity: 0.8;
+      transition: top 3s ease-in-out;
+      animation: bubble-anim 6s ease-in-out infinite;
+    }
+
+    .magic-circle.white {
+      background-color: white;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    }
+
+    .magic-circle.blue {
+      background-color: #3b82f6;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+    }
   </style>
 </head>
+
 <body>
 
+  <div id="circle-overlay"></div>
   <div id="loading-overlay">Waiting for signal...</div>
   <div id="text-overlay"></div>
   <div id="video-container"></div>
@@ -102,7 +161,7 @@
         currentVideo.pause();
         currentVideo.remove();
       }
-      
+
       overlay.style.opacity = '0';
       setTimeout(() => { overlay.style.display = 'none'; }, 500);
 
@@ -113,8 +172,8 @@
       video.muted = true; // Mute the background video
       video.playsInline = true;
       video.setAttribute('playsinline', ''); // Required for iOS/iPadOS
-      
-      video.onerror = function() {
+
+      video.onerror = function () {
         const err = video.error;
         let msg = 'Unknown Error';
         if (err) {
@@ -148,19 +207,61 @@
       sfxPlayer.pause();
       sfxPlayer.src = '';
       hideText();
-      
+
       overlay.style.display = 'flex';
       setTimeout(() => { overlay.style.opacity = '1'; }, 10);
+    }
+
+    function toggleCircles() {
+      const overlay = document.getElementById('circle-overlay');
+      if (overlay.style.display === 'block') {
+        overlay.style.display = 'none';
+        overlay.innerHTML = '';
+        return;
+      }
+
+      overlay.style.display = 'block';
+      overlay.innerHTML = '';
+
+      for (let i = 0; i < 180; i++) {
+        let circle = document.createElement('div');
+        circle.className = i % 2 === 0 ? 'magic-circle white' : 'magic-circle blue';
+        let size = Math.random() * 40 + 10;
+        circle.style.width = size + 'px';
+        circle.style.height = size + 'px';
+        circle.style.left = Math.random() * 100 + 'vw';
+        circle.style.top = Math.random() * 100 + 'vh';
+
+        circle.style.animationDuration = (Math.random() * 4 + 4) + 's';
+        circle.style.animationDelay = '-' + (Math.random() * 8) + 's';
+
+        overlay.appendChild(circle);
+      }
+    }
+
+    function separateCircles() {
+      const viewportWidth = window.innerWidth;
+      document.querySelectorAll('.magic-circle').forEach(c => {
+        const rect = c.getBoundingClientRect();
+        const delay = (1 - (rect.left / viewportWidth)) * 1.5;
+        c.style.transitionDelay = `${delay}s`;
+
+        if (c.classList.contains('white')) {
+          c.style.top = (Math.random() * 15) + 'vh';
+        } else {
+          c.style.top = (85 + Math.random() * 15) + 'vh';
+        }
+      });
     }
 
     // Connect to Server-Sent Events for VBS Control
     function connectSSE() {
       const source = new EventSource('/api/vbs/events');
-      
+
       source.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           if (data.type === 'play_video') {
             playVideo(data.payload.url);
           } else if (data.type === 'play_sfx') {
@@ -171,6 +272,10 @@
             showText(data.payload.text);
           } else if (data.type === 'hide_text') {
             hideText();
+          } else if (data.type === 'toggle_bubbles') {
+            toggleCircles();
+          } else if (data.type === 'separate_bubbles') {
+            separateCircles();
           }
         } catch (e) {
           console.error('Error parsing SSE message:', e);
@@ -188,4 +293,5 @@
     connectSSE();
   </script>
 </body>
+
 </html>
