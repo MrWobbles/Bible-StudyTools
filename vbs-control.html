@@ -523,6 +523,35 @@
     .ProseMirror u {
       text-decoration: underline;
     }
+
+    #circle-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+      display: none;
+    }
+
+    .magic-circle {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.8;
+      transition: top 3s ease-in-out, left 3s ease-in-out;
+    }
+
+    .magic-circle.white {
+      background-color: white;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    }
+
+    .magic-circle.blue {
+      background-color: #3b82f6;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+    }
   </style>
 
   <!-- TipTap ES Modules from esm.sh CDN (handles dependencies properly) -->
@@ -558,6 +587,9 @@
 </head>
 
 <body>
+
+  <!-- Floating Circles Overlay -->
+  <div id="circle-overlay"></div>
 
   <!-- Fullscreen Script View Overlay -->
   <div id="fullscreen-script-overlay">
@@ -1052,6 +1084,11 @@
             ${scene.video_url ? `<button class="btn-success" onclick="sendCommand('play_video', { url: '${scene.video_url}' })">Play Background</button>` : ''}
             <button class="btn-sm" style="background:#4b5563;" onclick="editScene('${scene.id}')">Edit</button>
             <button class="btn-sm btn-danger" onclick="deleteScene('${scene.id}')">Delete</button>
+
+            ${scene.title && scene.title.toLowerCase().includes('water') ? `
+              <button class="btn-sm" style="background:#8b5cf6; border-color:#7c3aed;" onclick="toggleCircles()">Bubbles</button>
+              <button class="btn-sm" style="background:#0ea5e9; border-color:#0284c7;" onclick="separateCircles()">Separate</button>
+            ` : ''}
           </div>
           ${textsHtml}
           ${scriptHtml}
@@ -1112,6 +1149,53 @@
     function findSfxUrlInScene(scene, sfxLabel) {
       const sfx = scene.sound_effects.find(s => s.label === sfxLabel);
       return sfx ? sfx.url : '';
+    }
+
+    let circleInterval = null;
+
+    function toggleCircles() {
+      const overlay = document.getElementById('circle-overlay');
+      if (overlay.style.display === 'block') {
+        overlay.style.display = 'none';
+        overlay.innerHTML = '';
+        if (circleInterval) clearInterval(circleInterval);
+        return;
+      }
+
+      overlay.style.display = 'block';
+      overlay.innerHTML = '';
+
+      for (let i = 0; i < 60; i++) {
+        let circle = document.createElement('div');
+        circle.className = i % 2 === 0 ? 'magic-circle white' : 'magic-circle blue';
+        let size = Math.random() * 20 + 10;
+        circle.style.width = size + 'px';
+        circle.style.height = size + 'px';
+        circle.style.left = Math.random() * 100 + 'vw';
+        circle.style.top = Math.random() * 100 + 'vh';
+        circle.dataset.floating = 'true';
+        overlay.appendChild(circle);
+      }
+
+      circleInterval = setInterval(() => {
+        document.querySelectorAll('.magic-circle[data-floating="true"]').forEach(c => {
+          c.style.left = Math.random() * 100 + 'vw';
+          c.style.top = Math.random() * 100 + 'vh';
+        });
+      }, 3000);
+    }
+
+    function separateCircles() {
+      document.querySelectorAll('.magic-circle').forEach(c => {
+        c.dataset.floating = 'false'; // Ignore interval movement
+        if (c.classList.contains('white')) {
+          c.style.top = (Math.random() * 15) + 'vh'; // Top 15%
+          c.style.left = (Math.random() * 90 + 5) + 'vw'; // Spread horizontally
+        } else {
+          c.style.top = (85 + Math.random() * 15) + 'vh'; // Bottom 15%
+          c.style.left = (Math.random() * 90 + 5) + 'vw'; // Spread horizontally
+        }
+      });
     }
 
     // --- Modal Logic ---
