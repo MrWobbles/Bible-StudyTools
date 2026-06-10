@@ -139,6 +139,9 @@
       height: 100vh;
       z-index: 4;
       display: none;
+      background-color: rgba(0, 0, 0, 0.75);
+      opacity: 0;
+      transition: opacity 1s ease-out;
     }
   </style>
 </head>
@@ -160,8 +163,9 @@
     let matrixInterval = null;
     let currentVideo = null;
 
-    function showText(text) {
+    function showText(text, color = '#fff') {
       textOverlay.textContent = text;
+      textOverlay.style.color = color;
       textOverlay.style.opacity = '1';
     }
 
@@ -224,7 +228,10 @@
 
       if (matrixInterval) clearInterval(matrixInterval);
       const canvas = document.getElementById('matrix-canvas');
-      if (canvas) canvas.style.display = 'none';
+      if (canvas) {
+        canvas.style.opacity = '0';
+        canvas.style.display = 'none';
+      }
 
       overlay.style.display = 'flex';
       setTimeout(() => { overlay.style.opacity = '1'; }, 10);
@@ -277,6 +284,7 @@
       const ctx = canvas.getContext('2d');
 
       canvas.style.display = 'block';
+      setTimeout(() => { canvas.style.opacity = '1'; }, 10);
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
 
@@ -286,7 +294,8 @@
 
       const drops = [];
       for (let i = 0; i < columns; i++) {
-        drops[i] = 1;
+        // Randomize starting Y position to remove the initial solid "scan" line
+        drops[i] = Math.random() * (canvas.height / fontSize);
       }
 
       if (matrixInterval) clearInterval(matrixInterval);
@@ -311,8 +320,10 @@
       // End after 5 seconds, hide canvas, and show completion text
       setTimeout(() => {
         clearInterval(matrixInterval);
-        canvas.style.display = 'none';
-        showText('FIRMAMENT STABILIZED');
+        canvas.style.opacity = '0'; // Fade out the canvas
+        showText('FIRMAMENT STABILIZED', '#ff0000'); // Red text
+
+        setTimeout(() => { canvas.style.display = 'none'; }, 1000); // Hide completely after fade
       }, 5000);
     }
 
