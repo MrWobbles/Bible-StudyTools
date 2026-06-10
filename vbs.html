@@ -35,6 +35,8 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      transform: translateZ(0);
+      will-change: transform;
       /* removes bottom spacing in some browsers */
     }
 
@@ -128,11 +130,22 @@
     .magic-circle.blue {
       background-color: #3b82f6;
     }
+
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 4;
+      display: none;
+    }
   </style>
 </head>
 
 <body>
 
+  <canvas id="matrix-canvas"></canvas>
   <div id="circle-overlay"></div>
   <div id="loading-overlay">Waiting for signal...</div>
   <div id="text-overlay"></div>
@@ -144,6 +157,7 @@
     const sfxPlayer = document.getElementById('sfx-player');
     const overlay = document.getElementById('loading-overlay');
     const textOverlay = document.getElementById('text-overlay');
+    let matrixInterval = null;
     let currentVideo = null;
 
     function showText(text) {
@@ -166,6 +180,7 @@
 
       const video = document.createElement('video');
       video.src = url;
+      video.preload = 'auto';
       video.autoplay = true;
       video.loop = true;
       video.muted = true; // Mute the background video
@@ -206,6 +221,10 @@
       sfxPlayer.pause();
       sfxPlayer.src = '';
       hideText();
+
+      if (matrixInterval) clearInterval(matrixInterval);
+      const canvas = document.getElementById('matrix-canvas');
+      if (canvas) canvas.style.display = 'none';
 
       overlay.style.display = 'flex';
       setTimeout(() => { overlay.style.opacity = '1'; }, 10);
@@ -253,6 +272,50 @@
       });
     }
 
+    function runMatrixEffect() {
+      const canvas = document.getElementById('matrix-canvas');
+      const ctx = canvas.getContext('2d');
+
+      canvas.style.display = 'block';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZ'.split('');
+      const fontSize = 20; // Bumped slightly for larger screens
+      const columns = canvas.width / fontSize;
+
+      const drops = [];
+      for (let i = 0; i < columns; i++) {
+        drops[i] = 1;
+      }
+
+      if (matrixInterval) clearInterval(matrixInterval);
+
+      function draw() {
+        ctx.fillStyle = 'rgba(0, 0, 0, .1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < drops.length; i++) {
+          const text = letters[Math.floor(Math.random() * letters.length)];
+          ctx.fillStyle = '#0f0'; // green text
+          ctx.font = fontSize + 'px monospace'; // Make sure font matches size
+          ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+          drops[i]++;
+          if (drops[i] * fontSize > canvas.height && Math.random() > .95) {
+            drops[i] = 0;
+          }
+        }
+      }
+
+      matrixInterval = setInterval(draw, 33);
+
+      // End after 5 seconds, hide canvas, and show completion text
+      setTimeout(() => {
+        clearInterval(matrixInterval);
+        canvas.style.display = 'none';
+        showText('FIRMAMENT STABILIZED');
+      }, 5000);
+    }
+
     // Connect to Server-Sent Events for VBS Control
     function connectSSE() {
       const source = new EventSource('/api/vbs/events');
@@ -275,6 +338,8 @@
             toggleCircles();
           } else if (data.type === 'separate_bubbles') {
             separateCircles();
+          } else if (data.type === 'matrix_effect') {
+            runMatrixEffect();
           }
         } catch (e) {
           console.error('Error parsing SSE message:', e);

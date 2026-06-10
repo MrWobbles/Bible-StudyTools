@@ -1057,6 +1057,10 @@
               <button class="btn-sm" style="background:#8b5cf6; border-color:#7c3aed;" onclick="toggleCircles()">Bubbles</button>
               <button class="btn-sm" style="background:#0ea5e9; border-color:#0284c7;" onclick="separateCircles()">Separate</button>
             ` : ''}
+
+            ${scene.title && scene.title.toLowerCase().includes('day 3') ? `
+              <button class="btn-sm" style="background:#10b981; border-color:#059669;" onclick="triggerMatrix()">Matrix Effect</button>
+            ` : ''}
           </div>
           ${textsHtml}
           ${scriptHtml}
@@ -1125,6 +1129,10 @@
 
     function separateCircles() {
       sendCommand('separate_bubbles');
+    }
+
+    function triggerMatrix() {
+      sendCommand('matrix_effect');
     }
 
     // --- Modal Logic ---
