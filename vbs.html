@@ -143,11 +143,23 @@
       opacity: 0;
       transition: opacity 1s ease-out;
     }
+
+    #sparkle-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 4;
+      pointer-events: none;
+      display: none;
+    }
   </style>
 </head>
 
 <body>
 
+  <canvas id="sparkle-canvas"></canvas>
   <canvas id="matrix-canvas"></canvas>
   <div id="circle-overlay"></div>
   <div id="loading-overlay">Waiting for signal...</div>
@@ -161,6 +173,7 @@
     const overlay = document.getElementById('loading-overlay');
     const textOverlay = document.getElementById('text-overlay');
     let matrixInterval = null;
+    let sparkleAnimationId = null;
     let currentVideo = null;
 
     function showText(text, color = '#fff') {
@@ -232,6 +245,10 @@
         canvas.style.opacity = '0';
         canvas.style.display = 'none';
       }
+
+      if (sparkleAnimationId) cancelAnimationFrame(sparkleAnimationId);
+      const sparkleCanvas = document.getElementById('sparkle-canvas');
+      if (sparkleCanvas) sparkleCanvas.style.display = 'none';
 
       overlay.style.display = 'flex';
       setTimeout(() => { overlay.style.opacity = '1'; }, 10);
@@ -327,6 +344,79 @@
       }, 5000);
     }
 
+    function toggleSparkles() {
+      const canvas = document.getElementById('sparkle-canvas');
+
+      if (canvas.style.display === 'block') {
+        canvas.style.display = 'none';
+        cancelAnimationFrame(sparkleAnimationId);
+        return;
+      }
+
+      canvas.style.display = 'block';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+
+      const particles = [];
+      const particleCount = 2000; // "Thousands" of sparkles
+      const colors = ['#ffffff', '#ffd700', '#fff8dc']; // White and subtle golds
+
+      // Initialize particles starting above the screen so they naturally fall into view
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: (Math.random() * canvas.height) - canvas.height,
+          size: Math.random() * 2.5 + 0.5,
+          speedY: Math.random() * 2 + 1, // Fall speed
+          speedX: (Math.random() - 0.5) * 0.8, // Slight left/right drift
+          opacity: Math.random(),
+          fadeSpeed: (Math.random() * 0.02) + 0.005,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        });
+      }
+
+      function animateSparkles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < particleCount; i++) {
+          let p = particles[i];
+          p.y += p.speedY;
+          p.x += p.speedX;
+
+          // Twinkling effect (pulsing opacity)
+          p.opacity += p.fadeSpeed;
+          if (p.opacity >= 1 || p.opacity <= 0) p.fadeSpeed *= -1;
+
+          ctx.globalAlpha = Math.max(0, Math.min(1, p.opacity));
+          ctx.fillStyle = p.color;
+
+          // Draw a pointy 4-point star / diamond
+          const s = p.size * 2; // Scale up slightly since the shape is thinner
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y - s);
+          ctx.lineTo(p.x + s / 4, p.y - s / 4);
+          ctx.lineTo(p.x + s, p.y);
+          ctx.lineTo(p.x + s / 4, p.y + s / 4);
+          ctx.lineTo(p.x, p.y + s);
+          ctx.lineTo(p.x - s / 4, p.y + s / 4);
+          ctx.lineTo(p.x - s, p.y);
+          ctx.lineTo(p.x - s / 4, p.y - s / 4);
+          ctx.closePath();
+          ctx.fill();
+
+          // Reset at the top when it falls past the bottom
+          if (p.y > canvas.height + s) {
+            p.y = 0 - s;
+            p.x = Math.random() * canvas.width;
+          }
+        }
+        sparkleAnimationId = requestAnimationFrame(animateSparkles);
+      }
+
+      animateSparkles();
+    }
+
     // Connect to Server-Sent Events for VBS Control
     function connectSSE() {
       const source = new EventSource('/api/vbs/events');
@@ -351,6 +441,8 @@
             separateCircles();
           } else if (data.type === 'matrix_effect') {
             runMatrixEffect();
+          } else if (data.type === 'toggle_sparkles') {
+            toggleSparkles();
           }
         } catch (e) {
           console.error('Error parsing SSE message:', e);
