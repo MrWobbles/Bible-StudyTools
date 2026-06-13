@@ -1065,6 +1065,10 @@
             ${scene.title && scene.title.toLowerCase().includes('day 4') ? `
               <button class="btn-sm" style="background:#f59e0b; border-color:#d97706; color:#000;" onclick="triggerSparkles()">✨ Sparkles</button>
             ` : ''}
+
+            ${scene.title && scene.title.toLowerCase().includes('day 5') ? `
+              <button class="btn-sm" style="background:#06b6d4; border-color:#0891b2;" onclick="triggerBirds()">🦅 Birds</button>
+            ` : ''}
           </div>
           ${textsHtml}
           ${scriptHtml}
@@ -1141,6 +1145,10 @@
 
     function triggerSparkles() {
       sendCommand('toggle_sparkles');
+    }
+
+    function triggerBirds() {
+      sendCommand('toggle_birds');
     }
 
     // --- Modal Logic ---

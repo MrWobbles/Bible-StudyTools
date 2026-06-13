@@ -154,15 +154,27 @@
       pointer-events: none;
       display: none;
     }
+
+    #bird-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 4;
+      pointer-events: none;
+      display: none;
+    }
   </style>
 </head>
 
 <body>
 
+  <canvas id="bird-canvas"></canvas>
   <canvas id="sparkle-canvas"></canvas>
   <canvas id="matrix-canvas"></canvas>
   <div id="circle-overlay"></div>
-  <div id="loading-overlay">Waiting for signal...</div>
+  <div id="loading-overlay"><img src="assets/images/beaker-loading.gif" alt="Loading..." /></div>
   <div id="text-overlay"></div>
   <div id="video-container"></div>
   <audio id="sfx-player"></audio>
@@ -174,6 +186,7 @@
     const textOverlay = document.getElementById('text-overlay');
     let matrixInterval = null;
     let sparkleAnimationId = null;
+    let birdAnimationId = null;
     let currentVideo = null;
 
     function showText(text, color = '#fff') {
@@ -186,11 +199,41 @@
       textOverlay.style.opacity = '0';
     }
 
+    function clearEffects() {
+      hideText();
+
+      sfxPlayer.pause();
+      sfxPlayer.src = '';
+
+      const circleOverlay = document.getElementById('circle-overlay');
+      if (circleOverlay) {
+        circleOverlay.style.display = 'none';
+        circleOverlay.innerHTML = '';
+      }
+
+      if (matrixInterval) clearInterval(matrixInterval);
+      const canvas = document.getElementById('matrix-canvas');
+      if (canvas) {
+        canvas.style.opacity = '0';
+        canvas.style.display = 'none';
+      }
+
+      if (sparkleAnimationId) cancelAnimationFrame(sparkleAnimationId);
+      const sparkleCanvas = document.getElementById('sparkle-canvas');
+      if (sparkleCanvas) sparkleCanvas.style.display = 'none';
+
+      if (birdAnimationId) cancelAnimationFrame(birdAnimationId);
+      const birdCanvas = document.getElementById('bird-canvas');
+      if (birdCanvas) birdCanvas.style.display = 'none';
+    }
+
     function playVideo(url) {
       if (currentVideo) {
         currentVideo.pause();
         currentVideo.remove();
       }
+
+      clearEffects();
 
       overlay.style.opacity = '0';
       setTimeout(() => { overlay.style.display = 'none'; }, 500);
@@ -235,20 +278,8 @@
         currentVideo.remove();
         currentVideo = null;
       }
-      sfxPlayer.pause();
-      sfxPlayer.src = '';
-      hideText();
 
-      if (matrixInterval) clearInterval(matrixInterval);
-      const canvas = document.getElementById('matrix-canvas');
-      if (canvas) {
-        canvas.style.opacity = '0';
-        canvas.style.display = 'none';
-      }
-
-      if (sparkleAnimationId) cancelAnimationFrame(sparkleAnimationId);
-      const sparkleCanvas = document.getElementById('sparkle-canvas');
-      if (sparkleCanvas) sparkleCanvas.style.display = 'none';
+      clearEffects();
 
       overlay.style.display = 'flex';
       setTimeout(() => { overlay.style.opacity = '1'; }, 10);
@@ -417,6 +448,66 @@
       animateSparkles();
     }
 
+    function toggleBirds() {
+      const canvas = document.getElementById('bird-canvas');
+      if (canvas.style.display === 'block') {
+        canvas.style.display = 'none';
+        cancelAnimationFrame(birdAnimationId);
+        return;
+      }
+
+      canvas.style.display = 'block';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+
+      const birds = [];
+      const numBirds = 45;
+
+      for (let i = 0; i < numBirds; i++) {
+        const size = Math.random() * 4 + 1.5; // Scale from 1.5 to 5.5
+        birds.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height * 0.6, // Keep them in the upper 60% of screen
+          size: size,
+          speedX: size * 0.6 + Math.random(), // Parallax: larger (closer) birds move faster
+          speedY: (Math.random() - 0.5) * 0.5, // Slight up/down drift
+          flapSpeed: Math.random() * 0.05 + 0.05,
+          flapState: Math.random() * Math.PI * 2, // Randomize starting wing position
+          opacity: size / 6 + 0.1 // Parallax: smaller (further) birds are slightly faded
+        });
+      }
+
+      function animateBirds() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let b of birds) {
+          b.x += b.speedX;
+          b.y += b.speedY;
+          b.flapState += b.flapSpeed;
+
+          if (b.x > canvas.width + b.size * 10) {
+            b.x = -b.size * 10;
+            b.y = Math.random() * canvas.height * 0.6;
+          }
+
+          const wingY = Math.sin(b.flapState) * b.size * 1.5;
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(255, 255, 255, ${b.opacity})`;
+          ctx.lineWidth = Math.max(1.5, b.size / 2);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.moveTo(b.x - b.size * 3, b.y - wingY); // left wing tip
+          ctx.quadraticCurveTo(b.x - b.size, b.y - wingY * 0.5, b.x, b.y); // left wing to body
+          ctx.quadraticCurveTo(b.x + b.size, b.y - wingY * 0.5, b.x + b.size * 3, b.y - wingY); // body to right wing tip
+          ctx.stroke();
+        }
+        birdAnimationId = requestAnimationFrame(animateBirds);
+      }
+
+      animateBirds();
+    }
+
     // Connect to Server-Sent Events for VBS Control
     function connectSSE() {
       const source = new EventSource('/api/vbs/events');
@@ -443,6 +534,8 @@
             runMatrixEffect();
           } else if (data.type === 'toggle_sparkles') {
             toggleSparkles();
+          } else if (data.type === 'toggle_birds') {
+            toggleBirds();
           }
         } catch (e) {
           console.error('Error parsing SSE message:', e);
