@@ -89,7 +89,6 @@ const QAPauseMarker = Node.create({
 
 let editor = null;
 let currentDocument = null;
-let autoSaveTimer = null;
 let isDirty = false;
 let currentClassId = null; // Can be either GUID or legacy classNumber
 let currentNoteId = null; // Note ID when editing notes
@@ -103,6 +102,7 @@ let lastEditorInteractionAt = 0;
 let eventListenersInitialized = false;
 let displayControlChannel = null;
 let displayControlChannelName = '';
+let autoSaveInterval = null;
 
 // Initialize editor on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -120,7 +120,24 @@ window.addEventListener('DOMContentLoaded', () => {
   initializeEditor();
   setupEventListeners();
   loadDocument();
+  initializeAutoSave();
 });
+
+// Auto-save functionality
+function initializeAutoSave() {
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval);
+  }
+
+  autoSaveInterval = setInterval(() => {
+    if (isDirty) {
+      console.log('Auto-saving document...');
+      saveDocument();
+    }
+  }, 300000); // Auto-save every 5 minutes
+
+  console.log('Auto-save initialized: will save every 5 minutes if changes are detected.');
+}
 
 // Initialize TipTap Editor
 function initializeEditor() {
@@ -168,7 +185,6 @@ function initializeEditor() {
     onUpdate: ({ editor }) => {
       isDirty = true;
       updateSaveStatus('Modified');
-      startAutoSave();
       updateOutlineNavigator();
     },
     onSelectionUpdate: ({ editor }) => {
@@ -655,7 +671,6 @@ function setupEventListeners() {
     codeTextarea.addEventListener('input', () => {
       isDirty = true;
       updateSaveStatus('Modified');
-      startAutoSave();
     });
   }
 
@@ -1771,7 +1786,6 @@ function toggleCodeView() {
         codeTextarea.value = codeMirrorInstance.getValue();
         isDirty = true;
         updateSaveStatus('Modified');
-        startAutoSave();
       });
     }
     
@@ -1798,7 +1812,6 @@ function toggleCodeView() {
     // Save document since we might have made changes in code view
     isDirty = true;
     updateSaveStatus('Modified');
-    startAutoSave();
   }
 }
 
@@ -1904,18 +1917,7 @@ async function saveDocument() {
   }
 }
 
-// Auto-save functionality
-function startAutoSave() {
-  if (autoSaveTimer) {
-    clearTimeout(autoSaveTimer);
-  }
 
-  autoSaveTimer = setTimeout(() => {
-    if (isDirty) {
-      saveDocument();
-    }
-  }, 300000); // Auto-save after 5 minutes
-}
 
 // Update Save Status
 function updateSaveStatus(status) {
