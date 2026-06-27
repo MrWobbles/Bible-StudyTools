@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/core@latest/dist/index.umd.js"></script>
+  <script>
+    // Map exports to what other Tiptap UMDs expect
+    window.core = window['@tiptap/core'];
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@latest/dist/index.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-highlight@latest/dist/index.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-text-style@latest/dist/index.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-color@latest/dist/index.umd.js"></script>
+</head>
+<body>
+  <div id="editor"></div>
+  <script>
+    try {
+      window.tiptap = {
+        Editor: window.core.Editor,
+        Node: window.core.Node,
+        StarterKit: window['@tiptap/starter-kit'].StarterKit,
+        Highlight: window['@tiptap/extension-highlight'].Highlight,
+        TextStyle: window['@tiptap/extension-text-style'].TextStyle,
+        Color: window['@tiptap/extension-color'].Color
+      };
+
+      const editor = new tiptap.Editor({
+        element: document.querySelector('#editor'),
+        extensions: [
+          tiptap.StarterKit,
+          tiptap.Highlight,
+          tiptap.TextStyle,
+          tiptap.Color
+        ],
+        content: '<p>Hello World!</p>',
+      });
+      console.log('Tiptap initialized successfully!');
+    } catch(e) {
+      console.error(e);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script type="importmap">
+    {
+      "imports": {
+        "@tiptap/core": "https://esm.sh/@tiptap/core@3.2.0?bundle",
+        "@tiptap/pm/": "https://esm.sh/@tiptap/pm@3.2.0/",
+        "@tiptap/starter-kit": "https://esm.sh/@tiptap/starter-kit@3.2.0?bundle",
+        "@tiptap/extension-highlight": "https://esm.sh/@tiptap/extension-highlight@3.2.0?bundle",
+        "@tiptap/extension-text-style": "https://esm.sh/@tiptap/extension-text-style@3.2.0?bundle",
+        "@tiptap/extension-color": "https://esm.sh/@tiptap/extension-color@3.2.0?bundle"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="editor"></div>
+  <script type="module">
+    import { Editor, Node } from '@tiptap/core';
+    import StarterKit from '@tiptap/starter-kit';
+    
+    window.tiptap = { Editor, Node, StarterKit }; // just testing
+    
+    try {
+      const editor = new Editor({
+        element: document.querySelector('#editor'),
+        extensions: [StarterKit],
+        content: '<p>Hello World!</p>',
+      });
+      console.log('Tiptap initialized successfully!');
+    } catch(e) {
+      console.error(e);
+    }
+  </script>
+</body>
+</html>

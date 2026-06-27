@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VBS Media Player</title>
   <style>
-    body, html {
+    body,
+    html {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -17,7 +19,7 @@
       align-items: center;
       font-family: sans-serif;
     }
-    
+
     #video-container {
       width: 100%;
       height: 100%;
@@ -32,7 +34,10 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      display: block; /* removes bottom spacing in some browsers */
+      display: block;
+      transform: translateZ(0);
+      will-change: transform;
+      /* removes bottom spacing in some browsers */
     }
 
     #loading-overlay {
@@ -65,18 +70,111 @@
       font-weight: 900;
       text-transform: uppercase;
       color: #fff;
-      -webkit-text-stroke: 4px #000; /* Black outline */
-      text-shadow: 6px 6px 0 #000, 10px 10px 20px rgba(0,0,0,0.8);
+      -webkit-text-stroke: 4px #000;
+      /* Black outline */
+      text-shadow: 6px 6px 0 #000, 10px 10px 20px rgba(0, 0, 0, 0.8);
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s;
       text-align: center;
     }
+
+    #circle-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+      display: none;
+    }
+
+    @keyframes bubble-anim {
+
+      0%,
+      100% {
+        border-radius: 40% 60% 50% 50% / 50% 50% 60% 40%;
+        transform: translate3d(0, 15px, 0) scale3d(0.95, 1.05, 1);
+      }
+
+      25% {
+        border-radius: 50% 50% 40% 60% / 40% 60% 50% 50%;
+        transform: translate3d(10px, 0px, 0) scale3d(1.05, 0.95, 1);
+      }
+
+      50% {
+        border-radius: 60% 40% 50% 50% / 50% 50% 40% 60%;
+        transform: translate3d(0, -15px, 0) scale3d(0.95, 1.05, 1);
+      }
+
+      75% {
+        border-radius: 50% 50% 60% 40% / 60% 40% 50% 50%;
+        transform: translate3d(-10px, 0px, 0) scale3d(1.05, 0.95, 1);
+      }
+    }
+
+    .magic-circle {
+      position: absolute;
+      opacity: 0.8;
+      transition: top 3s ease-in-out;
+      animation: bubble-anim 6s ease-in-out infinite;
+      will-change: transform, border-radius, top;
+    }
+
+    .magic-circle.white {
+      background-color: white;
+    }
+
+    .magic-circle.blue {
+      background-color: #3b82f6;
+    }
+
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 4;
+      display: none;
+      background-color: rgba(0, 0, 0, 0.75);
+      opacity: 0;
+      transition: opacity 1s ease-out;
+    }
+
+    #sparkle-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 4;
+      pointer-events: none;
+      display: none;
+    }
+
+    #bird-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 4;
+      pointer-events: none;
+      display: none;
+    }
   </style>
 </head>
+
 <body>
 
-  <div id="loading-overlay">Waiting for signal...</div>
+  <canvas id="bird-canvas"></canvas>
+  <canvas id="sparkle-canvas"></canvas>
+  <canvas id="matrix-canvas"></canvas>
+  <div id="circle-overlay"></div>
+  <div id="loading-overlay"><img src="https://media.mrwobbles.dev/beaker-loading.gif" alt="Loading..." /></div>
   <div id="text-overlay"></div>
   <div id="video-container"></div>
   <audio id="sfx-player"></audio>
@@ -86,10 +184,14 @@
     const sfxPlayer = document.getElementById('sfx-player');
     const overlay = document.getElementById('loading-overlay');
     const textOverlay = document.getElementById('text-overlay');
+    let matrixInterval = null;
+    let sparkleAnimationId = null;
+    let birdAnimationId = null;
     let currentVideo = null;
 
-    function showText(text) {
+    function showText(text, color = '#fff') {
       textOverlay.textContent = text;
+      textOverlay.style.color = color;
       textOverlay.style.opacity = '1';
     }
 
@@ -97,24 +199,55 @@
       textOverlay.style.opacity = '0';
     }
 
+    function clearEffects() {
+      hideText();
+
+      sfxPlayer.pause();
+      sfxPlayer.src = '';
+
+      const circleOverlay = document.getElementById('circle-overlay');
+      if (circleOverlay) {
+        circleOverlay.style.display = 'none';
+        circleOverlay.innerHTML = '';
+      }
+
+      if (matrixInterval) clearInterval(matrixInterval);
+      const canvas = document.getElementById('matrix-canvas');
+      if (canvas) {
+        canvas.style.opacity = '0';
+        canvas.style.display = 'none';
+      }
+
+      if (sparkleAnimationId) cancelAnimationFrame(sparkleAnimationId);
+      const sparkleCanvas = document.getElementById('sparkle-canvas');
+      if (sparkleCanvas) sparkleCanvas.style.display = 'none';
+
+      if (birdAnimationId) cancelAnimationFrame(birdAnimationId);
+      const birdCanvas = document.getElementById('bird-canvas');
+      if (birdCanvas) birdCanvas.style.display = 'none';
+    }
+
     function playVideo(url) {
       if (currentVideo) {
         currentVideo.pause();
         currentVideo.remove();
       }
-      
+
+      clearEffects();
+
       overlay.style.opacity = '0';
       setTimeout(() => { overlay.style.display = 'none'; }, 500);
 
       const video = document.createElement('video');
       video.src = url;
+      video.preload = 'auto';
       video.autoplay = true;
       video.loop = true;
       video.muted = true; // Mute the background video
       video.playsInline = true;
       video.setAttribute('playsinline', ''); // Required for iOS/iPadOS
-      
-      video.onerror = function() {
+
+      video.onerror = function () {
         const err = video.error;
         let msg = 'Unknown Error';
         if (err) {
@@ -145,22 +278,244 @@
         currentVideo.remove();
         currentVideo = null;
       }
-      sfxPlayer.pause();
-      sfxPlayer.src = '';
-      hideText();
-      
+
+      clearEffects();
+
       overlay.style.display = 'flex';
       setTimeout(() => { overlay.style.opacity = '1'; }, 10);
+    }
+
+    function toggleCircles() {
+      const overlay = document.getElementById('circle-overlay');
+      if (overlay.style.display === 'block') {
+        overlay.style.display = 'none';
+        overlay.innerHTML = '';
+        return;
+      }
+
+      overlay.style.display = 'block';
+      overlay.innerHTML = '';
+
+      for (let i = 0; i < 400; i++) {
+        let circle = document.createElement('div');
+        circle.className = i % 2 === 0 ? 'magic-circle white' : 'magic-circle blue';
+        let size = Math.random() * 40 + 10;
+        circle.style.width = size + 'px';
+        circle.style.height = size + 'px';
+        circle.style.left = Math.random() * 100 + 'vw';
+        circle.style.top = Math.random() * 100 + 'vh';
+
+        circle.style.animationDuration = (Math.random() * 4 + 4) + 's';
+        circle.style.animationDelay = '-' + (Math.random() * 8) + 's';
+
+        overlay.appendChild(circle);
+      }
+    }
+
+    function separateCircles() {
+      const viewportWidth = window.innerWidth;
+      document.querySelectorAll('.magic-circle').forEach(c => {
+        const rect = c.getBoundingClientRect();
+        const delay = (1 - (rect.left / viewportWidth)) * 1.5;
+        c.style.transitionDelay = `${delay}s`;
+
+        if (c.classList.contains('white')) {
+          c.style.top = (Math.random() * 15) + 'vh';
+        } else {
+          c.style.top = (85 + Math.random() * 15) + 'vh';
+        }
+      });
+    }
+
+    function runMatrixEffect() {
+      const canvas = document.getElementById('matrix-canvas');
+      const ctx = canvas.getContext('2d');
+
+      canvas.style.display = 'block';
+      setTimeout(() => { canvas.style.opacity = '1'; }, 10);
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZABCDEFGHIJKLMNOPQRSTUVXYZ'.split('');
+      const fontSize = 20; // Bumped slightly for larger screens
+      const columns = canvas.width / fontSize;
+
+      const drops = [];
+      for (let i = 0; i < columns; i++) {
+        // Randomize starting Y position to remove the initial solid "scan" line
+        drops[i] = Math.random() * (canvas.height / fontSize);
+      }
+
+      if (matrixInterval) clearInterval(matrixInterval);
+
+      function draw() {
+        ctx.fillStyle = 'rgba(0, 0, 0, .1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < drops.length; i++) {
+          const text = letters[Math.floor(Math.random() * letters.length)];
+          ctx.fillStyle = '#0f0'; // green text
+          ctx.font = fontSize + 'px monospace'; // Make sure font matches size
+          ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+          drops[i]++;
+          if (drops[i] * fontSize > canvas.height && Math.random() > .95) {
+            drops[i] = 0;
+          }
+        }
+      }
+
+      matrixInterval = setInterval(draw, 33);
+
+      // End after 5 seconds, hide canvas, and show completion text
+      setTimeout(() => {
+        clearInterval(matrixInterval);
+        canvas.style.opacity = '0'; // Fade out the canvas
+        showText('FIRMAMENT STABILIZED', '#ff0000'); // Red text
+
+        setTimeout(() => { canvas.style.display = 'none'; }, 1000); // Hide completely after fade
+      }, 5000);
+    }
+
+    function toggleSparkles() {
+      const canvas = document.getElementById('sparkle-canvas');
+
+      if (canvas.style.display === 'block') {
+        canvas.style.display = 'none';
+        cancelAnimationFrame(sparkleAnimationId);
+        return;
+      }
+
+      canvas.style.display = 'block';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+
+      const particles = [];
+      const particleCount = 2000; // "Thousands" of sparkles
+      const colors = ['#ffffff', '#ffd700', '#fff8dc']; // White and subtle golds
+
+      // Initialize particles starting above the screen so they naturally fall into view
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: (Math.random() * canvas.height) - canvas.height,
+          size: Math.random() * 2.5 + 0.5,
+          speedY: Math.random() * 2 + 1, // Fall speed
+          speedX: (Math.random() - 0.5) * 0.8, // Slight left/right drift
+          opacity: Math.random(),
+          fadeSpeed: (Math.random() * 0.02) + 0.005,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        });
+      }
+
+      function animateSparkles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < particleCount; i++) {
+          let p = particles[i];
+          p.y += p.speedY;
+          p.x += p.speedX;
+
+          // Twinkling effect (pulsing opacity)
+          p.opacity += p.fadeSpeed;
+          if (p.opacity >= 1 || p.opacity <= 0) p.fadeSpeed *= -1;
+
+          ctx.globalAlpha = Math.max(0, Math.min(1, p.opacity));
+          ctx.fillStyle = p.color;
+
+          // Draw a pointy 4-point star / diamond
+          const s = p.size * 2; // Scale up slightly since the shape is thinner
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y - s);
+          ctx.lineTo(p.x + s / 4, p.y - s / 4);
+          ctx.lineTo(p.x + s, p.y);
+          ctx.lineTo(p.x + s / 4, p.y + s / 4);
+          ctx.lineTo(p.x, p.y + s);
+          ctx.lineTo(p.x - s / 4, p.y + s / 4);
+          ctx.lineTo(p.x - s, p.y);
+          ctx.lineTo(p.x - s / 4, p.y - s / 4);
+          ctx.closePath();
+          ctx.fill();
+
+          // Reset at the top when it falls past the bottom
+          if (p.y > canvas.height + s) {
+            p.y = 0 - s;
+            p.x = Math.random() * canvas.width;
+          }
+        }
+        sparkleAnimationId = requestAnimationFrame(animateSparkles);
+      }
+
+      animateSparkles();
+    }
+
+    function toggleBirds() {
+      const canvas = document.getElementById('bird-canvas');
+      if (canvas.style.display === 'block') {
+        canvas.style.display = 'none';
+        cancelAnimationFrame(birdAnimationId);
+        return;
+      }
+
+      canvas.style.display = 'block';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+
+      const birds = [];
+      const numBirds = 45;
+
+      for (let i = 0; i < numBirds; i++) {
+        const size = Math.random() * 4 + 1.5; // Scale from 1.5 to 5.5
+        birds.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height * 0.6, // Keep them in the upper 60% of screen
+          size: size,
+          speedX: size * 0.6 + Math.random(), // Parallax: larger (closer) birds move faster
+          speedY: (Math.random() - 0.5) * 0.5, // Slight up/down drift
+          flapSpeed: Math.random() * 0.05 + 0.05,
+          flapState: Math.random() * Math.PI * 2, // Randomize starting wing position
+          opacity: size / 6 + 0.1 // Parallax: smaller (further) birds are slightly faded
+        });
+      }
+
+      function animateBirds() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let b of birds) {
+          b.x += b.speedX;
+          b.y += b.speedY;
+          b.flapState += b.flapSpeed;
+
+          if (b.x > canvas.width + b.size * 10) {
+            b.x = -b.size * 10;
+            b.y = Math.random() * canvas.height * 0.6;
+          }
+
+          const wingY = Math.sin(b.flapState) * b.size * 1.5;
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(255, 255, 255, ${b.opacity})`;
+          ctx.lineWidth = Math.max(1.5, b.size / 2);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.moveTo(b.x - b.size * 3, b.y - wingY); // left wing tip
+          ctx.quadraticCurveTo(b.x - b.size, b.y - wingY * 0.5, b.x, b.y); // left wing to body
+          ctx.quadraticCurveTo(b.x + b.size, b.y - wingY * 0.5, b.x + b.size * 3, b.y - wingY); // body to right wing tip
+          ctx.stroke();
+        }
+        birdAnimationId = requestAnimationFrame(animateBirds);
+      }
+
+      animateBirds();
     }
 
     // Connect to Server-Sent Events for VBS Control
     function connectSSE() {
       const source = new EventSource('/api/vbs/events');
-      
+
       source.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           if (data.type === 'play_video') {
             playVideo(data.payload.url);
           } else if (data.type === 'play_sfx') {
@@ -171,6 +526,16 @@
             showText(data.payload.text);
           } else if (data.type === 'hide_text') {
             hideText();
+          } else if (data.type === 'toggle_bubbles') {
+            toggleCircles();
+          } else if (data.type === 'separate_bubbles') {
+            separateCircles();
+          } else if (data.type === 'matrix_effect') {
+            runMatrixEffect();
+          } else if (data.type === 'toggle_sparkles') {
+            toggleSparkles();
+          } else if (data.type === 'toggle_birds') {
+            toggleBirds();
           }
         } catch (e) {
           console.error('Error parsing SSE message:', e);
@@ -188,4 +553,5 @@
     connectSSE();
   </script>
 </body>
+
 </html>
