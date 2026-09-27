@@ -145,7 +145,7 @@ const DATA_DOC_MAP = {
   lessonplans: 'lessonPlans',
   notes: 'notes'
 };
-const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html', 'dj-dashboard.html', 'requests.html', 'vbs.html', 'vbs-control.html'];
+const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html', 'dj-dashboard.html', 'requests.html', 'vbs.html', 'vbs-control.html', 'teleprompter.html'];
 const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
 const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html', 'vbs.html']);
 const ADMIN_HTML_FILES = new Set(['user-admin.html']);

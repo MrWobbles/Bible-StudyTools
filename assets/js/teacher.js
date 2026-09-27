@@ -139,6 +139,12 @@ function initializePage() {
     openDisplayBtn.addEventListener('click', openDisplayWindow);
   }
 
+  // Set up teleprompter button
+  const openTeleprompterBtn = document.getElementById('open-teleprompter-btn');
+  if (openTeleprompterBtn) {
+    openTeleprompterBtn.addEventListener('click', openTeleprompter);
+  }
+
   if (statusEl) statusEl.textContent = 'Ready. Open the display page on the TV (student.html).';
 }
 
@@ -971,14 +977,14 @@ function renderGeneratedOutline() {
 document.addEventListener('click', (e) => {
   const link = e.target.closest('a[href]');
   const img = e.target.closest('img');
-  
+
   if (!link && !img) return;
-  
+
   const targetEl = link || img;
   const inNotes = notesEl && notesEl.contains(targetEl);
   const inDisplay = document.querySelector('.editor-content-display')?.contains(targetEl);
   const inGuide = document.getElementById('guide-content')?.contains(targetEl);
-  
+
   if (inNotes || inDisplay || inGuide) {
     handleTeacherLinkClick(e, targetEl);
   }
@@ -991,7 +997,7 @@ function handleTeacherLinkClick(e, element) {
 
   const isImg = element.tagName.toLowerCase() === 'img';
   const href = isImg ? (element.getAttribute('src') || '') : (element.getAttribute('href') || '');
-  
+
   if (!href || href.startsWith('bst-media:') || href === '#' || href.startsWith('#')) {
     return;
   }
@@ -1007,7 +1013,7 @@ function handleTeacherLinkClick(e, element) {
   // Otherwise, determine media type and send to display
   let mediaType = isImg ? 'image' : 'link';
   const lowerUrl = href.toLowerCase();
-  
+
   if (!isImg) {
     if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
       mediaType = 'video';
@@ -1024,8 +1030,8 @@ function handleTeacherLinkClick(e, element) {
     }
   }
 
-  const title = isImg 
-    ? (String(element.getAttribute('alt') || '').trim() || href) 
+  const title = isImg
+    ? (String(element.getAttribute('alt') || '').trim() || href)
     : (String(element.textContent || '').trim() || href);
 
   sendCommand('displayMedia', {
@@ -1044,7 +1050,7 @@ function handleTeacherLinkClick(e, element) {
   } else {
     element.style.color = '#4CAF50';
   }
-  
+
   element.title = 'Sent to display screen (Hold Alt to open locally)';
   setTimeout(() => {
     if (isImg) {
@@ -1114,15 +1120,15 @@ document.addEventListener('contextmenu', (e) => {
   if (selection && !e.shiftKey) { // Allow shift+right click for default menu
     e.preventDefault();
     createContextMenu();
-    
+
     let x = e.clientX;
     let y = e.clientY;
-    
+
     customContextMenu.style.display = 'block';
     const rect = customContextMenu.getBoundingClientRect();
     if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width;
     if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height;
-    
+
     customContextMenu.style.left = `${x}px`;
     customContextMenu.style.top = `${y}px`;
   }
@@ -1344,6 +1350,11 @@ function openDisplayWindow() {
       displayWindowCheckInterval = null;
     }
   }, 1000);
+}
+
+function openTeleprompter() {
+  const teleprompterUrl = `${window.location.origin}/teleprompter.html?class=${classId}`;
+  window.open(teleprompterUrl, 'teleprompter-screen', 'width=1024,height=768,menubar=no,toolbar=no');
 }
 
 function getDisplayViewportSize() {

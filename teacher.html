@@ -25,7 +25,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700"
+    rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/teacher.css" />
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="apple-touch-icon" href="assets/images/icon.png" />
@@ -39,16 +40,29 @@
         <p class="subtitle app__subtitle">Loading class content...</p>
       </div>
       <div class="title-group app__title-group" style="align-items: flex-end; text-align: right;">
-        <button id="open-display-btn" class="pill-link"><span class="material-symbols-outlined">cast</span>Open display page</button>
-        <small class="subtitle">Load that window on the TV; control it from here.</small>
+        <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+          <div>
+            <button id="open-display-btn" class="pill-link"><span class="material-symbols-outlined">cast</span>Open
+              display page</button>
+            <small class="subtitle">Load that window on the TV; control it from here.</small>
+          </div>
+          <div>
+            <button id="open-teleprompter-btn" class="pill-link"><span
+                class="material-symbols-outlined">mic</span>Teleprompter</button>
+            <small class="subtitle">Speech-enabled teleprompter view.</small>
+          </div>
+        </div>
       </div>
     </header>
 
     <div class="layout app__layout app__layout--teacher">
       <aside class="drawer-toggles">
-        <button id="toggle-media-btn" class="pill-link"><span class="material-symbols-outlined">videocam</span>Media resources</button>
-        <button id="toggle-verse-btn" class="pill-link"><span class="material-symbols-outlined">menu_book</span>Quick verse</button>
-        <button id="toggle-text-btn" class="pill-link"><span class="material-symbols-outlined">text_fields</span>Custom text</button>
+        <button id="toggle-media-btn" class="pill-link"><span class="material-symbols-outlined">videocam</span>Media
+          resources</button>
+        <button id="toggle-verse-btn" class="pill-link"><span class="material-symbols-outlined">menu_book</span>Quick
+          verse</button>
+        <button id="toggle-text-btn" class="pill-link"><span class="material-symbols-outlined">text_fields</span>Custom
+          text</button>
       </aside>
 
       <section class="card" id="question-bank">
@@ -81,7 +95,8 @@
               <button type="button" data-cmd="formatBlock" data-value="p">Paragraph</button>
               <button type="button" data-cmd="removeFormat">Clear</button>
             </div>
-            <div id="notes" class="rte-editor" contenteditable="true" spellcheck="true" role="textbox" aria-label="Presenter notes">
+            <div id="notes" class="rte-editor" contenteditable="true" spellcheck="true" role="textbox"
+              aria-label="Presenter notes">
             </div>
           </div>
           <div class="note-actions">
@@ -130,8 +145,7 @@
 
   <div id="student-preview-shell"
     style="position: fixed; bottom: 90px; right: 20px; width: 400px; height: 225px; border: 1px solid #ccc; z-index: 1000; pointer-events: none; display: none; overflow: hidden; background: #000;">
-    <iframe id="student-preview" src=""
-      style="position: absolute; top: 0; left: 0; border: 0;"></iframe>
+    <iframe id="student-preview" src="" style="position: absolute; top: 0; left: 0; border: 0;"></iframe>
   </div>
 </body>
 
