@@ -7,10 +7,52 @@ let currentSectionIndex = 0;
 let currentPointIndex = 0;
 let allOutlinePoints = []; // Flat array of all points with metadata
 let isListening = false;
+let userInitiatedStop = false; // Track if user explicitly stopped, vs error/restart
 let listeningTimeout = null;
 let recognitionInstance = null;
 let spokenWords = []; // Track words that have been spoken
-const DEBUG = false;
+const DEBUG = true; // Always on - helps users report issues
+
+// Error tracking for diagnostics
+const errorLog = {
+  errors: [],
+  warnings: [],
+  startTime: Date.now(),
+
+  addError(message, context = {}) {
+    const entry = {
+      timestamp: Date.now(),
+      timeElapsed: Date.now() - this.startTime,
+      message,
+      context,
+      type: 'error'
+    };
+    this.errors.push(entry);
+    debug(`❌ ERROR: ${message}`, context);
+  },
+
+  addWarning(message, context = {}) {
+    const entry = {
+      timestamp: Date.now(),
+      timeElapsed: Date.now() - this.startTime,
+      message,
+      context,
+      type: 'warning'
+    };
+    this.warnings.push(entry);
+    debug(`⚠️ WARNING: ${message}`, context);
+  },
+
+  getReport() {
+    return {
+      uptime: Date.now() - this.startTime,
+      errorCount: this.errors.length,
+      warningCount: this.warnings.length,
+      errors: this.errors,
+      warnings: this.warnings
+    };
+  }
+};
 
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -33,105 +75,173 @@ const CONFIG = {
 // Initialize when page loads
 async function initializePage() {
   try {
+    debug('🚀 Initializing teleprompter...');
+
     classId = new URLSearchParams(window.location.search).get('class') || '1';
+    debug(`📚 Class ID from URL: ${classId}`);
+
+    // Check if BSTApi is available
+    if (!window.BSTApi) {
+      throw new Error('BSTApi not loaded - make sure api.js is included');
+    }
+
+    debug('🔄 Fetching classes from API...');
     const raw = await window.BSTApi.getClasses();
+
+    if (!raw) {
+      errorLog.addError('API returned null response');
+      throw new Error('API returned null - check network and server');
+    }
+
+    debug(`✓ API response received: ${typeof raw}`);
+
     const classesArr = Array.isArray(raw) ? raw : Array.isArray(raw?.classes) ? raw.classes : [raw];
+    debug(`✓ Found ${classesArr.length} class(es)`);
+
     classConfig = classesArr.find(c => c.classNumber?.toString() === classId || c.id === classId) || classesArr[0] || {};
 
-    if (!classConfig) {
-      throw new Error('Class not found');
+    if (!classConfig || !classConfig.title) {
+      errorLog.addWarning('Class config incomplete', { classId, config: classConfig });
+      classConfig = classConfig || { title: 'Unknown Class', content: { html: '' } };
     }
 
     document.title = `Teleprompter — ${classConfig.title}`;
-    buildEditorNotesIndex();
-    renderInitialContent();
-    setupSpeechRecognition();
-    setupControls();
+    debug(`✓ Loaded class: "${classConfig.title}"`);
 
-    debug(`Loaded class: ${classConfig.title}`);
-    debug(`Total points: ${allOutlinePoints.length}`);
+    buildEditorNotesIndex();
+    debug(`✓ Built notes index: ${allOutlinePoints.length} points`);
+
+    renderInitialContent();
+    debug(`✓ Rendered initial content`);
+
+    setupSpeechRecognition();
+    debug(`✓ Speech recognition ready`);
+
+    setupControls();
+    debug(`✓ Controls initialized`);
+
+    debug('✅ Teleprompter initialization complete!');
+    showStatusMessage('Ready to go! Click the microphone to start.', 3000);
   } catch (err) {
     console.error('Failed to initialize teleprompter:', err);
+    errorLog.addError(`Initialization failed: ${err.message}`, { error: err.toString() });
+
     const content = document.getElementById('teleprompter-content');
     if (content) {
-      content.innerHTML = `<div style="color: red; padding: 20px;"><strong>Error loading class:</strong> ${err.message}</div>`;
+      let errorHtml = `<div style="color: red; padding: 20px; font-family: monospace;">
+        <strong>❌ Error loading teleprompter:</strong><br><br>
+        ${err.message}<br><br>
+        <small style="color: #999;">`;
+
+      if (err.message.includes('BSTApi')) {
+        errorHtml += 'Make sure api.js is loaded before teleprompter.js<br>';
+      } else if (err.message.includes('API')) {
+        errorHtml += 'Check your network connection and that the server is running<br>';
+      }
+
+      errorHtml += `Debug: classId=${classId}<br>Browser: ${navigator.userAgent.substring(0, 50)}...</small>
+      </div>`;
+
+      content.innerHTML = errorHtml;
     }
+
+    // Show error in status
+    showStatusMessage('❌ Failed to load: ' + err.message, 5000);
   }
 }
 
 // Build points from editor notes (HTML content)
 function buildEditorNotesIndex() {
-  allOutlinePoints = [];
+  try {
+    allOutlinePoints = [];
 
-  // Get editor content HTML
-  const editorHtml = classConfig.content?.html;
-  if (!editorHtml) {
-    debug('No editor content found');
-    return;
-  }
+    // Get editor content HTML
+    const editorHtml = classConfig.content?.html;
+    if (!editorHtml) {
+      errorLog.addWarning('No editor content found in classConfig');
+      debug('No editor content found - class may not have notes set');
+      return;
+    }
 
-  // Parse HTML and extract text chunks
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(editorHtml, 'text/html');
+    debug(`📝 Parsing editor HTML (${editorHtml.length} chars)...`);
 
-  // Extract headings and paragraphs
-  const blocks = [];
-  let currentSection = classConfig.title || 'Notes';
+    // Parse HTML and extract text chunks
+    const parser = new DOMParser();
+    let doc;
+    try {
+      doc = parser.parseFromString(editorHtml, 'text/html');
+    } catch (parseErr) {
+      errorLog.addError('Failed to parse HTML', { error: parseErr.message });
+      throw new Error(`Invalid HTML format: ${parseErr.message}`);
+    }
 
-  // Iterate through all block-level elements
-  const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li');
-  elements.forEach((el) => {
-    const text = el.textContent?.trim();
-    if (!text) return;
+    // Extract headings and paragraphs
+    const blocks = [];
+    let currentSection = classConfig.title || 'Notes';
 
-    const tagName = el.tagName.toLowerCase();
+    // Iterate through all block-level elements
+    const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li');
+    elements.forEach((el) => {
+      const text = el.textContent?.trim();
+      if (!text) return;
 
-    // Update section title on headings
-    if (tagName.startsWith('h')) {
-      currentSection = text;
-      // Add heading as a point
-      blocks.push({
-        text: text,
-        type: 'heading',
-        sectionTitle: currentSection
-      });
-    } else if (tagName === 'p' || tagName === 'li') {
-      // Add paragraph/list item as a point
-      blocks.push({
-        text: text,
-        type: tagName === 'li' ? 'bullet' : 'paragraph',
-        sectionTitle: currentSection
+      const tagName = el.tagName.toLowerCase();
+
+      // Update section title on headings
+      if (tagName.startsWith('h')) {
+        currentSection = text;
+        // Add heading as a point
+        blocks.push({
+          text: text,
+          type: 'heading',
+          sectionTitle: currentSection
+        });
+      } else if (tagName === 'p' || tagName === 'li') {
+        // Add paragraph/list item as a point
+        blocks.push({
+          text: text,
+          type: tagName === 'li' ? 'bullet' : 'paragraph',
+          sectionTitle: currentSection
+        });
+      }
+    });
+
+    // If no blocks found, try splitting by sentences
+    if (blocks.length === 0 && editorHtml) {
+      const plainText = doc.body.textContent || '';
+      const sentences = plainText
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      sentences.forEach((sentence) => {
+        blocks.push({
+          text: sentence,
+          type: 'sentence',
+          sectionTitle: currentSection
+        });
       });
     }
-  });
 
-  // If no blocks found, try splitting by sentences
-  if (blocks.length === 0 && editorHtml) {
-    const plainText = doc.body.textContent || '';
-    const sentences = plainText
-      .split(/(?<=[.!?])\s+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
+    // Convert blocks to indexed points
+    allOutlinePoints = blocks.map((block, idx) => ({
+      index: idx,
+      text: block.text,
+      type: block.type,
+      sectionTitle: block.sectionTitle,
+      fullPoint: block
+    }));
 
-    sentences.forEach((sentence) => {
-      blocks.push({
-        text: sentence,
-        type: 'sentence',
-        sectionTitle: currentSection
-      });
-    });
+    debug(`✓ Parsed ${allOutlinePoints.length} points from editor notes`);
+
+    if (allOutlinePoints.length === 0) {
+      errorLog.addWarning('No text content found in editor HTML');
+    }
+  } catch (err) {
+    errorLog.addError(`Failed to build notes index: ${err.message}`);
+    console.error('buildEditorNotesIndex error:', err);
+    throw err;
   }
-
-  // Convert blocks to indexed points
-  allOutlinePoints = blocks.map((block, idx) => ({
-    index: idx,
-    text: block.text,
-    type: block.type,
-    sectionTitle: block.sectionTitle,
-    fullPoint: block
-  }));
-
-  debug(`Parsed ${allOutlinePoints.length} points from editor notes`);
 }
 
 // Render initial content
@@ -275,7 +385,7 @@ function setupSpeechRecognition() {
   let lastAutoAdvanceTime = 0;
 
   recognitionInstance.onstart = () => {
-    debug('Speech recognition started');
+    debug('🎤 Speech recognition started');
     updateListeningStatus(true);
   };
 
@@ -334,17 +444,54 @@ function setupSpeechRecognition() {
 
   recognitionInstance.onerror = (event) => {
     console.error('Speech recognition error:', event.error);
-    debug(`Error: ${event.error}`);
+    errorLog.addError(`Speech recognition error: ${event.error}`);
+    debug(`❌ Error: ${event.error}`);
 
-    // Don't show alert for normal "no-speech" errors
-    if (event.error !== 'no-speech' && event.error !== 'network') {
-      // Silently handle common errors
+    // Handle different error types
+    if (event.error === 'network') {
+      debug('🔄 Network error - will auto-restart via onend handler');
+      debug('   (Trying to reconnect to speech service...)');
+      showStatusMessage('Network issue - reconnecting...', 2000);
+    } else if (event.error === 'no-speech') {
+      debug('⏱️ No speech detected (this is normal if you haven\'t spoken yet)');
+    } else if (event.error === 'audio-capture') {
+      showStatusMessage('⚠️ No microphone found - check your device settings', 4000);
+      errorLog.addError('No audio input device detected');
+      isListening = false;
+      updateListeningStatus(false);
+    } else if (event.error === 'not-allowed') {
+      showStatusMessage('⚠️ Microphone permission denied - check your browser settings', 4000);
+      errorLog.addError('Microphone permission not granted');
+      isListening = false;
+      updateListeningStatus(false);
+    } else {
+      // Other errors
+      debug(`⚠️ Speech recognition error: ${event.error}`);
+      showStatusMessage(`Error: ${event.error}`, 2000);
     }
   };
 
   recognitionInstance.onend = () => {
     debug('Speech recognition ended');
-    updateListeningStatus(false);
+
+    // Only update UI if user explicitly stopped, not for internal restarts
+    if (userInitiatedStop) {
+      isListening = false;
+      updateListeningStatus(false);
+      userInitiatedStop = false;
+    } else if (isListening) {
+      // Keep trying to restart if still listening
+      debug('Restarting speech recognition...');
+      setTimeout(() => {
+        if (isListening) {
+          try {
+            recognitionInstance.start();
+          } catch (e) {
+            debug(`Failed to auto-restart: ${e.message}`);
+          }
+        }
+      }, 500);
+    }
   };
 }
 
@@ -437,67 +584,147 @@ function setupControls() {
 // Toggle listening on/off
 function toggleListening() {
   if (!recognitionInstance) {
-    alert('Web Speech API not available');
+    errorLog.addError('Web Speech API not available');
+    showStatusMessage('❌ Web Speech API not available', 3000);
     return;
   }
 
   if (isListening) {
+    // User is explicitly stopping
+    debug('⏹️ User stopped listening');
+    userInitiatedStop = true;
     recognitionInstance.stop();
-    isListening = false;
+    clearTimeout(listeningTimeout);
   } else {
+    // User is starting to listen
+    debug('🎤 User started listening');
+    userInitiatedStop = false;
+
     // Clear transcript display when starting
     document.getElementById('speech-transcript').textContent = '';
     document.getElementById('current-confidence').style.display = 'none';
-    recognitionInstance.start();
-    isListening = true;
 
-    // Set timeout to restart if no speech detected
-    clearTimeout(listeningTimeout);
-    listeningTimeout = setTimeout(() => {
-      if (isListening) {
-        recognitionInstance.stop();
-        recognitionInstance.start();
-      }
-    }, 10000);
+    try {
+      recognitionInstance.start();
+      isListening = true;
+      updateListeningStatus(true);
+    } catch (e) {
+      errorLog.addError(`Failed to start listening: ${e.message}`, { error: e.toString() });
+      console.error('Failed to start speech recognition:', e);
+      showStatusMessage('❌ Failed to start listening: ' + e.message, 3000);
+      // Set timeout to restart if no speech detected for 10 seconds
+      clearTimeout(listeningTimeout);
+      listeningTimeout = setTimeout(() => {
+        if (isListening && !userInitiatedStop) {
+          debug('No speech detected for 10s, restarting...');
+          try {
+            recognitionInstance.stop();
+            setTimeout(() => {
+              if (isListening && !userInitiatedStop) {
+                recognitionInstance.start();
+              }
+            }, 100);
+          } catch (e) {
+            debug(`Auto-restart timeout failed: ${e.message}`);
+          }
+        }
+      }, 10000);
+    }
   }
 
-  updateListeningStatus(isListening);
-}
+  // Update listening status display
+  function updateListeningStatus(listening) {
+    const statusEl = document.getElementById('listening-status');
+    const toggleBtn = document.getElementById('toggle-listening');
 
-// Update listening status display
-function updateListeningStatus(listening) {
-  const statusEl = document.getElementById('listening-status');
-  const toggleBtn = document.getElementById('toggle-listening');
-
-  if (listening) {
-    statusEl.textContent = 'Listening: ON';
-    statusEl.classList.add('listening-active');
-    toggleBtn.classList.add('active');
-    toggleBtn.querySelector('.btn-label').textContent = 'Stop Listening';
-  } else {
-    statusEl.textContent = 'Listening: OFF';
-    statusEl.classList.remove('listening-active');
-    toggleBtn.classList.remove('active');
-    toggleBtn.querySelector('.btn-label').textContent = 'Start Listening';
+    if (listening) {
+      statusEl.textContent = 'Listening: ON';
+      statusEl.classList.add('listening-active');
+      toggleBtn.classList.add('active');
+      toggleBtn.querySelector('.btn-label').textContent = 'Stop Listening';
+    } else {
+      statusEl.textContent = 'Listening: OFF';
+      statusEl.classList.remove('listening-active');
+      toggleBtn.classList.remove('active');
+      toggleBtn.querySelector('.btn-label').textContent = 'Start Listening';
+    }
   }
-}
 
-// Debug output
-function debug(msg) {
-  if (DEBUG) {
-    console.log(`[Teleprompter] ${msg}`);
-    const debugPanel = document.getElementById('debug-panel');
-    if (debugPanel) {
-      const debugOutput = document.getElementById('debug-output');
-      const line = document.createElement('div');
-      line.textContent = msg;
-      debugOutput.insertBefore(line, debugOutput.firstChild);
-      if (debugOutput.children.length > 20) {
-        debugOutput.removeChild(debugOutput.lastChild);
+  // Show temporary message to user
+  function showStatusMessage(message, duration = 3000) {
+    const statusEl = document.getElementById('listening-status');
+    const originalText = statusEl.textContent;
+
+    statusEl.textContent = message;
+    statusEl.style.color = 'var(--accent-amber)';
+
+    setTimeout(() => {
+      statusEl.textContent = originalText;
+      statusEl.style.color = '';
+    }, duration);
+  }
+
+  // Debug output with timestamps and context
+  function debug(msg, context = {}) {
+    if (DEBUG) {
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+      const fullMsg = `[${time}] ${msg}`;
+      console.log(`[Teleprompter] ${fullMsg}`, context);
+
+      const debugPanel = document.getElementById('debug-panel');
+      if (debugPanel) {
+        const debugOutput = document.getElementById('debug-output');
+        const line = document.createElement('div');
+        line.style.fontSize = '11px';
+        line.style.padding = '2px 4px';
+        line.style.borderBottom = '1px solid #ddd';
+        line.style.wordBreak = 'break-word';
+        line.style.fontFamily = 'monospace';
+        line.textContent = fullMsg;
+
+        if (Object.keys(context).length > 0) {
+          line.title = JSON.stringify(context, null, 2);
+          line.style.cursor = 'help';
+        }
+
+        debugOutput.insertBefore(line, debugOutput.firstChild);
+        if (debugOutput.children.length > 50) {
+          debugOutput.removeChild(debugOutput.lastChild);
+        }
       }
     }
   }
-}
 
-// Start initialization when page loads
-window.addEventListener('DOMContentLoaded', initializePage);
+  // Export debug report for sharing with developers
+  window.getDebugReport = function () {
+    const report = errorLog.getReport();
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      language: navigator.language,
+      onLine: navigator.onLine,
+      classId: classId,
+      classTitle: classConfig?.title || 'N/A',
+      pointsLoaded: allOutlinePoints.length,
+      isListening: isListening,
+      ...report
+    };
+    return debugInfo;
+  };
+
+  // Also expose as a copy-to-clipboard function
+  window.copyDebugReport = function () {
+    const report = window.getDebugReport();
+    const text = JSON.stringify(report, null, 2);
+    navigator.clipboard.writeText(text).then(() => {
+      console.log('Debug report copied to clipboard!');
+      showStatusMessage('✓ Debug report copied to clipboard', 2000);
+    }).catch(err => {
+      console.error('Failed to copy:', err);
+      console.log('DEBUG REPORT:', report);
+    });
+  };
+
+  // Start initialization when page loads
+  window.addEventListener('DOMContentLoaded', initializePage);
