@@ -1356,6 +1356,17 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   word-wrap: break-word;
 }
 
+.teleprompter__word {
+  display: inline;
+  transition: opacity var(--duration-normal) var(--ease-standard);
+  cursor: default;
+}
+
+.teleprompter__word.read {
+  opacity: 0.35;
+  color: var(--text-muted);
+}
+
 .teleprompter__point.upcoming .point-text {
   font-size: 18px;
 }

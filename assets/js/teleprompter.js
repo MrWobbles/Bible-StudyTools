@@ -9,6 +9,7 @@ let allOutlinePoints = []; // Flat array of all points with metadata
 let isListening = false;
 let listeningTimeout = null;
 let recognitionInstance = null;
+let spokenWords = []; // Track words that have been spoken
 const DEBUG = false;
 
 // Speech Recognition Setup
@@ -37,12 +38,12 @@ async function initializePage() {
     const classesArr = Array.isArray(raw) ? raw : Array.isArray(raw?.classes) ? raw.classes : [raw];
     classConfig = classesArr.find(c => c.classNumber?.toString() === classId || c.id === classId) || classesArr[0] || {};
 
-    if (!classConfig || !classConfig.outline) {
-      throw new Error('No class outline found');
+    if (!classConfig) {
+      throw new Error('Class not found');
     }
 
     document.title = `Teleprompter — ${classConfig.title}`;
-    buildOutlinePointsIndex();
+    buildEditorNotesIndex();
     renderInitialContent();
     setupSpeechRecognition();
     setupControls();
@@ -58,28 +59,79 @@ async function initializePage() {
   }
 }
 
-// Build a flat index of all outline points with section context
-function buildOutlinePointsIndex() {
+// Build points from editor notes (HTML content)
+function buildEditorNotesIndex() {
   allOutlinePoints = [];
 
-  classConfig.outline.forEach((section, sectionIdx) => {
-    if (Array.isArray(section.points)) {
-      section.points.forEach((point, pointIdx) => {
-        const pointText = typeof point === 'object' ? point.text : point;
-        const pointType = typeof point === 'object' ? point.type : 'point';
+  // Get editor content HTML
+  const editorHtml = classConfig.content?.html;
+  if (!editorHtml) {
+    debug('No editor content found');
+    return;
+  }
 
-        allOutlinePoints.push({
-          sectionId: section.id,
-          sectionTitle: section.summary,
-          sectionIndex: sectionIdx,
-          pointIndex: pointIdx,
-          text: pointText,
-          type: pointType,
-          fullPoint: point
-        });
+  // Parse HTML and extract text chunks
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(editorHtml, 'text/html');
+
+  // Extract headings and paragraphs
+  const blocks = [];
+  let currentSection = classConfig.title || 'Notes';
+
+  // Iterate through all block-level elements
+  const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li');
+  elements.forEach((el) => {
+    const text = el.textContent?.trim();
+    if (!text) return;
+
+    const tagName = el.tagName.toLowerCase();
+
+    // Update section title on headings
+    if (tagName.startsWith('h')) {
+      currentSection = text;
+      // Add heading as a point
+      blocks.push({
+        text: text,
+        type: 'heading',
+        sectionTitle: currentSection
+      });
+    } else if (tagName === 'p' || tagName === 'li') {
+      // Add paragraph/list item as a point
+      blocks.push({
+        text: text,
+        type: tagName === 'li' ? 'bullet' : 'paragraph',
+        sectionTitle: currentSection
       });
     }
   });
+
+  // If no blocks found, try splitting by sentences
+  if (blocks.length === 0 && editorHtml) {
+    const plainText = doc.body.textContent || '';
+    const sentences = plainText
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    sentences.forEach((sentence) => {
+      blocks.push({
+        text: sentence,
+        type: 'sentence',
+        sectionTitle: currentSection
+      });
+    });
+  }
+
+  // Convert blocks to indexed points
+  allOutlinePoints = blocks.map((block, idx) => ({
+    index: idx,
+    text: block.text,
+    type: block.type,
+    sectionTitle: block.sectionTitle,
+    fullPoint: block
+  }));
+
+  debug(`Parsed ${allOutlinePoints.length} points from editor notes`);
 }
 
 // Render initial content
@@ -90,7 +142,8 @@ function renderInitialContent() {
 // Update the display based on current indices
 function updateCurrentPointDisplay() {
   if (allOutlinePoints.length === 0) {
-    document.getElementById('current-section-title').textContent = 'No outline points found';
+    document.getElementById('current-section-title').textContent = 'No content found';
+    document.getElementById('current-point').innerHTML = '<div class="point-text">Load some editor notes to get started.</div>';
     return;
   }
 
@@ -105,18 +158,23 @@ function updateCurrentPointDisplay() {
   const currentPoint = allOutlinePoints[currentPointIndex];
 
   // Update section title
-  document.getElementById('current-section-title').textContent = currentPoint.sectionTitle;
+  document.getElementById('current-section-title').textContent = currentPoint.sectionTitle || 'Content';
 
   // Update current point (large, prominent display)
   const currentPointEl = document.getElementById('current-point');
+  const pointTextHTML = wrapWordsInSpans(currentPoint.text);
+
   currentPointEl.innerHTML = `
-    <div class="point-type-badge">${currentPoint.type}</div>
-    <div class="point-text">${currentPoint.text}</div>
+    <div class="point-type-badge">${currentPoint.type || 'text'}</div>
+    <div class="point-text">${pointTextHTML}</div>
   `;
 
   // Update progress
   document.getElementById('progress-display').textContent =
     `${currentPointIndex + 1} / ${allOutlinePoints.length}`;
+
+  // Reset spoken words for new point
+  spokenWords = [];
 
   // Render upcoming points preview
   renderUpcomingPoints();
@@ -138,11 +196,71 @@ function renderUpcomingPoints() {
     const el = document.createElement('div');
     el.className = 'teleprompter__point upcoming';
     el.innerHTML = `
-      <div class="point-type-badge">${point.type}</div>
+      <div class="point-type-badge">${point.type || 'text'}</div>
       <div class="point-text">${point.text}</div>
     `;
     upcomingContainer.appendChild(el);
   }
+}
+
+// Wrap each word in a span for highlighting
+function wrapWordsInSpans(text) {
+  const words = text.split(/(\s+)/); // Split while keeping whitespace
+  return words.map((word, idx) => {
+    // Keep whitespace as-is
+    if (/^\s+$/.test(word)) {
+      return word;
+    }
+    // Wrap actual words in spans with data-word attribute
+    const sanitizedWord = word.replace(/[<>]/g, ''); // Basic XSS protection
+    return `<span class="teleprompter__word" data-word-idx="${idx}">${sanitizedWord}</span>`;
+  }).join('');
+}
+
+// Mark words as read based on spoken transcript
+function markWordsAsRead(transcript) {
+  if (!transcript || transcript.trim().length === 0) return;
+
+  // Get the current point text
+  const currentPoint = allOutlinePoints[currentPointIndex];
+  if (!currentPoint) return;
+
+  // Split transcript into words and normalize
+  const transcriptWords = transcript.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+
+  // Get all word spans
+  const wordSpans = document.querySelectorAll('.teleprompter__word');
+  if (wordSpans.length === 0) return;
+
+  // Build current point text words (normalized)
+  const pointWords = currentPoint.text.toLowerCase().split(/(\s+)/).filter(w => w.length > 0 && !/^\s+$/.test(w));
+
+  // Track which point words have been covered
+  let pointWordIdx = 0;
+
+  transcriptWords.forEach(transcriptWord => {
+    // Find matching word in current point
+    while (pointWordIdx < pointWords.length) {
+      const pointWord = pointWords[pointWordIdx];
+
+      // Check if words are similar (handle punctuation, partial matches)
+      const stripped = pointWord.replace(/[^\w]/g, '');
+      if (stripped.startsWith(transcriptWord) || transcriptWord.startsWith(stripped)) {
+        // Mark this word as read
+        wordSpans.forEach(span => {
+          const spanText = span.textContent.toLowerCase().replace(/[^\w]/g, '');
+          if (spanText === stripped) {
+            span.classList.add('read');
+          }
+        });
+        pointWordIdx++;
+        break;
+      }
+
+      // If no match, move to next point word
+      pointWordIdx++;
+    }
+  });
 }
 
 // Setup Web Speech API
@@ -192,6 +310,10 @@ function setupSpeechRecognition() {
     } else {
       confDisplay.style.display = 'none';
     }
+
+    // Mark words as read based on both interim and final transcripts
+    const textToMatch = finalTranscript || interimTranscript;
+    markWordsAsRead(textToMatch);
 
     // Check for phrase match when final transcript arrives
     if (finalTranscript && displayConfidence >= CONFIG.confidenceThreshold) {
