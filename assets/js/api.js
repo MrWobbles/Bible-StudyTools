@@ -288,15 +288,15 @@
   }
 
   async function getClasses() {
-    return fetchJson('/api/data/classes');
+    return fetchJson('/api/data/classes', {}, { requireAdmin: true });
   }
 
   async function getLessonPlans() {
-    return fetchJson('/api/data/lessonPlans');
+    return fetchJson('/api/data/lessonPlans', {}, { requireAdmin: true });
   }
 
   async function getNotes() {
-    return fetchJson('/api/data/notes');
+    return fetchJson('/api/data/notes', {}, { requireAdmin: true });
   }
 
   async function upsertSupabaseClass(classId, classPayload) {

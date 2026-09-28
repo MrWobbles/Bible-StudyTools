@@ -1214,8 +1214,26 @@ function requireSupabaseConnection(res) {
 app.get('/api/data/:fileName', async (req, res) => {
   // Allow GET requests on localhost without authentication for testing
   const isLoopback = isLoopbackRequest(req);
+
+  // Check auth: allow loopback, admin token, or Supabase auth
   if (!isLoopback && !hasValidAdminToken(req)) {
-    return res.status(401).json({ error: 'Authentication required for remote access.' });
+    // Try Supabase authentication
+    if (SUPABASE_AUTH_ENABLED) {
+      const bearerToken = extractBearerToken(req);
+      if (bearerToken) {
+        const user = await getSupabaseUserFromToken(bearerToken);
+        if (user) {
+          req.authUser = user;
+          // User is authenticated, continue
+        } else {
+          return res.status(401).json({ error: 'Invalid or expired authentication.' });
+        }
+      } else {
+        return res.status(401).json({ error: 'Authentication required for remote access.' });
+      }
+    } else {
+      return res.status(401).json({ error: 'Authentication required for remote access.' });
+    }
   }
 
   try {
