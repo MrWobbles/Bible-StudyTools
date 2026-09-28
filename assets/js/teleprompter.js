@@ -15,6 +15,14 @@ let networkErrorCount = 0; // Track consecutive network errors
 const MAX_NETWORK_RETRIES = 3; // Stop retrying after this many network errors
 const DEBUG = true; // Always on - helps users report issues
 
+// Best practice: Track confidence streaks and freezing
+let consecutiveHighConfidenceMatches = 0; // For freeze/resume logic
+let isTrackingFrozen = false; // Freeze when confidence drops
+let lastAutoAdvanceTime = 0;
+let targetScrollPosition = 0; // For smooth Lerp scrolling
+let currentScrollPosition = 0;
+let scrollAnimationId = null;
+
 // Error tracking for diagnostics
 const errorLog = {
   errors: [],
@@ -71,7 +79,16 @@ const CONFIG = {
   matchThreshold: 0.6, // Minimum similarity score to advance (0-1)
   autoAdvanceDelay: 500, // ms before auto-advancing
   confidenceThreshold: 0.3, // Minimum confidence for recognized speech
-  maxUpcomingPoints: 3 // How many upcoming points to show
+  maxUpcomingPoints: 3, // How many upcoming points to show
+
+  // New best-practice settings
+  SMOOTH_SCROLL_DURATION: 400, // ms for Lerp/smooth scrolling
+  SLIDING_WINDOW_SIZE: 5, // Look at current ± 5 points
+  AUTO_ADVANCE_THRESHOLD: 0.50, // 50% of words needed
+  MIN_MATCHED_WORDS: 2, // Require at least 2 words
+  CONFIDENCE_STREAK: 3, // Require 3 consecutive high-confidence matches before tracking resumes
+  REWIND_THRESHOLD: 0.8, // If match score is high but below current, trigger rewind
+  LOW_CONFIDENCE_FREEZE: true // Freeze display when confidence drops below threshold
 };
 
 // Initialize when page loads
@@ -528,21 +545,53 @@ function setupSpeechRecognition() {
     const textToMatch = finalTranscript || interimTranscript;
     markWordsAsRead(textToMatch);
 
-    // Check for phrase match when final transcript arrives
+    // Only process final, high-confidence results (best practice: proper debouncing)
     if (finalTranscript && displayConfidence >= CONFIG.confidenceThreshold) {
       const now = Date.now();
       const timeSinceLastAdvance = now - lastAutoAdvanceTime;
 
       // Use sequential word matching with fuzzy matching
       const matchResult = matchWordsSequential(finalTranscript);
-      const AUTO_ADVANCE_THRESHOLD = 0.70; // 70% of words spoken = auto-advance
 
-      if (matchResult.percentage >= AUTO_ADVANCE_THRESHOLD && timeSinceLastAdvance > CONFIG.autoAdvanceDelay) {
-        debug(`✅ Match: ${matchResult.matchedCount}/${matchResult.totalWords} words (${Math.round(matchResult.percentage * 100)}%) - auto-advancing`);
-        advanceToPoint(currentPointIndex + 1);
-        lastAutoAdvanceTime = now;
-      } else if (matchResult.matchedCount > 0) {
-        debug(`📊 Progress: ${matchResult.matchedCount}/${matchResult.totalWords} words (${Math.round(matchResult.percentage * 100)}%)`);
+      // Check for rewind (user repeating earlier lines)
+      const rewindIndex = checkForRewind(finalTranscript);
+      if (rewindIndex !== null && displayConfidence > 0.85) {
+        // High confidence match in past - they're repeating
+        advanceToPoint(rewindIndex);
+        debug(`🔄 Rewind: Moving back to point ${rewindIndex}`);
+        return;
+      }
+
+      // Implement confidence streak: require N consecutive matches before tracking
+      if (matchResult.percentage >= CONFIG.AUTO_ADVANCE_THRESHOLD &&
+        matchResult.matchedCount >= CONFIG.MIN_MATCHED_WORDS) {
+        consecutiveHighConfidenceMatches++;
+
+        if (consecutiveHighConfidenceMatches >= CONFIG.CONFIDENCE_STREAK &&
+          timeSinceLastAdvance > CONFIG.autoAdvanceDelay &&
+          !isTrackingFrozen) {
+          debug(`✅ Match (streak ${consecutiveHighConfidenceMatches}): ${matchResult.matchedCount}/${matchResult.totalWords} (${Math.round(matchResult.percentage * 100)}%) - auto-advancing`);
+          advanceToPoint(currentPointIndex + 1);
+          lastAutoAdvanceTime = now;
+          consecutiveHighConfidenceMatches = 0;
+        } else {
+          debug(`📊 Progress (streak ${consecutiveHighConfidenceMatches}/${CONFIG.CONFIDENCE_STREAK}): ${matchResult.matchedCount}/${matchResult.totalWords} (${Math.round(matchResult.percentage * 100)}%)`);
+        }
+      } else {
+        // Low confidence match - reset streak and potentially freeze
+        consecutiveHighConfidenceMatches = 0;
+        if (CONFIG.LOW_CONFIDENCE_FREEZE && displayConfidence < 0.5) {
+          isTrackingFrozen = true;
+          debug('❄️ FROZEN: Low confidence - waiting for strong match to resume');
+          showStatusMessage('⚠️ Low confidence - tracking paused', 2000);
+        }
+      }
+    } else if (finalTranscript) {
+      // Final result but low confidence - freeze tracking
+      consecutiveHighConfidenceMatches = 0;
+      if (CONFIG.LOW_CONFIDENCE_FREEZE) {
+        isTrackingFrozen = true;
+        debug('❄️ FROZEN: Confidence below threshold');
       }
     }
 
@@ -696,6 +745,104 @@ function fuzzyMatchWords(spokenWord, expectedWord) {
   return similarity > 0.6 ? similarity : 0;
 }
 
+// Smooth scrolling with Lerp (Linear Interpolation) - best practice for pro teleprompters
+function smoothScrollToPoint(pointIndex) {
+  const pointElement = document.querySelector(`[data-point-index="${pointIndex}"]`);
+  if (!pointElement) return;
+
+  const container = document.getElementById('content-area');
+  const targetOffset = pointElement.offsetTop - (container.clientHeight * 0.30); // Keep at 30% from top
+  targetScrollPosition = Math.max(0, targetOffset);
+
+  // Cancel any existing animation
+  if (scrollAnimationId) {
+    cancelAnimationFrame(scrollAnimationId);
+  }
+
+  // Animate using Lerp over CONFIG.SMOOTH_SCROLL_DURATION ms
+  const startTime = Date.now();
+  const startPosition = currentScrollPosition;
+
+  function animateScroll() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / CONFIG.SMOOTH_SCROLL_DURATION, 1);
+
+    // Ease-in-out cubic for smooth deceleration
+    const easeProgress = progress < 0.5
+      ? 4 * progress * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+    currentScrollPosition = startPosition + (targetScrollPosition - startPosition) * easeProgress;
+    container.scrollTop = currentScrollPosition;
+
+    if (progress < 1) {
+      scrollAnimationId = requestAnimationFrame(animateScroll);
+    } else {
+      container.scrollTop = targetScrollPosition;
+      currentScrollPosition = targetScrollPosition;
+    }
+  }
+
+  animateScroll();
+}
+
+// Sliding window strategy: match against nearby points, not the entire script
+function getWindowedPoints(centerIndex, windowSize = CONFIG.SLIDING_WINDOW_SIZE) {
+  const start = Math.max(0, centerIndex - 2);
+  const end = Math.min(allOutlinePoints.length, centerIndex + windowSize);
+  return allOutlinePoints.slice(start, end).map((point, idx) => ({
+    ...point,
+    windowIndex: start + idx
+  }));
+}
+
+// Detect rewinds: if user repeats a line they already said, move backward
+function checkForRewind(spokenText) {
+  if (currentPointIndex === 0) return null; // Can't rewind at start
+
+  // Check if spoken text matches previous points (common rewind/repeat pattern)
+  for (let i = Math.max(0, currentPointIndex - 3); i < currentPointIndex; i++) {
+    const prevPoint = allOutlinePoints[i];
+    const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'is', 'are', 'was', 'were', 'in', 'at', 'of', 'to', 'for', 'from', 'with', 'by', 'about', 'be', 'have', 'do']);
+    const isNumericWord = (w) => /^\d+$/.test(w);
+
+    // Extract key words from previous point
+    const prevWords = prevPoint.text
+      .split(/\s+/)
+      .filter(w => w && w.length > 0)
+      .map(w => w.replace(/[^\w]/g, ''))
+      .filter(w => !commonWords.has(w.toLowerCase()) && !isNumericWord(w) && w.length > 0);
+
+    // Extract key words from spoken text
+    const spokenWords = spokenText
+      .split(/\s+/)
+      .filter(w => w && w.length > 0)
+      .map(w => w.replace(/[^\w]/g, ''))
+      .filter(w => !commonWords.has(w.toLowerCase()) && !isNumericWord(w) && w.length > 0);
+
+    if (prevWords.length === 0 || spokenWords.length === 0) continue;
+
+    // Calculate match percentage
+    let matchedCount = 0;
+    for (const spokenWord of spokenWords) {
+      for (const prevWord of prevWords) {
+        if (fuzzyMatchWords(spokenWord, prevWord) > 0.7) {
+          matchedCount++;
+          break;
+        }
+      }
+    }
+
+    const matchPercentage = matchedCount / Math.max(prevWords.length, spokenWords.length);
+    if (matchPercentage > CONFIG.REWIND_THRESHOLD) {
+      debug(`🔄 REWIND DETECTED: Speaker repeated "${prevPoint.text.substring(0, 40)}..."`);
+      return i; // Return index to rewind to
+    }
+  }
+
+  return null;
+}
+
 // Match spoken words sequentially to current point
 function matchWordsSequential(spokenText) {
   if (!spokenText || allOutlinePoints.length === 0) return { matchedCount: 0, totalWords: 0, percentage: 0 };
@@ -703,20 +850,22 @@ function matchWordsSequential(spokenText) {
   const currentPoint = allOutlinePoints[currentPointIndex];
   if (!currentPoint) return { matchedCount: 0, totalWords: 0, percentage: 0 };
 
-  // Extract words from point, filtering common words
+  // Extract words from point, filtering common words and numbers
   const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'is', 'are', 'was', 'were', 'in', 'at', 'of', 'to', 'for', 'from', 'with', 'by', 'about', 'be', 'have', 'do']);
+  const isNumericWord = (w) => /^\d+$/.test(w); // Skip pure numbers like "60", "2024", etc
+
   const pointWords = currentPoint.text
     .split(/\s+/)
     .filter(w => w && w.length > 0)
     .map(w => w.replace(/[^\w]/g, '')) // Remove punctuation
-    .filter(w => !commonWords.has(w.toLowerCase()) && w.length > 0);
+    .filter(w => !commonWords.has(w.toLowerCase()) && !isNumericWord(w) && w.length > 0);
 
   // Extract words from spoken text
   const spokenWords = spokenText
     .split(/\s+/)
     .filter(w => w && w.length > 0)
     .map(w => w.replace(/[^\w]/g, ''))
-    .filter(w => !commonWords.has(w.toLowerCase()) && w.length > 0);
+    .filter(w => !commonWords.has(w.toLowerCase()) && !isNumericWord(w) && w.length > 0);
 
   if (pointWords.length === 0) return { matchedCount: 0, totalWords: 0, percentage: 0 };
 
@@ -768,11 +917,16 @@ function calculateSimilarity(str1, str2) {
   return intersection.size / union.size;
 }
 
-// Advance to a specific point
+// Advance to a specific point with smooth scrolling
 function advanceToPoint(pointIndex) {
   if (pointIndex < 0 || pointIndex >= allOutlinePoints.length) return;
+  if (pointIndex === currentPointIndex) return; // No change needed
+
   currentPointIndex = pointIndex;
   updateCurrentPointDisplay();
+  smoothScrollToPoint(pointIndex); // Use Lerp scrolling instead of instant snap
+  consecutiveHighConfidenceMatches = 0; // Reset streak on manual advance
+  isTrackingFrozen = false;
 }
 
 // Setup manual controls
@@ -803,6 +957,16 @@ function setupControls() {
       advanceToPoint(currentPointIndex - 1);
     }
   });
+
+  // Scroll wheel support - manual velocity fallback (best practice)
+  const contentArea = document.getElementById('content-area');
+  if (contentArea) {
+    contentArea.addEventListener('wheel', (e) => {
+      // Allow natural scroll behavior - don't prevent default
+      // This gives users a fallback if speech recognition fails
+      // User can scroll manually at any time
+    }, { passive: true });
+  }
 }
 
 // Toggle listening on/off
