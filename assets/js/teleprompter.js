@@ -11,6 +11,8 @@ let userInitiatedStop = false; // Track if user explicitly stopped, vs error/res
 let listeningTimeout = null;
 let recognitionInstance = null;
 let spokenWords = []; // Track words that have been spoken
+let networkErrorCount = 0; // Track consecutive network errors
+const MAX_NETWORK_RETRIES = 3; // Stop retrying after this many network errors
 const DEBUG = true; // Always on - helps users report issues
 
 // Error tracking for diagnostics
@@ -113,6 +115,9 @@ async function initializePage() {
 
     renderInitialContent();
     debug(`✓ Rendered initial content`);
+
+    // Initialize on-device speech recognition (works offline)
+    await initializeOnDeviceSpeechRecognition();
 
     setupSpeechRecognition();
     debug(`✓ Speech recognition ready`);
@@ -373,6 +378,87 @@ function markWordsAsRead(transcript) {
   });
 }
 
+// Helper: Wrap a promise with a timeout
+function withTimeout(promise, timeoutMs, timeoutMessage = 'Operation timed out') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
+    )
+  ]);
+}
+
+// Initialize on-device speech recognition (works offline - no network required)
+async function initializeOnDeviceSpeechRecognition() {
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognitionAPI) {
+    debug('⚠️ Speech Recognition API not available in this browser');
+    return;
+  }
+
+  // Check if on-device speech recognition is supported
+  try {
+    if (!SpeechRecognitionAPI.available) {
+      debug('ℹ️ On-device speech recognition not available in this browser');
+      debug('ℹ️ Using standard Web Speech API (cloud-based with restricted networks)');
+      return;
+    }
+
+    debug('🔍 Checking for on-device speech recognition language packs...');
+
+    // Add timeout to prevent hanging
+    const availability = await withTimeout(
+      SpeechRecognitionAPI.available({
+        langs: ['en-US'],
+        processLocally: true,
+        quality: 'command'
+      }),
+      5000,
+      'On-device availability check timed out'
+    );
+
+    if (availability === 'available') {
+      debug('✅ On-device speech recognition ready (offline mode)');
+      window.onDeviceSpeechAvailable = true;
+    } else if (availability === 'downloading' || availability === 'downloadable') {
+      debug('📥 Downloading on-device speech recognition language pack...');
+      showStatusMessage('Downloading speech language pack...', 5000);
+
+      try {
+        // Add timeout to prevent hanging during install
+        const installed = await withTimeout(
+          SpeechRecognitionAPI.install({
+            langs: ['en-US'],
+            processLocally: true,
+            quality: 'command'
+          }),
+          30000,
+          'Language pack installation timed out'
+        );
+
+        if (installed) {
+          debug('✅ Language pack installed! On-device speech recognition ready.');
+          window.onDeviceSpeechAvailable = true;
+          showStatusMessage('✅ Ready! Speech recognition is offline now.', 3000);
+        } else {
+          debug('⚠️ Language pack installation failed');
+          debug('ℹ️ Will use standard Web Speech API instead');
+        }
+      } catch (err) {
+        debug(`⚠️ Language pack installation failed: ${err.message}`);
+        debug('ℹ️ Falling back to standard Web Speech API (cloud-based)');
+      }
+    } else if (availability === 'unavailable') {
+      debug('ℹ️ On-device speech recognition not available');
+      debug('ℹ️ Using standard Web Speech API (cloud-based)');
+    }
+  } catch (err) {
+    debug(`ℹ️ On-device speech recognition not supported: ${err.message}`);
+    debug('ℹ️ Using standard Web Speech API (cloud-based)');
+  }
+}
+
 // Setup Web Speech API
 function setupSpeechRecognition() {
   if (!SpeechRecognition) return;
@@ -382,10 +468,17 @@ function setupSpeechRecognition() {
   recognitionInstance.interimResults = CONFIG.interimResults;
   recognitionInstance.language = CONFIG.language;
 
+  // Use on-device speech recognition if available (works offline)
+  if (window.onDeviceSpeechAvailable) {
+    recognitionInstance.processLocally = true;
+    debug('🎤 Using on-device speech recognition (offline mode)');
+  }
+
   let lastAutoAdvanceTime = 0;
 
   recognitionInstance.onstart = () => {
     debug('🎤 Speech recognition started');
+    // Note: Don't reset error count here - let it accumulate through restart attempts
     updateListeningStatus(true);
   };
 
@@ -449,9 +542,25 @@ function setupSpeechRecognition() {
 
     // Handle different error types
     if (event.error === 'network') {
-      debug('🔄 Network error - will auto-restart via onend handler');
-      debug('   (Trying to reconnect to speech service...)');
-      showStatusMessage('Network issue - reconnecting...', 2000);
+      networkErrorCount++;
+      if (networkErrorCount >= MAX_NETWORK_RETRIES) {
+        debug(`🛑 Network error limit reached (${networkErrorCount} attempts)`);
+        showStatusMessage('❌ Network unavailable - cannot reach speech service. Check your internet connection.', 5000);
+        isListening = false;
+        updateListeningStatus(false);
+        errorLog.addError(`Network errors exceeded max retries (${MAX_NETWORK_RETRIES})`);
+      } else {
+        debug(`🔄 Network error (${networkErrorCount}/${MAX_NETWORK_RETRIES}) - will auto-restart via onend handler`);
+        debug('   (Trying to reconnect to speech service...)');
+        showStatusMessage(`Network issue - reconnecting... (${networkErrorCount}/${MAX_NETWORK_RETRIES})`, 2000);
+      }
+    } else if (event.error === 'language-not-supported') {
+      debug('⚠️ Language pack not available for on-device recognition, falling back to cloud-based');
+      // Fall back to cloud-based if on-device language not supported
+      if (recognitionInstance.processLocally) {
+        recognitionInstance.processLocally = false;
+        showStatusMessage('Switching to cloud-based speech recognition...', 2000);
+      }
     } else if (event.error === 'no-speech') {
       debug('⏱️ No speech detected (this is normal if you haven\'t spoken yet)');
     } else if (event.error === 'audio-capture') {
@@ -477,13 +586,14 @@ function setupSpeechRecognition() {
     // Only update UI if user explicitly stopped, not for internal restarts
     if (userInitiatedStop) {
       isListening = false;
+      networkErrorCount = 0;
       updateListeningStatus(false);
       userInitiatedStop = false;
-    } else if (isListening) {
-      // Keep trying to restart if still listening
+    } else if (isListening && networkErrorCount < MAX_NETWORK_RETRIES) {
+      // Keep trying to restart if still listening and haven't exceeded retry limit
       debug('Restarting speech recognition...');
       setTimeout(() => {
-        if (isListening) {
+        if (isListening && networkErrorCount < MAX_NETWORK_RETRIES) {
           try {
             recognitionInstance.start();
           } catch (e) {
@@ -491,6 +601,11 @@ function setupSpeechRecognition() {
           }
         }
       }, 500);
+    } else if (networkErrorCount >= MAX_NETWORK_RETRIES) {
+      // Stop if we've hit the retry limit
+      isListening = false;
+      updateListeningStatus(false);
+      debug('Stopping due to network error limit');
     }
   };
 }
@@ -582,6 +697,7 @@ function setupControls() {
 }
 
 // Toggle listening on/off
+// Toggle listening on/off
 function toggleListening() {
   if (!recognitionInstance) {
     errorLog.addError('Web Speech API not available');
@@ -599,6 +715,7 @@ function toggleListening() {
     // User is starting to listen
     debug('🎤 User started listening');
     userInitiatedStop = false;
+    networkErrorCount = 0; // Reset error counter on new listen session
 
     // Clear transcript display when starting
     document.getElementById('speech-transcript').textContent = '';
@@ -612,119 +729,122 @@ function toggleListening() {
       errorLog.addError(`Failed to start listening: ${e.message}`, { error: e.toString() });
       console.error('Failed to start speech recognition:', e);
       showStatusMessage('❌ Failed to start listening: ' + e.message, 3000);
-      // Set timeout to restart if no speech detected for 10 seconds
-      clearTimeout(listeningTimeout);
-      listeningTimeout = setTimeout(() => {
-        if (isListening && !userInitiatedStop) {
-          debug('No speech detected for 10s, restarting...');
-          try {
-            recognitionInstance.stop();
-            setTimeout(() => {
-              if (isListening && !userInitiatedStop) {
-                recognitionInstance.start();
-              }
-            }, 100);
-          } catch (e) {
-            debug(`Auto-restart timeout failed: ${e.message}`);
-          }
-        }
-      }, 10000);
+      return;
     }
-  }
 
-  // Update listening status display
-  function updateListeningStatus(listening) {
-    const statusEl = document.getElementById('listening-status');
-    const toggleBtn = document.getElementById('toggle-listening');
-
-    if (listening) {
-      statusEl.textContent = 'Listening: ON';
-      statusEl.classList.add('listening-active');
-      toggleBtn.classList.add('active');
-      toggleBtn.querySelector('.btn-label').textContent = 'Stop Listening';
-    } else {
-      statusEl.textContent = 'Listening: OFF';
-      statusEl.classList.remove('listening-active');
-      toggleBtn.classList.remove('active');
-      toggleBtn.querySelector('.btn-label').textContent = 'Start Listening';
-    }
-  }
-
-  // Show temporary message to user
-  function showStatusMessage(message, duration = 3000) {
-    const statusEl = document.getElementById('listening-status');
-    const originalText = statusEl.textContent;
-
-    statusEl.textContent = message;
-    statusEl.style.color = 'var(--accent-amber)';
-
-    setTimeout(() => {
-      statusEl.textContent = originalText;
-      statusEl.style.color = '';
-    }, duration);
-  }
-
-  // Debug output with timestamps and context
-  function debug(msg, context = {}) {
-    if (DEBUG) {
-      const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
-      const fullMsg = `[${time}] ${msg}`;
-      console.log(`[Teleprompter] ${fullMsg}`, context);
-
-      const debugPanel = document.getElementById('debug-panel');
-      if (debugPanel) {
-        const debugOutput = document.getElementById('debug-output');
-        const line = document.createElement('div');
-        line.style.fontSize = '11px';
-        line.style.padding = '2px 4px';
-        line.style.borderBottom = '1px solid #ddd';
-        line.style.wordBreak = 'break-word';
-        line.style.fontFamily = 'monospace';
-        line.textContent = fullMsg;
-
-        if (Object.keys(context).length > 0) {
-          line.title = JSON.stringify(context, null, 2);
-          line.style.cursor = 'help';
+    // Set timeout to restart if no speech detected for 10 seconds
+    clearTimeout(listeningTimeout);
+    listeningTimeout = setTimeout(() => {
+      if (isListening && !userInitiatedStop) {
+        debug('No speech detected for 10s, restarting...');
+        try {
+          recognitionInstance.stop();
+          setTimeout(() => {
+            if (isListening && !userInitiatedStop) {
+              recognitionInstance.start();
+            }
+          }, 100);
+        } catch (e) {
+          debug(`Auto-restart timeout failed: ${e.message}`);
         }
+      }
+    }, 10000);
+  }
+}
 
-        debugOutput.insertBefore(line, debugOutput.firstChild);
-        if (debugOutput.children.length > 50) {
-          debugOutput.removeChild(debugOutput.lastChild);
-        }
+// Update listening status display
+function updateListeningStatus(listening) {
+  const statusEl = document.getElementById('listening-status');
+  const toggleBtn = document.getElementById('toggle-listening');
+
+  if (listening) {
+    statusEl.textContent = 'Listening: ON';
+    statusEl.classList.add('listening-active');
+    toggleBtn.classList.add('active');
+    toggleBtn.querySelector('.btn-label').textContent = 'Stop Listening';
+  } else {
+    statusEl.textContent = 'Listening: OFF';
+    statusEl.classList.remove('listening-active');
+    toggleBtn.classList.remove('active');
+    toggleBtn.querySelector('.btn-label').textContent = 'Start Listening';
+  }
+}
+
+// Show temporary message to user
+function showStatusMessage(message, duration = 3000) {
+  const statusEl = document.getElementById('listening-status');
+  const originalText = statusEl.textContent;
+
+  statusEl.textContent = message;
+  statusEl.style.color = 'var(--accent-amber)';
+
+  setTimeout(() => {
+    statusEl.textContent = originalText;
+    statusEl.style.color = '';
+  }, duration);
+}
+
+// Debug output with timestamps and context
+function debug(msg, context = {}) {
+  if (DEBUG) {
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+    const fullMsg = `[${time}] ${msg}`;
+    console.log(`[Teleprompter] ${fullMsg}`, context);
+
+    const debugPanel = document.getElementById('debug-panel');
+    if (debugPanel) {
+      const debugOutput = document.getElementById('debug-output');
+      const line = document.createElement('div');
+      line.style.fontSize = '11px';
+      line.style.padding = '2px 4px';
+      line.style.borderBottom = '1px solid #ddd';
+      line.style.wordBreak = 'break-word';
+      line.style.fontFamily = 'monospace';
+      line.textContent = fullMsg;
+
+      if (Object.keys(context).length > 0) {
+        line.title = JSON.stringify(context, null, 2);
+        line.style.cursor = 'help';
+      }
+
+      debugOutput.insertBefore(line, debugOutput.firstChild);
+      if (debugOutput.children.length > 50) {
+        debugOutput.removeChild(debugOutput.lastChild);
       }
     }
   }
+}
 
-  // Export debug report for sharing with developers
-  window.getDebugReport = function () {
-    const report = errorLog.getReport();
-    const debugInfo = {
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      language: navigator.language,
-      onLine: navigator.onLine,
-      classId: classId,
-      classTitle: classConfig?.title || 'N/A',
-      pointsLoaded: allOutlinePoints.length,
-      isListening: isListening,
-      ...report
-    };
-    return debugInfo;
+// Export debug report for sharing with developers
+window.getDebugReport = function () {
+  const report = errorLog.getReport();
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    language: navigator.language,
+    onLine: navigator.onLine,
+    classId: classId,
+    classTitle: classConfig?.title || 'N/A',
+    pointsLoaded: allOutlinePoints.length,
+    isListening: isListening,
+    ...report
   };
+  return debugInfo;
+};
 
-  // Also expose as a copy-to-clipboard function
-  window.copyDebugReport = function () {
-    const report = window.getDebugReport();
-    const text = JSON.stringify(report, null, 2);
-    navigator.clipboard.writeText(text).then(() => {
-      console.log('Debug report copied to clipboard!');
-      showStatusMessage('✓ Debug report copied to clipboard', 2000);
-    }).catch(err => {
-      console.error('Failed to copy:', err);
-      console.log('DEBUG REPORT:', report);
-    });
-  };
+// Also expose as a copy-to-clipboard function
+window.copyDebugReport = function () {
+  const report = window.getDebugReport();
+  const text = JSON.stringify(report, null, 2);
+  navigator.clipboard.writeText(text).then(() => {
+    console.log('Debug report copied to clipboard!');
+    showStatusMessage('✓ Debug report copied to clipboard', 2000);
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+    console.log('DEBUG REPORT:', report);
+  });
+};
 
-  // Start initialization when page loads
-  window.addEventListener('DOMContentLoaded', initializePage);
+// Start initialization when page loads
+window.addEventListener('DOMContentLoaded', initializePage);

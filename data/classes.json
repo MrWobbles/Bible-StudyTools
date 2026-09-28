@@ -1,0 +1,20 @@
+[
+  {
+    "id": "class-1",
+    "classNumber": 1,
+    "title": "Sample Bible Study Class",
+    "description": "Test class for teleprompter",
+    "content": {
+      "html": "<h1>Welcome to Bible Study</h1><p>This is a sample lesson with content for the teleprompter to display.</p><p>Speak naturally and the teleprompter will highlight words as you go.</p><h2>Key Points</h2><p>God loves us and wants to have a relationship with us.</p><p>We can trust God with our fears and anxieties.</p><p>Faith is about believing even when we can't see the outcome.</p>"
+    },
+    "outline": {
+      "points": [
+        "God loves us",
+        "Trust in God",
+        "Faith in action"
+      ]
+    },
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+]

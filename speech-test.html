@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Speech API Test</title>
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 800px;
+      margin: 50px auto;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #output {
+      border: 1px solid #ccc;
+      padding: 20px;
+      margin-top: 20px;
+      min-height: 200px;
+      white-space: pre-wrap;
+      font-family: monospace;
+    }
+
+    .success {
+      color: green;
+    }
+
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Web Speech API Diagnostic Test</h1>
+  <p>This page tests if your browser and network can use the Web Speech API</p>
+
+  <button onclick="testSupport()">1. Test Browser Support</button>
+  <button onclick="testMicrophone()">2. Test Microphone (Say something)</button>
+  <button onclick="clearOutput()">Clear Output</button>
+
+  <div id="output"></div>
+
+  <script>
+    const output = document.getElementById('output');
+    let recognition = null;
+
+    function log(msg, isError = false) {
+      const className = isError ? 'error' : 'success';
+      output.innerHTML += `<div class="${className}">${msg}</div>`;
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clearOutput() {
+      output.innerHTML = '';
+    }
+
+    function testSupport() {
+      clearOutput();
+      log('Testing browser support...\n');
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        log('❌ Web Speech API NOT supported in this browser', true);
+        log('Your browser does not support Web Speech API.');
+        return;
+      }
+
+      log('✅ Web Speech API IS supported');
+      log('\nBrowser info:');
+      log('  User Agent: ' + navigator.userAgent);
+      log('  Platform: ' + navigator.platform);
+
+      try {
+        recognition = new SpeechRecognition();
+        log('✅ Successfully created SpeechRecognition instance');
+        log('\nConfiguration:');
+        log('  continuous: ' + recognition.continuous);
+        log('  interimResults: ' + recognition.interimResults);
+        log('  language: ' + recognition.language);
+      } catch (e) {
+        log('❌ Failed to create instance: ' + e.message, true);
+      }
+    }
+
+    function testMicrophone() {
+      clearOutput();
+      log('Starting microphone test...');
+      log('Please say something for 5 seconds.\n');
+
+      if (!recognition) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          log('❌ Web Speech API not supported', true);
+          return;
+        }
+        recognition = new SpeechRecognition();
+      }
+
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.language = 'en-US';
+
+      recognition.onstart = () => {
+        log('✅ Recognition started');
+        log('   Listening for speech...');
+      };
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          const isFinal = event.results[i].isFinal;
+          const confidence = event.results[i][0].confidence;
+          log(`${isFinal ? '✅ FINAL' : '📝 interim'}: "${transcript}" (${Math.round(confidence * 100)}%)`);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        log(`❌ ERROR: ${event.error}`, true);
+        log('\nError types:');
+        log('  network - Cannot reach speech service');
+        log('  audio-capture - Microphone not available');
+        log('  not-allowed - Microphone permission denied');
+        log('  no-speech - No speech detected');
+      };
+
+      recognition.onend = () => {
+        log('✅ Recognition ended');
+      };
+
+      try {
+        recognition.start();
+        log('✅ start() called successfully\n');
+      } catch (e) {
+        log('❌ Failed to start: ' + e.message, true);
+      }
+    }
+
+    // Test on page load
+    window.onload = () => {
+      log('Page loaded. Click buttons to run tests.\n');
+      testSupport();
+    };
+  </script>
+</body>
+
+</html>

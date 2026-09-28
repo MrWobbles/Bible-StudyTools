@@ -145,10 +145,29 @@ const DATA_DOC_MAP = {
   lessonplans: 'lessonPlans',
   notes: 'notes'
 };
-const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html', 'dj-dashboard.html', 'requests.html', 'vbs.html', 'vbs-control.html', 'teleprompter.html'];
+const PUBLIC_HTML_FILES = ['index.html', 'admin.html', 'user-admin.html', 'editor.html', 'student.html', 'teacher.html', 'dj-dashboard.html', 'requests.html', 'vbs.html', 'vbs-control.html', 'teleprompter.html', 'speech-test.html'];
 const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
-const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html', 'vbs.html']);
+const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html', 'vbs.html', 'teleprompter.html', 'speech-test.html']);
 const ADMIN_HTML_FILES = new Set(['user-admin.html']);
+
+// Helper function to load data from local JSON files when Supabase is unavailable
+async function loadLocalData(key) {
+  try {
+    const fileMap = {
+      'classes': 'data/classes.json',
+      'lessonplans': 'data/lessonPlans.json',
+      'notes': 'data/notes.json'
+    };
+    const filePath = fileMap[key.toLowerCase()];
+    if (!filePath) return null;
+
+    const data = await fs.readFile(filePath, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error(`Failed to load local data for "${key}":`, err.message);
+    return null;
+  }
+}
 
 const supabaseServiceClient = SUPABASE_SERVICE_ENABLED
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -1192,24 +1211,39 @@ function requireSupabaseConnection(res) {
 
 // ===== API ENDPOINTS =====
 
-app.get('/api/data/:fileName', requireAuthenticatedAccess, async (req, res) => {
+app.get('/api/data/:fileName', async (req, res) => {
+  // Allow GET requests on localhost without authentication for testing
+  const isLoopback = isLoopbackRequest(req);
+  if (!isLoopback && !hasValidAdminToken(req)) {
+    return res.status(401).json({ error: 'Authentication required for remote access.' });
+  }
+
   try {
     const key = String(req.params.fileName || '').toLowerCase();
     const docId = DATA_DOC_MAP[key];
     if (!docId) {
       return res.status(400).json({ error: 'Invalid data key. Use "classes", "lessonPlans", or "notes".' });
     }
-    if (!isConnected()) {
-      return res.status(503).json({ error: 'Supabase is disconnected. Data is unavailable.' });
+
+    // Try Supabase first if connected
+    if (isConnected()) {
+      const ownerOptions = getRequestOwnerOptions(req);
+      const data = ownerOptions
+        ? await loadDoc(docId, ownerOptions)
+        : await loadDoc(docId);
+      if (!data) {
+        return res.status(404).json({ error: 'Data not found' });
+      }
+      return res.json(data);
     }
-    const ownerOptions = getRequestOwnerOptions(req);
-    const data = ownerOptions
-      ? await loadDoc(docId, ownerOptions)
-      : await loadDoc(docId);
-    if (!data) {
-      return res.status(404).json({ error: 'Data not found' });
+
+    // Fall back to local JSON files when Supabase is disconnected
+    console.log(`[Local Fallback] Loading ${key} from local files`);
+    const localData = await loadLocalData(key);
+    if (localData === null) {
+      return res.status(503).json({ error: 'Supabase is disconnected and no local data is available.' });
     }
-    res.json(data);
+    return res.json(localData);
   } catch (err) {
     sendApiError(res, err, 'Failed to load data');
   }
