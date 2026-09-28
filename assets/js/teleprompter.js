@@ -523,12 +523,16 @@ function setupSpeechRecognition() {
       const now = Date.now();
       const timeSinceLastAdvance = now - lastAutoAdvanceTime;
 
-      // Try to match against upcoming points
-      const match = findBestMatch(finalTranscript, displayConfidence);
-      if (match && timeSinceLastAdvance > CONFIG.autoAdvanceDelay) {
-        debug(`Match found: "${match.text}" (score: ${match.score.toFixed(2)})`);
-        advanceToPoint(match.index);
+      // Use sequential word matching with fuzzy matching
+      const matchResult = matchWordsSequential(finalTranscript);
+      const AUTO_ADVANCE_THRESHOLD = 0.70; // 70% of words spoken = auto-advance
+
+      if (matchResult.percentage >= AUTO_ADVANCE_THRESHOLD && timeSinceLastAdvance > CONFIG.autoAdvanceDelay) {
+        debug(`✅ Match: ${matchResult.matchedCount}/${matchResult.totalWords} words (${Math.round(matchResult.percentage * 100)}%) - auto-advancing`);
+        advanceToPoint(currentPointIndex + 1);
         lastAutoAdvanceTime = now;
+      } else if (matchResult.matchedCount > 0) {
+        debug(`📊 Progress: ${matchResult.matchedCount}/${matchResult.totalWords} words (${Math.round(matchResult.percentage * 100)}%)`);
       }
     }
 
@@ -636,6 +640,101 @@ function findBestMatch(spokenText, confidence) {
   }
 
   return bestMatch;
+}
+
+// Levenshtein distance for fuzzy word matching
+function levenshteinDistance(str1, str2) {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const matrix = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(0));
+
+  for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+  for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  return matrix[len1][len2];
+}
+
+// Calculate fuzzy match score (0-1) between two words
+function fuzzyMatchWords(spokenWord, expectedWord) {
+  const s1 = spokenWord.toLowerCase();
+  const s2 = expectedWord.toLowerCase();
+
+  // Exact match = perfect score
+  if (s1 === s2) return 1;
+
+  // Allow phonetic variations (similar start = higher score)
+  if (s1.startsWith(s2.substring(0, 3)) || s2.startsWith(s1.substring(0, 3))) {
+    return 0.85;
+  }
+
+  const maxLen = Math.max(s1.length, s2.length);
+  const distance = levenshteinDistance(s1, s2);
+  const similarity = 1 - (distance / maxLen);
+
+  // Only return matches with >60% similarity
+  return similarity > 0.6 ? similarity : 0;
+}
+
+// Match spoken words sequentially to current point
+function matchWordsSequential(spokenText) {
+  if (!spokenText || allOutlinePoints.length === 0) return { matchedCount: 0, totalWords: 0, percentage: 0 };
+
+  const currentPoint = allOutlinePoints[currentPointIndex];
+  if (!currentPoint) return { matchedCount: 0, totalWords: 0, percentage: 0 };
+
+  // Extract words from point, filtering common words
+  const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'is', 'are', 'was', 'were', 'in', 'at', 'of', 'to', 'for', 'from', 'with', 'by', 'about', 'be', 'have', 'do']);
+  const pointWords = currentPoint.text
+    .split(/\s+/)
+    .filter(w => w && w.length > 0)
+    .map(w => w.replace(/[^\w]/g, '')) // Remove punctuation
+    .filter(w => !commonWords.has(w.toLowerCase()) && w.length > 0);
+
+  // Extract words from spoken text
+  const spokenWords = spokenText
+    .split(/\s+/)
+    .filter(w => w && w.length > 0)
+    .map(w => w.replace(/[^\w]/g, ''))
+    .filter(w => !commonWords.has(w.toLowerCase()) && w.length > 0);
+
+  if (pointWords.length === 0) return { matchedCount: 0, totalWords: 0, percentage: 0 };
+
+  // Try to match spoken words to point words sequentially
+  let matchedCount = 0;
+  let pointWordIndex = 0;
+
+  for (const spokenWord of spokenWords) {
+    if (pointWordIndex >= pointWords.length) break;
+
+    const expectedWord = pointWords[pointWordIndex];
+    const matchScore = fuzzyMatchWords(spokenWord, expectedWord);
+
+    if (matchScore > 0.65) {
+      matchedCount++;
+      pointWordIndex++;
+    }
+  }
+
+  const percentage = pointWords.length > 0 ? (matchedCount / pointWords.length) : 0;
+
+  return {
+    matchedCount,
+    totalWords: pointWords.length,
+    percentage: percentage,
+    spokenWords,
+    pointWords
+  };
 }
 
 // Simple text similarity calculation (Levenshtein-like)
