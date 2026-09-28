@@ -391,9 +391,17 @@ function withTimeout(promise, timeoutMs, timeoutMessage = 'Operation timed out')
 // Initialize on-device speech recognition (works offline - no network required)
 async function initializeOnDeviceSpeechRecognition() {
   const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const LANGUAGE_PACK_INSTALLED_KEY = 'bst_on_device_speech_installed';
 
   if (!SpeechRecognitionAPI) {
     debug('⚠️ Speech Recognition API not available in this browser');
+    return;
+  }
+
+  // Check if language pack has been previously installed
+  if (localStorage.getItem(LANGUAGE_PACK_INSTALLED_KEY) === 'true') {
+    debug('✅ On-device language pack cached - using offline mode');
+    window.onDeviceSpeechAvailable = true;
     return;
   }
 
@@ -401,7 +409,7 @@ async function initializeOnDeviceSpeechRecognition() {
   try {
     if (!SpeechRecognitionAPI.available) {
       debug('ℹ️ On-device speech recognition not available in this browser');
-      debug('ℹ️ Using standard Web Speech API (cloud-based with restricted networks)');
+      debug('ℹ️ Using standard Web Speech API (cloud-based)');
       return;
     }
 
@@ -421,6 +429,7 @@ async function initializeOnDeviceSpeechRecognition() {
     if (availability === 'available') {
       debug('✅ On-device speech recognition ready (offline mode)');
       window.onDeviceSpeechAvailable = true;
+      localStorage.setItem(LANGUAGE_PACK_INSTALLED_KEY, 'true');
     } else if (availability === 'downloading' || availability === 'downloadable') {
       debug('📥 Downloading on-device speech recognition language pack...');
       showStatusMessage('Downloading speech language pack...', 5000);
@@ -440,6 +449,7 @@ async function initializeOnDeviceSpeechRecognition() {
         if (installed) {
           debug('✅ Language pack installed! On-device speech recognition ready.');
           window.onDeviceSpeechAvailable = true;
+          localStorage.setItem(LANGUAGE_PACK_INSTALLED_KEY, 'true');
           showStatusMessage('✅ Ready! Speech recognition is offline now.', 3000);
         } else {
           debug('⚠️ Language pack installation failed');
