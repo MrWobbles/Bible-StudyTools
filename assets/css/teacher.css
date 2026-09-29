@@ -1262,6 +1262,29 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   font-weight: 500;
 }
 
+/* Speed Control Section */
+.teleprompter__speed-controls {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: 0 var(--space-md);
+  border-left: 1px solid var(--border-subtle);
+  padding-left: var(--space-lg);
+}
+
+.speed-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-blue);
+  min-width: 110px;
+  text-align: center;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-surface-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-family: "Courier New", monospace;
+}
+
 /* Main Content Area */
 .teleprompter__container {
   display: flex;

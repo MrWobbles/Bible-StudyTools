@@ -23,6 +23,12 @@ let targetScrollPosition = 0; // For smooth Lerp scrolling
 let currentScrollPosition = 0;
 let scrollAnimationId = null;
 
+// Constant-speed scroll mode (default mode)
+let scrollVelocity = 60; // pixels per second
+let isScrolling = true; // Paused vs playing
+let lastScrollTime = Date.now();
+let scrollLoopId = null;
+
 // Error tracking for diagnostics
 const errorLog = {
   errors: [],
@@ -937,37 +943,132 @@ function setupControls() {
   const resetBtn = document.getElementById('reset-scroll');
   const closeBtn = document.getElementById('close-teleprompter');
 
+  // New: Speed controls for constant-speed scroll mode
+  const playPauseBtn = document.getElementById('play-pause-scroll');
+  const speedUpBtn = document.getElementById('speed-up');
+  const speedDownBtn = document.getElementById('speed-down');
+  const speedResetBtn = document.getElementById('speed-reset');
+  const speedDisplay = document.getElementById('speed-display');
+
   toggleBtn.addEventListener('click', toggleListening);
   nextBtn.addEventListener('click', () => advanceToPoint(currentPointIndex + 1));
   prevBtn.addEventListener('click', () => advanceToPoint(currentPointIndex - 1));
   resetBtn.addEventListener('click', () => advanceToPoint(0));
   closeBtn.addEventListener('click', () => {
     if (isListening) toggleListening();
+    if (scrollLoopId) cancelAnimationFrame(scrollLoopId);
     window.close();
   });
+
+  // Speed control listeners
+  if (playPauseBtn) {
+    playPauseBtn.addEventListener('click', toggleScrolling);
+  }
+  if (speedUpBtn) {
+    speedUpBtn.addEventListener('click', () => changeScrollSpeed(10)); // +10 px/s
+  }
+  if (speedDownBtn) {
+    speedDownBtn.addEventListener('click', () => changeScrollSpeed(-10)); // -10 px/s
+  }
+  if (speedResetBtn) {
+    speedResetBtn.addEventListener('click', () => resetScrollSpeed());
+  }
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === ' ') {
       e.preventDefault();
-      toggleListening();
-    } else if (e.key === 'ArrowRight' || e.key === 'n') {
-      advanceToPoint(currentPointIndex + 1);
-    } else if (e.key === 'ArrowLeft' || e.key === 'p') {
-      advanceToPoint(currentPointIndex - 1);
+      toggleScrolling(); // Space for play/pause instead of speech toggle
+    } else if (e.key === 'ArrowRight' || e.key === '+' || e.key === '=') {
+      changeScrollSpeed(10);
+    } else if (e.key === 'ArrowLeft' || e.key === '-') {
+      changeScrollSpeed(-10);
+    } else if (e.key === 'r' || e.key === 'R') {
+      resetScrollSpeed();
     }
   });
 
-  // Scroll wheel support - manual velocity fallback (best practice)
+  // Scroll wheel support - manual velocity control
   const contentArea = document.getElementById('content-area');
   if (contentArea) {
     contentArea.addEventListener('wheel', (e) => {
-      // Allow natural scroll behavior - don't prevent default
-      // This gives users a fallback if speech recognition fails
-      // User can scroll manually at any time
+      // Scroll wheel controls speed
+      if (e.deltaY < 0) {
+        changeScrollSpeed(5); // Scroll up = speed up
+      } else if (e.deltaY > 0) {
+        changeScrollSpeed(-5); // Scroll down = slow down
+      }
     }, { passive: true });
   }
+
+  updateSpeedDisplay();
+  startScrollLoop(); // Start constant-speed scrolling by default
 }
+
+// Toggle scrolling on/off (play/pause)
+function toggleScrolling() {
+  isScrolling = !isScrolling;
+  const btn = document.getElementById('play-pause-scroll');
+  if (btn) {
+    btn.textContent = isScrolling ? '⏸️ Pause' : '▶️ Play';
+  }
+  debug(`${isScrolling ? '▶️ PLAYING' : '⏸️ PAUSED'} at ${scrollVelocity} px/s`);
+  showStatusMessage(`${isScrolling ? '▶️ Playing' : '⏸️ Paused'} - Speed: ${scrollVelocity} px/s`, 1500);
+}
+
+// Adjust scroll speed
+function changeScrollSpeed(delta) {
+  const minSpeed = 10; // Minimum 10 px/s
+  const maxSpeed = 200; // Maximum 200 px/s
+  scrollVelocity = Math.max(minSpeed, Math.min(maxSpeed, scrollVelocity + delta));
+  updateSpeedDisplay();
+  showStatusMessage(`📊 Speed: ${scrollVelocity} px/s (${(scrollVelocity / 60 * 100).toFixed(0)}%)`, 1200);
+  debug(`Speed changed to: ${scrollVelocity} px/s`);
+}
+
+// Reset scroll speed to default
+function resetScrollSpeed() {
+  scrollVelocity = 60;
+  updateSpeedDisplay();
+  showStatusMessage(`🔄 Speed reset to: ${scrollVelocity} px/s`, 1500);
+  debug('Speed reset to default: 60 px/s');
+}
+
+// Update speed display element
+function updateSpeedDisplay() {
+  const speedDisplay = document.getElementById('speed-display');
+  if (speedDisplay) {
+    const percentage = Math.round((scrollVelocity / 60) * 100);
+    speedDisplay.textContent = `${scrollVelocity} px/s (${percentage}%)`;
+  }
+}
+
+// Constant-speed scroll loop (runs continuously)
+function startScrollLoop() {
+  function scroll() {
+    if (!isScrolling) {
+      scrollLoopId = requestAnimationFrame(scroll);
+      return;
+    }
+
+    const now = Date.now();
+    const deltaTime = (now - lastScrollTime) / 1000; // Convert to seconds
+    lastScrollTime = now;
+
+    const contentArea = document.getElementById('content-area');
+    if (contentArea) {
+      // Update scroll position based on velocity
+      contentArea.scrollTop += scrollVelocity * deltaTime;
+    }
+
+    scrollLoopId = requestAnimationFrame(scroll);
+  }
+
+  scroll();
+}
+
+// Scroll wheel support - manual velocity fallback (best practice)
+
 
 // Toggle listening on/off
 // Toggle listening on/off

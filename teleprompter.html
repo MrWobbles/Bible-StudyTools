@@ -33,19 +33,40 @@
     <!-- Control Bar (Top) -->
     <header class="teleprompter__header">
       <div class="teleprompter__controls">
-        <button id="toggle-listening" class="btn-primary" title="Start/Stop listening">
+        <!-- Speech Recognition Controls -->
+        <button id="toggle-listening" class="btn-primary" title="Start/Stop listening (Space)">
           <span class="material-icons">mic</span>
           <span class="btn-label">Start Listening</span>
         </button>
-        <button id="manual-next" class="btn-secondary" title="Manually advance to next">
+
+        <!-- Scroll Navigation -->
+        <button id="manual-next" class="btn-secondary" title="Next point (→)">
           <span class="material-icons">skip_next</span>
         </button>
-        <button id="manual-prev" class="btn-secondary" title="Go to previous">
+        <button id="manual-prev" class="btn-secondary" title="Previous point (←)">
           <span class="material-icons">skip_previous</span>
         </button>
-        <button id="reset-scroll" class="btn-secondary" title="Reset scroll">
+        <button id="reset-scroll" class="btn-secondary" title="Reset to top">
           <span class="material-icons">refresh</span>
         </button>
+
+        <!-- Speed Control -->
+        <div class="teleprompter__speed-controls">
+          <button id="play-pause-scroll" class="btn-primary" title="Play/Pause scrolling (Space)">
+            <span class="material-icons">play_arrow</span>
+            <span class="btn-label">Play</span>
+          </button>
+          <button id="speed-down" class="btn-secondary" title="Slow down (-)" style="min-width: 40px;">
+            <span class="material-icons">remove</span>
+          </button>
+          <span id="speed-display" class="speed-text" title="Current scroll speed">60 px/s (100%)</span>
+          <button id="speed-up" class="btn-secondary" title="Speed up (+)" style="min-width: 40px;">
+            <span class="material-icons">add</span>
+          </button>
+          <button id="speed-reset" class="btn-secondary" title="Reset speed (R)">
+            <span class="material-icons">restore</span>
+          </button>
+        </div>
       </div>
       <div class="teleprompter__status">
         <span id="listening-status" class="status-indicator">Listening: OFF</span>
