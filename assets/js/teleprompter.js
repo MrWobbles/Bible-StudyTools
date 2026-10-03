@@ -249,7 +249,8 @@ function buildEditorNotesIndex() {
           blocks.push({
             text: text,
             html: buildLineHtml(el),
-            verse: el.querySelector('a[data-verse]')?.dataset.verse?.trim() || '',
+            verse: Array.from(el.querySelectorAll('a')).map(getVerseRef).find(Boolean) || '',
+            media: Array.from(el.querySelectorAll('a')).map(decodeTileMedia).find(Boolean) || null,
             type: tagName === 'li' ? 'bullet' : 'paragraph',
             sectionTitle: currentSection
           });
@@ -283,6 +284,7 @@ function buildEditorNotesIndex() {
       text: block.text,
       html: block.html,
       verse: block.verse,
+      media: block.media,
       url: block.url,
       title: block.title,
       type: block.type,
@@ -377,6 +379,28 @@ function safeMediaUrl(raw) {
   return '';
 }
 
+// Older saved notes lost data-verse, so a bare "#" link falls back to its text
+function getVerseRef(a) {
+  const explicit = a.dataset?.verse?.trim();
+  if (explicit) return explicit;
+  const href = (a.getAttribute('href') || '').trim();
+  const text = a.textContent.trim();
+  if ((href === '' || href === '#') && /^[1-3]?\s?[A-Za-z]+\.?\s+\d+/.test(text)) return text;
+  return '';
+}
+
+// Editor media tiles carry the full media object in a bst-media: href
+function decodeTileMedia(a) {
+  const href = (a.getAttribute('href') || '').trim();
+  if (!href.startsWith('bst-media:')) return null;
+  try {
+    const media = JSON.parse(decodeURIComponent(href.slice('bst-media:'.length)));
+    return media && typeof media === 'object' ? media : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 // Build a line's HTML, keeping links clickable and word-wrapping text
 function buildLineHtml(node) {
   return Array.from(node.childNodes).map((child) => {
@@ -384,7 +408,12 @@ function buildLineHtml(node) {
     if (child.nodeType !== Node.ELEMENT_NODE || child.tagName === 'IMG') return '';
     const inner = buildLineHtml(child);
     if (child.tagName === 'A') {
-      const verse = child.dataset?.verse?.trim();
+      const tileMedia = decodeTileMedia(child);
+      if (tileMedia) {
+        const label = tileMedia.title || tileMedia.reference || tileMedia.type || 'Media';
+        return `<a class="teleprompter__link teleprompter__link--tile" href="#" data-media="${escapeAttr(encodeURIComponent(JSON.stringify(tileMedia)))}">${wrapWordsInSpans(label)}</a>`;
+      }
+      const verse = getVerseRef(child);
       if (verse) {
         return `<a class="teleprompter__link teleprompter__link--verse" href="#" data-verse="${escapeAttr(verse)}">${inner}</a>`;
       }
@@ -424,12 +453,26 @@ function showImageOnDisplay(point) {
   });
 }
 
-function showVerseOnDisplay(reference) {
-  let translation = 'nkjv';
-  try { translation = localStorage.getItem('bible-translation-preference') || 'nkjv'; } catch (err) { }
+function showVerseOnDisplay(reference, translationOverride) {
+  let translation = translationOverride || 'nkjv';
+  if (!translationOverride) {
+    try { translation = localStorage.getItem('bible-translation-preference') || 'nkjv'; } catch (err) { }
+  }
   sendDisplayMessage({
     type: 'displayMedia',
     media: { type: 'verse', reference, translation, title: reference, fullscreen: true }
+  });
+}
+
+function showMediaOnDisplay(media) {
+  if (media.type === 'verse') {
+    showVerseOnDisplay(media.reference || media.title || '', media.translation);
+    return;
+  }
+  const type = media.type === 'images' ? 'image' : media.type;
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { ...media, type, fullscreen: type === 'image' }
   });
 }
 
@@ -457,6 +500,8 @@ function triggerMediaForIndex(index) {
     const point = allOutlinePoints[i];
     if (point.type === 'image' && i <= index) {
       active = { id: `image-${i}`, show: () => showImageOnDisplay(point) };
+    } else if (point.media && Math.max(0, i - 1) <= index) {
+      active = { id: `media-${i}`, show: () => showMediaOnDisplay(point.media) };
     } else if (point.verse && Math.max(0, i - 1) <= index) {
       active = { id: `verse-${i}`, show: () => showVerseOnDisplay(point.verse) };
     }
@@ -1169,7 +1214,9 @@ function setupControls() {
       const link = e.target.closest('a.teleprompter__link');
       if (!link) return;
       e.preventDefault();
-      if (link.dataset.verse) showVerseOnDisplay(link.dataset.verse);
+      if (link.dataset.media) {
+        try { showMediaOnDisplay(JSON.parse(decodeURIComponent(link.dataset.media))); } catch (err) { }
+      } else if (link.dataset.verse) showVerseOnDisplay(link.dataset.verse);
       else showLinkOnDisplay(link.dataset.url);
     });
 

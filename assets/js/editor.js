@@ -155,7 +155,18 @@ function initializeEditor() {
       Color,
       Underline,
       Highlight.configure({ multicolor: true }),
-      Link.configure({
+      Link.extend({
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            'data-verse': {
+              default: null,
+              parseHTML: (el) => el.getAttribute('data-verse'),
+              renderHTML: (attrs) => (attrs['data-verse'] ? { 'data-verse': attrs['data-verse'] } : {}),
+            },
+          };
+        },
+      }).configure({
         openOnClick: false,
         HTMLAttributes: {
           class: 'editor-link',
