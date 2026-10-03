@@ -1242,7 +1242,7 @@ function setupControls() {
     }
   });
 
-  // Scroll wheel support - manual velocity control
+  // Scroll sync and link clicks
   const contentArea = document.getElementById('content-area');
   if (contentArea) {
     contentArea.addEventListener('scroll', () => {
@@ -1258,18 +1258,49 @@ function setupControls() {
       } else if (link.dataset.verse) showVerseOnDisplay(link.dataset.verse);
       else showLinkOnDisplay(link.dataset.url);
     });
-
-    contentArea.addEventListener('wheel', (e) => {
-      // Scroll wheel controls speed
-      if (e.deltaY < 0) {
-        changeScrollSpeed(1); // Scroll up = speed up
-      } else if (e.deltaY > 0) {
-        changeScrollSpeed(-1); // Scroll down = slow down
-      }
   }
 
   updateSpeedDisplay();
   startScrollLoop(); // Start constant-speed scrolling by default
+  initClockAndMarker();
+}
+
+function initClockAndMarker() {
+  const marker = document.getElementById('reading-marker');
+  const area = document.getElementById('content-area');
+  const clockEl = document.getElementById('clock-display');
+  const timerEl = document.getElementById('timer-display');
+
+  // Matches the 30% reading line used by syncCurrentPointToScroll
+  const placeMarker = () => {
+    if (!marker || !area) return;
+    marker.style.top = `${area.offsetTop + area.clientHeight * 0.30}px`;
+  };
+  placeMarker();
+  window.addEventListener('resize', placeMarker);
+
+  let timerMs = 0;
+  let last = Date.now();
+  const pad = (n) => String(n).padStart(2, '0');
+  const tick = () => {
+    const now = Date.now();
+    if (isScrolling) timerMs += now - last;
+    last = now;
+    if (clockEl) clockEl.textContent = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (timerEl) {
+      const total = Math.floor(timerMs / 1000);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      timerEl.textContent = h ? `${h}:${pad(m)}:${pad(total % 60)}` : `${pad(m)}:${pad(total % 60)}`;
+    }
+  };
+  const reset = () => { timerMs = 0; last = Date.now(); tick(); };
+  timerEl?.addEventListener('click', reset);
+  timerEl?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.stopPropagation(); reset(); }
+  });
+  tick();
+  setInterval(tick, 500);
 }
 
 // Toggle scrolling on/off (play/pause)

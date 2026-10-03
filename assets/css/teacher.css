@@ -1457,6 +1457,49 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   flex-wrap: wrap;
 }
 
+.app--teleprompter {
+  position: relative;
+}
+
+.teleprompter__marker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30%;
+  height: 0;
+  border-top: 2px solid var(--accent-purple);
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.teleprompter__marker::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: -8px;
+  border-left: 12px solid var(--accent-purple);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+}
+
+.teleprompter__clock {
+  order: -1;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.teleprompter__clock-sep {
+  margin: 0 6px;
+}
+
+#timer-display {
+  cursor: pointer;
+}
+
 .progress-text {
   font-size: 14px;
   font-weight: 500;

@@ -106,7 +106,13 @@
     </div>
 
     <!-- Bottom Info -->
+    <div class="teleprompter__marker" id="reading-marker" aria-hidden="true"></div>
     <div class="teleprompter__footer">
+      <span class="teleprompter__clock" title="Clock | Timer (runs while scrolling; click to reset)">
+        <span id="clock-display">--:--</span>
+        <span class="teleprompter__clock-sep">|</span>
+        <span id="timer-display" role="button" tabindex="0">00:00</span>
+      </span>
       <span id="progress-display" class="progress-text"></span>
       <span id="speech-transcript" class="speech-text"></span>
     </div>
