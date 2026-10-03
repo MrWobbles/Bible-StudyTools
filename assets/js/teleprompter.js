@@ -249,6 +249,7 @@ function buildEditorNotesIndex() {
           blocks.push({
             text: text,
             html: buildLineHtml(el),
+            verse: el.querySelector('a[data-verse]')?.dataset.verse?.trim() || '',
             type: tagName === 'li' ? 'bullet' : 'paragraph',
             sectionTitle: currentSection
           });
@@ -281,6 +282,7 @@ function buildEditorNotesIndex() {
       index: idx,
       text: block.text,
       html: block.html,
+      verse: block.verse,
       url: block.url,
       title: block.title,
       type: block.type,
@@ -382,6 +384,10 @@ function buildLineHtml(node) {
     if (child.nodeType !== Node.ELEMENT_NODE || child.tagName === 'IMG') return '';
     const inner = buildLineHtml(child);
     if (child.tagName === 'A') {
+      const verse = child.dataset?.verse?.trim();
+      if (verse) {
+        return `<a class="teleprompter__link teleprompter__link--verse" href="#" data-verse="${escapeAttr(verse)}">${inner}</a>`;
+      }
       const url = safeMediaUrl(child.getAttribute('href'));
       if (!url) return inner;
       return `<a class="teleprompter__link" href="${escapeAttr(url)}" data-url="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
@@ -392,7 +398,7 @@ function buildLineHtml(node) {
 
 // Display channel shared with student.html
 let displayChannel = null;
-let shownMediaIndex = -1;
+let shownMediaId = null;
 
 function getDisplayChannelKey() {
   return classConfig.channelName || `class${classId}-control`;
@@ -418,6 +424,15 @@ function showImageOnDisplay(point) {
   });
 }
 
+function showVerseOnDisplay(reference) {
+  let translation = 'nkjv';
+  try { translation = localStorage.getItem('bible-translation-preference') || 'nkjv'; } catch (err) { }
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { type: 'verse', reference, translation, title: reference, fullscreen: true }
+  });
+}
+
 function showLinkOnDisplay(url) {
   const lower = url.toLowerCase();
   let type = 'link';
@@ -430,24 +445,29 @@ function showLinkOnDisplay(url) {
 }
 
 function clearDisplay() {
-  shownMediaIndex = -1;
+  shownMediaId = null;
   sendDisplayMessage({ type: 'clearScreen' });
 }
 
-// Show the latest image at or above the reading line; clear if the reader moved above all images
+// Images show when reached; a verse shows once the line before it is current
 function triggerMediaForIndex(index) {
-  let mediaIndex = -1;
-  for (let i = index; i >= 0; i--) {
-    if (allOutlinePoints[i]?.type === 'image') { mediaIndex = i; break; }
+  let active = null;
+  const last = Math.min(index + 1, allOutlinePoints.length - 1);
+  for (let i = 0; i <= last; i++) {
+    const point = allOutlinePoints[i];
+    if (point.type === 'image' && i <= index) {
+      active = { id: `image-${i}`, show: () => showImageOnDisplay(point) };
+    } else if (point.verse && Math.max(0, i - 1) <= index) {
+      active = { id: `verse-${i}`, show: () => showVerseOnDisplay(point.verse) };
+    }
   }
-  if (mediaIndex === shownMediaIndex) return;
-  const hadMedia = shownMediaIndex !== -1;
-  shownMediaIndex = mediaIndex;
-  if (mediaIndex === -1) {
-    if (hadMedia) sendDisplayMessage({ type: 'clearScreen' });
-  } else {
-    showImageOnDisplay(allOutlinePoints[mediaIndex]);
-  }
+
+  const activeId = active ? active.id : null;
+  if (activeId === shownMediaId) return;
+  const hadMedia = shownMediaId !== null;
+  shownMediaId = activeId;
+  if (active) active.show();
+  else if (hadMedia) sendDisplayMessage({ type: 'clearScreen' });
 }
 
 // Keep the current index in sync with the line at the reading position while scrolling
@@ -1100,24 +1120,37 @@ function setupControls() {
     playPauseBtn.addEventListener('click', toggleScrolling);
   }
   if (speedUpBtn) {
-    speedUpBtn.addEventListener('click', () => changeScrollSpeed(10)); // +10 px/s
+    speedUpBtn.addEventListener('click', (e) => changeScrollSpeed(e.shiftKey ? 1 : 5));
   }
   if (speedDownBtn) {
-    speedDownBtn.addEventListener('click', () => changeScrollSpeed(-10)); // -10 px/s
+    speedDownBtn.addEventListener('click', (e) => changeScrollSpeed(e.shiftKey ? -1 : -5));
   }
   if (speedResetBtn) {
     speedResetBtn.addEventListener('click', () => resetScrollSpeed());
   }
+  document.getElementById('speed-slider')?.addEventListener('input', (e) => setScrollSpeed(Number(e.target.value)));
+  document.getElementById('verse-prev')?.addEventListener('click', () => sendDisplayMessage({ type: 'versePrevious' }));
+  document.getElementById('verse-next')?.addEventListener('click', () => sendDisplayMessage({ type: 'verseNext' }));
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    if (e.target.matches?.('input[type="range"]')) e.target.blur();
+    const step = e.shiftKey ? 1 : 5;
     if (e.key === ' ') {
       e.preventDefault();
       toggleScrolling(); // Space for play/pause instead of speech toggle
     } else if (e.key === 'ArrowRight' || e.key === '+' || e.key === '=') {
-      changeScrollSpeed(10);
-    } else if (e.key === 'ArrowLeft' || e.key === '-') {
-      changeScrollSpeed(-10);
+      e.preventDefault();
+      changeScrollSpeed(step);
+    } else if (e.key === 'ArrowLeft' || e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      changeScrollSpeed(-step);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      sendDisplayMessage({ type: 'verseNext' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      sendDisplayMessage({ type: 'versePrevious' });
     } else if (e.key === 'r' || e.key === 'R') {
       resetScrollSpeed();
     } else if (e.key === 'c' || e.key === 'C') {
@@ -1136,15 +1169,16 @@ function setupControls() {
       const link = e.target.closest('a.teleprompter__link');
       if (!link) return;
       e.preventDefault();
-      showLinkOnDisplay(link.dataset.url);
+      if (link.dataset.verse) showVerseOnDisplay(link.dataset.verse);
+      else showLinkOnDisplay(link.dataset.url);
     });
 
     contentArea.addEventListener('wheel', (e) => {
       // Scroll wheel controls speed
       if (e.deltaY < 0) {
-        changeScrollSpeed(5); // Scroll up = speed up
+        changeScrollSpeed(1); // Scroll up = speed up
       } else if (e.deltaY > 0) {
-        changeScrollSpeed(-5); // Scroll down = slow down
+        changeScrollSpeed(-1); // Scroll down = slow down
       }
     }, { passive: true });
   }
@@ -1167,9 +1201,11 @@ function toggleScrolling() {
 
 // Adjust scroll speed
 function changeScrollSpeed(delta) {
-  const minSpeed = 10; // Minimum 10 px/s
-  const maxSpeed = 200; // Maximum 200 px/s
-  scrollVelocity = Math.max(minSpeed, Math.min(maxSpeed, scrollVelocity + delta));
+  setScrollSpeed(scrollVelocity + delta);
+}
+
+function setScrollSpeed(value) {
+  scrollVelocity = Math.max(5, Math.min(300, Math.round(value)));
   updateSpeedDisplay();
   showStatusMessage(`📊 Speed: ${scrollVelocity} px/s (${(scrollVelocity / 60 * 100).toFixed(0)}%)`, 1200);
   debug(`Speed changed to: ${scrollVelocity} px/s`);
@@ -1186,6 +1222,8 @@ function resetScrollSpeed() {
 // Update speed display element
 function updateSpeedDisplay() {
   const speedDisplay = document.getElementById('speed-display');
+  const speedSlider = document.getElementById('speed-slider');
+  if (speedSlider) speedSlider.value = scrollVelocity;
   if (speedDisplay) {
     const percentage = Math.round((scrollVelocity / 60) * 100);
     speedDisplay.textContent = `${scrollVelocity} px/s (${percentage}%)`;

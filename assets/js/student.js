@@ -783,6 +783,8 @@ async function renderVerseMedia(media) {
   const reference = (media.reference || media.title || '').trim();
   if (!reference) return;
 
+  if (media.fullscreen) document.body.classList.add('fullscreen-mode');
+
   if (player) {
     player.destroy();
     player = null;

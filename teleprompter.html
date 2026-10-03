@@ -57,6 +57,12 @@
         <button id="clear-display" class="btn-secondary" title="Clear student display (C)">
           <span class="material-icons">hide_image</span>
         </button>
+        <button id="verse-prev" class="btn-secondary" title="Previous verse page (Up arrow)">
+          <span class="material-icons">keyboard_arrow_up</span>
+        </button>
+        <button id="verse-next" class="btn-secondary" title="Next verse page (Down arrow)">
+          <span class="material-icons">keyboard_arrow_down</span>
+        </button>
 
         <!-- Speed Control -->
         <div class="teleprompter__speed-controls">
@@ -64,11 +70,12 @@
             <span class="material-icons">play_arrow</span>
             <span class="btn-label">Play</span>
           </button>
-          <button id="speed-down" class="btn-secondary" title="Slow down (-)" style="min-width: 40px;">
+          <button id="speed-down" class="btn-secondary" title="Slow down (-, Shift for fine)" style="min-width: 40px;">
             <span class="material-icons">remove</span>
           </button>
+          <input id="speed-slider" type="range" min="5" max="300" step="1" value="60" title="Scroll speed (px/s)" style="width: 140px;" />
           <span id="speed-display" class="speed-text" title="Current scroll speed">60 px/s (100%)</span>
-          <button id="speed-up" class="btn-secondary" title="Speed up (+)" style="min-width: 40px;">
+          <button id="speed-up" class="btn-secondary" title="Speed up (+, Shift for fine)" style="min-width: 40px;">
             <span class="material-icons">add</span>
           </button>
           <button id="speed-reset" class="btn-secondary" title="Reset speed (R)">
