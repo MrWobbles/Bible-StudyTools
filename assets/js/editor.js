@@ -1052,7 +1052,7 @@ async function fetchVerseFromLabs(reference, translation) {
 
 async function fetchVerseFromBibleApi(reference, translation) {
   const version = String(translation || 'web').toLowerCase();
-  const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(version)}`;
+  const url = `/api/bible/simple?reference=${encodeURIComponent(reference)}&translation=${encodeURIComponent(version)}`;
 
   try {
     const res = await fetch(url);

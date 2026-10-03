@@ -1399,6 +1399,25 @@ app.get('/api/bible/bibles', async (req, res) => {
   }
 });
 
+app.get('/api/bible/simple', async (req, res) => {
+  const reference = String(req.query.reference || '').trim();
+  const translation = String(req.query.translation || 'web').trim().toLowerCase();
+
+  if (!reference || reference.length > 200 || !/^[a-z0-9-]{1,20}$/.test(translation)) {
+    return res.status(400).json({ error: 'valid reference and translation are required' });
+  }
+
+  try {
+    const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(translation)}`;
+    const response = await fetch(url);
+    const body = await response.text();
+    res.status(response.status).type('application/json').send(body);
+  } catch (err) {
+    console.error('Error proxying bible-api.com request:', err);
+    res.status(502).json({ error: 'Failed to fetch passage from bible-api.com' });
+  }
+});
+
 app.get('/api/bible/passages', async (req, res) => {
   if (!API_BIBLE_KEY) {
     return res.status(503).json({ error: 'API_BIBLE_KEY is not configured on the server.' });
