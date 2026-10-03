@@ -421,6 +421,28 @@ function returnToDefaultView() {
   const playerDiv = document.querySelector('.player-shell');
   if (!playerDiv) return;
 
+  const shownImg = playerDiv.querySelector(':scope > img');
+  if (shownImg && !playerDiv.dataset.fadingOut) {
+    playerDiv.dataset.fadingOut = '1';
+    shownImg.style.transition = 'opacity 450ms ease, transform 450ms ease';
+    shownImg.style.opacity = '0';
+    shownImg.style.transform = 'scale(0.98)';
+    pendingMedia = null;
+    setTimeout(() => {
+      delete playerDiv.dataset.fadingOut;
+      if (pendingMedia) return;
+      resetToDefaultViewNow();
+    }, 450);
+    return;
+  }
+
+  resetToDefaultViewNow();
+}
+
+function resetToDefaultViewNow() {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
   pendingMedia = null;
   versePages = [];
   currentVersePageIndex = 0;
@@ -657,7 +679,18 @@ function handlePendingMedia() {
         player.destroy();
         player = null;
       }
-      playerDiv.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:contain;" alt="${pendingMedia.title || 'Image'}">`;
+      playerDiv.innerHTML = '';
+      const img = document.createElement('img');
+      img.alt = pendingMedia.title || 'Image';
+      img.style.cssText = 'width:100%; height:100%; object-fit:contain; opacity:0; transform:scale(0.98); transition:opacity 600ms ease, transform 600ms ease;';
+      const reveal = () => requestAnimationFrame(() => {
+        img.style.opacity = '1';
+        img.style.transform = 'scale(1)';
+      });
+      img.onload = reveal;
+      img.onerror = reveal;
+      img.src = imgUrl;
+      playerDiv.appendChild(img);
       if (pendingMedia.fullscreen) document.body.classList.add('fullscreen-mode');
       pendingMedia = null;
     }

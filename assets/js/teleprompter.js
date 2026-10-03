@@ -1199,7 +1199,20 @@ function setupControls() {
   if (speedResetBtn) {
     speedResetBtn.addEventListener('click', () => resetScrollSpeed());
   }
-  document.getElementById('speed-slider')?.addEventListener('input', (e) => setScrollSpeed(Number(e.target.value)));
+  const speedInput = document.getElementById('speed-input');
+  if (speedInput) {
+    const applyTypedSpeed = () => {
+      const value = Number(speedInput.value);
+      if (Number.isFinite(value) && speedInput.value !== '') setScrollSpeed(value);
+      else updateSpeedDisplay();
+    };
+    speedInput.addEventListener('change', applyTypedSpeed);
+    speedInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { applyTypedSpeed(); speedInput.blur(); }
+    });
+    speedInput.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+  }
   document.getElementById('verse-prev')?.addEventListener('click', () => sendDisplayMessage({ type: 'versePrevious' }));
   document.getElementById('verse-next')?.addEventListener('click', () => sendDisplayMessage({ type: 'verseNext' }));
 
@@ -1253,7 +1266,6 @@ function setupControls() {
       } else if (e.deltaY > 0) {
         changeScrollSpeed(-1); // Scroll down = slow down
       }
-    }, { passive: true });
   }
 
   updateSpeedDisplay();
@@ -1295,8 +1307,8 @@ function resetScrollSpeed() {
 // Update speed display element
 function updateSpeedDisplay() {
   const speedDisplay = document.getElementById('speed-display');
-  const speedSlider = document.getElementById('speed-slider');
-  if (speedSlider) speedSlider.value = scrollVelocity;
+  const speedInput = document.getElementById('speed-input');
+  if (speedInput) speedInput.value = scrollVelocity;
   if (speedDisplay) {
     const percentage = Math.round((scrollVelocity / 60) * 100);
     speedDisplay.textContent = `${scrollVelocity} px/s (${percentage}%)`;
