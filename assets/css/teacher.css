@@ -1290,6 +1290,7 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  min-height: 0;
   overflow: auto;
   padding: var(--space-xl);
   gap: var(--space-xl);
@@ -1398,6 +1399,49 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+}
+
+/* Continuous auto-scroll script */
+.teleprompter__script {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 0 70vh;
+  font-size: 40px;
+  line-height: 1.5;
+}
+
+.teleprompter__line {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  opacity: 0.55;
+  transition: opacity var(--duration-normal) var(--ease-standard);
+}
+
+.teleprompter__line.current {
+  opacity: 1;
+}
+
+.teleprompter__line--image img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+}
+
+.teleprompter__link {
+  color: var(--accent-blue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.teleprompter__line--heading {
+  font-size: 1.1em;
+  color: var(--accent-purple);
 }
 
 /* Footer */

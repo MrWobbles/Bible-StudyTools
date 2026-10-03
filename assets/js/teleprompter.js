@@ -25,7 +25,9 @@ let scrollAnimationId = null;
 
 // Constant-speed scroll mode (default mode)
 let scrollVelocity = 60; // pixels per second
-let isScrolling = true; // Paused vs playing
+let isScrolling = false; // Paused vs playing; user starts it with Play
+let isProgrammaticScroll = false; // True while a point-jump animation owns scrollTop
+let scrollRemainder = 0; // Sub-pixel carry so slow speeds still move
 let lastScrollTime = Date.now();
 let scrollLoopId = null;
 
@@ -208,30 +210,53 @@ function buildEditorNotesIndex() {
     let currentSection = classConfig.title || 'Notes';
 
     // Iterate through all block-level elements
-    const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li');
-    elements.forEach((el) => {
-      const text = el.textContent?.trim();
-      if (!text) return;
+    const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, img');
+    const seenImages = new Set();
+    const pushImage = (img) => {
+      if (seenImages.has(img)) return;
+      seenImages.add(img);
+      const url = safeMediaUrl(img.getAttribute('src'));
+      if (!url) return;
+      blocks.push({
+        text: '',
+        type: 'image',
+        url,
+        title: img.getAttribute('alt') || 'Image',
+        sectionTitle: currentSection
+      });
+    };
 
+    elements.forEach((el) => {
       const tagName = el.tagName.toLowerCase();
 
-      // Update section title on headings
-      if (tagName.startsWith('h')) {
-        currentSection = text;
-        // Add heading as a point
-        blocks.push({
-          text: text,
-          type: 'heading',
-          sectionTitle: currentSection
-        });
-      } else if (tagName === 'p' || tagName === 'li') {
-        // Add paragraph/list item as a point
-        blocks.push({
-          text: text,
-          type: tagName === 'li' ? 'bullet' : 'paragraph',
-          sectionTitle: currentSection
-        });
+      if (tagName === 'img') {
+        pushImage(el);
+        return;
       }
+
+      const text = el.textContent?.trim();
+      if (text) {
+        // Update section title on headings
+        if (tagName.startsWith('h')) {
+          currentSection = text;
+          blocks.push({
+            text: text,
+            html: buildLineHtml(el),
+            type: 'heading',
+            sectionTitle: currentSection
+          });
+        } else if (tagName === 'p' || tagName === 'li') {
+          blocks.push({
+            text: text,
+            html: buildLineHtml(el),
+            type: tagName === 'li' ? 'bullet' : 'paragraph',
+            sectionTitle: currentSection
+          });
+        }
+      }
+
+      // Images nested in a text block follow it in reading order
+      el.querySelectorAll('img').forEach(pushImage);
     });
 
     // If no blocks found, try splitting by sentences
@@ -255,6 +280,9 @@ function buildEditorNotesIndex() {
     allOutlinePoints = blocks.map((block, idx) => ({
       index: idx,
       text: block.text,
+      html: block.html,
+      url: block.url,
+      title: block.title,
       type: block.type,
       sectionTitle: block.sectionTitle,
       fullPoint: block
@@ -281,9 +309,11 @@ function renderInitialContent() {
 function updateCurrentPointDisplay() {
   if (allOutlinePoints.length === 0) {
     document.getElementById('current-section-title').textContent = 'No content found';
-    document.getElementById('current-point').innerHTML = '<div class="point-text">Load some editor notes to get started.</div>';
+    document.getElementById('script-flow').innerHTML = '<div class="point-text">Load some editor notes to get started.</div>';
     return;
   }
+
+  renderScriptFlow();
 
   // Clamp indices to valid range
   if (currentPointIndex >= allOutlinePoints.length) {
@@ -298,14 +328,10 @@ function updateCurrentPointDisplay() {
   // Update section title
   document.getElementById('current-section-title').textContent = currentPoint.sectionTitle || 'Content';
 
-  // Update current point (large, prominent display)
-  const currentPointEl = document.getElementById('current-point');
-  const pointTextHTML = wrapWordsInSpans(currentPoint.text);
-
-  currentPointEl.innerHTML = `
-    <div class="point-type-badge">${currentPoint.type || 'text'}</div>
-    <div class="point-text">${pointTextHTML}</div>
-  `;
+  // Highlight the current line
+  document.querySelectorAll('#script-flow .teleprompter__line.current').forEach(el => el.classList.remove('current'));
+  const currentPointEl = document.querySelector(`#script-flow [data-point-index="${currentPointIndex}"]`);
+  if (currentPointEl) currentPointEl.classList.add('current');
 
   // Update progress
   document.getElementById('progress-display').textContent =
@@ -314,30 +340,129 @@ function updateCurrentPointDisplay() {
   // Reset spoken words for new point
   spokenWords = [];
 
-  // Render upcoming points preview
-  renderUpcomingPoints();
-
-  // Scroll into view (smooth scroll)
-  currentPointEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-// Render upcoming points in preview area
-function renderUpcomingPoints() {
-  const upcomingContainer = document.getElementById('upcoming-points');
-  upcomingContainer.innerHTML = '';
+// Render every point once into one continuous scrollable script
+function renderScriptFlow() {
+  const flow = document.getElementById('script-flow');
+  if (flow.dataset.rendered === String(allOutlinePoints.length)) return;
 
-  for (let i = 1; i <= CONFIG.maxUpcomingPoints; i++) {
-    const idx = currentPointIndex + i;
-    if (idx >= allOutlinePoints.length) break;
+  flow.innerHTML = allOutlinePoints.map((point, idx) => {
+    if (point.type === 'image') {
+      return `<figure class="teleprompter__line teleprompter__line--image" data-point-index="${idx}"><img src="${escapeAttr(point.url)}" alt="${escapeAttr(point.title)}"></figure>`;
+    }
+    const tag = point.type === 'heading' ? 'h2' : 'div';
+    return `<${tag} class="teleprompter__line teleprompter__line--${point.type}" data-point-index="${idx}">${point.html ?? wrapWordsInSpans(point.text)}</${tag}>`;
+  }).join('');
+  flow.dataset.rendered = String(allOutlinePoints.length);
+}
 
-    const point = allOutlinePoints[idx];
-    const el = document.createElement('div');
-    el.className = 'teleprompter__point upcoming';
-    el.innerHTML = `
-      <div class="point-type-badge">${point.type || 'text'}</div>
-      <div class="point-text">${point.text}</div>
-    `;
-    upcomingContainer.appendChild(el);
+function escapeAttr(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Only allow http(s), same-site paths and inline images
+function safeMediaUrl(raw) {
+  const value = (raw || '').trim();
+  if (!value) return '';
+  if (/^data:image\//i.test(value)) return value;
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href;
+  } catch (err) {
+    return '';
+  }
+  return '';
+}
+
+// Build a line's HTML, keeping links clickable and word-wrapping text
+function buildLineHtml(node) {
+  return Array.from(node.childNodes).map((child) => {
+    if (child.nodeType === Node.TEXT_NODE) return wrapWordsInSpans(child.textContent);
+    if (child.nodeType !== Node.ELEMENT_NODE || child.tagName === 'IMG') return '';
+    const inner = buildLineHtml(child);
+    if (child.tagName === 'A') {
+      const url = safeMediaUrl(child.getAttribute('href'));
+      if (!url) return inner;
+      return `<a class="teleprompter__link" href="${escapeAttr(url)}" data-url="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+    }
+    return inner;
+  }).join('');
+}
+
+// Display channel shared with student.html
+let displayChannel = null;
+let shownMediaIndex = -1;
+
+function getDisplayChannelKey() {
+  return classConfig.channelName || `class${classId}-control`;
+}
+
+function sendDisplayMessage(message) {
+  const payload = { ...message, sentAt: Date.now() };
+  if (!displayChannel) {
+    if (window.bst?.createBroadcastChannel) {
+      displayChannel = window.bst.createBroadcastChannel(getDisplayChannelKey());
+    } else if ('BroadcastChannel' in window) {
+      displayChannel = new BroadcastChannel(getDisplayChannelKey());
+    }
+  }
+  if (displayChannel) displayChannel.postMessage(payload);
+  try { localStorage.setItem(`${getDisplayChannelKey()}-storage`, JSON.stringify(payload)); } catch (err) { }
+}
+
+function showImageOnDisplay(point) {
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { type: 'image', title: point.title || 'Image', url: point.url, sources: [{ url: point.url }], fullscreen: true }
+  });
+}
+
+function showLinkOnDisplay(url) {
+  const lower = url.toLowerCase();
+  let type = 'link';
+  if (lower.includes('youtube.com') || lower.includes('youtu.be') || /\.(mp4|webm|ogg)(\?|$)/.test(lower)) type = 'video';
+  else if (/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/.test(lower)) type = 'image';
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { type, title: 'Link', url, sources: [{ url }], fullscreen: type === 'image' }
+  });
+}
+
+function clearDisplay() {
+  shownMediaIndex = -1;
+  sendDisplayMessage({ type: 'clearScreen' });
+}
+
+// Show the latest image at or above the reading line; clear if the reader moved above all images
+function triggerMediaForIndex(index) {
+  let mediaIndex = -1;
+  for (let i = index; i >= 0; i--) {
+    if (allOutlinePoints[i]?.type === 'image') { mediaIndex = i; break; }
+  }
+  if (mediaIndex === shownMediaIndex) return;
+  const hadMedia = shownMediaIndex !== -1;
+  shownMediaIndex = mediaIndex;
+  if (mediaIndex === -1) {
+    if (hadMedia) sendDisplayMessage({ type: 'clearScreen' });
+  } else {
+    showImageOnDisplay(allOutlinePoints[mediaIndex]);
+  }
+}
+
+// Keep the current index in sync with the line at the reading position while scrolling
+function syncCurrentPointToScroll(container) {
+  const readingLine = container.getBoundingClientRect().top + container.clientHeight * 0.30;
+  const lines = document.querySelectorAll('#script-flow .teleprompter__line');
+  let found = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].getBoundingClientRect().top <= readingLine) found = i;
+    else break;
+  }
+  if (found !== currentPointIndex) {
+    currentPointIndex = found;
+    updateCurrentPointDisplay();
+    triggerMediaForIndex(found);
   }
 }
 
@@ -350,7 +475,7 @@ function wrapWordsInSpans(text) {
       return word;
     }
     // Wrap actual words in spans with data-word attribute
-    const sanitizedWord = word.replace(/[<>]/g, ''); // Basic XSS protection
+    const sanitizedWord = word.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return `<span class="teleprompter__word" data-word-idx="${idx}">${sanitizedWord}</span>`;
   }).join('');
 }
@@ -367,7 +492,7 @@ function markWordsAsRead(transcript) {
   const transcriptWords = transcript.toLowerCase().split(/\s+/).filter(w => w.length > 0);
 
   // Get all word spans
-  const wordSpans = document.querySelectorAll('.teleprompter__word');
+  const wordSpans = document.querySelectorAll('#script-flow .teleprompter__line.current .teleprompter__word');
   if (wordSpans.length === 0) return;
 
   // Build current point text words (normalized)
@@ -757,8 +882,11 @@ function smoothScrollToPoint(pointIndex) {
   if (!pointElement) return;
 
   const container = document.getElementById('content-area');
-  const targetOffset = pointElement.offsetTop - (container.clientHeight * 0.30); // Keep at 30% from top
+  const containerTop = container.getBoundingClientRect().top;
+  const targetOffset = container.scrollTop + pointElement.getBoundingClientRect().top - containerTop - (container.clientHeight * 0.30); // Keep at 30% from top
   targetScrollPosition = Math.max(0, targetOffset);
+  currentScrollPosition = container.scrollTop;
+  isProgrammaticScroll = true;
 
   // Cancel any existing animation
   if (scrollAnimationId) {
@@ -786,6 +914,8 @@ function smoothScrollToPoint(pointIndex) {
     } else {
       container.scrollTop = targetScrollPosition;
       currentScrollPosition = targetScrollPosition;
+      isProgrammaticScroll = false;
+      scrollRemainder = 0;
     }
   }
 
@@ -930,6 +1060,7 @@ function advanceToPoint(pointIndex) {
 
   currentPointIndex = pointIndex;
   updateCurrentPointDisplay();
+  triggerMediaForIndex(pointIndex);
   smoothScrollToPoint(pointIndex); // Use Lerp scrolling instead of instant snap
   consecutiveHighConfidenceMatches = 0; // Reset streak on manual advance
   isTrackingFrozen = false;
@@ -954,6 +1085,10 @@ function setupControls() {
   nextBtn.addEventListener('click', () => advanceToPoint(currentPointIndex + 1));
   prevBtn.addEventListener('click', () => advanceToPoint(currentPointIndex - 1));
   resetBtn.addEventListener('click', () => advanceToPoint(0));
+  document.getElementById('open-display')?.addEventListener('click', () => {
+    window.open(`student.html?class=${classId}`, 'display-screen', 'width=1280,height=720');
+  });
+  document.getElementById('clear-display')?.addEventListener('click', clearDisplay);
   closeBtn.addEventListener('click', () => {
     if (isListening) toggleListening();
     if (scrollLoopId) cancelAnimationFrame(scrollLoopId);
@@ -985,12 +1120,25 @@ function setupControls() {
       changeScrollSpeed(-10);
     } else if (e.key === 'r' || e.key === 'R') {
       resetScrollSpeed();
+    } else if (e.key === 'c' || e.key === 'C') {
+      clearDisplay();
     }
   });
 
   // Scroll wheel support - manual velocity control
   const contentArea = document.getElementById('content-area');
   if (contentArea) {
+    contentArea.addEventListener('scroll', () => {
+      if (!isProgrammaticScroll) syncCurrentPointToScroll(contentArea);
+    }, { passive: true });
+
+    contentArea.addEventListener('click', (e) => {
+      const link = e.target.closest('a.teleprompter__link');
+      if (!link) return;
+      e.preventDefault();
+      showLinkOnDisplay(link.dataset.url);
+    });
+
     contentArea.addEventListener('wheel', (e) => {
       // Scroll wheel controls speed
       if (e.deltaY < 0) {
@@ -1008,9 +1156,10 @@ function setupControls() {
 // Toggle scrolling on/off (play/pause)
 function toggleScrolling() {
   isScrolling = !isScrolling;
+  lastScrollTime = Date.now();
   const btn = document.getElementById('play-pause-scroll');
   if (btn) {
-    btn.textContent = isScrolling ? '⏸️ Pause' : '▶️ Play';
+    btn.innerHTML = `<span class="material-icons">${isScrolling ? 'pause' : 'play_arrow'}</span><span class="btn-label">${isScrolling ? 'Pause' : 'Play'}</span>`;
   }
   debug(`${isScrolling ? '▶️ PLAYING' : '⏸️ PAUSED'} at ${scrollVelocity} px/s`);
   showStatusMessage(`${isScrolling ? '▶️ Playing' : '⏸️ Paused'} - Speed: ${scrollVelocity} px/s`, 1500);
@@ -1046,19 +1195,23 @@ function updateSpeedDisplay() {
 // Constant-speed scroll loop (runs continuously)
 function startScrollLoop() {
   function scroll() {
-    if (!isScrolling) {
-      scrollLoopId = requestAnimationFrame(scroll);
-      return;
-    }
-
     const now = Date.now();
     const deltaTime = (now - lastScrollTime) / 1000; // Convert to seconds
     lastScrollTime = now;
 
+    if (!isScrolling || isProgrammaticScroll) {
+      scrollLoopId = requestAnimationFrame(scroll);
+      return;
+    }
+
     const contentArea = document.getElementById('content-area');
     if (contentArea) {
-      // Update scroll position based on velocity
-      contentArea.scrollTop += scrollVelocity * deltaTime;
+      scrollRemainder += scrollVelocity * deltaTime;
+      const whole = Math.floor(scrollRemainder);
+      if (whole > 0) {
+        scrollRemainder -= whole;
+        contentArea.scrollTop += whole;
+      }
     }
 
     scrollLoopId = requestAnimationFrame(scroll);

@@ -644,6 +644,7 @@ function handlePendingMedia() {
         player = null;
       }
       playerDiv.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:contain;" alt="${pendingMedia.title || 'Image'}">`;
+      if (pendingMedia.fullscreen) document.body.classList.add('fullscreen-mode');
       pendingMedia = null;
     }
   } else if (pendingMedia.type === 'pdf' || pendingMedia.type === 'document') {

@@ -50,6 +50,14 @@
           <span class="material-icons">refresh</span>
         </button>
 
+        <!-- Student display -->
+        <button id="open-display" class="btn-secondary" title="Open student display window">
+          <span class="material-icons">cast</span>
+        </button>
+        <button id="clear-display" class="btn-secondary" title="Clear student display (C)">
+          <span class="material-icons">hide_image</span>
+        </button>
+
         <!-- Speed Control -->
         <div class="teleprompter__speed-controls">
           <button id="play-pause-scroll" class="btn-primary" title="Play/Pause scrolling (Space)">
@@ -80,31 +88,20 @@
     </header>
 
     <!-- Main Content Area -->
-    <div class="teleprompter__container">
-      <!-- Current & Next Points Display -->
+<div class="teleprompter__container" id="content-area">
       <div class="teleprompter__content" id="teleprompter-content">
         <div class="teleprompter__section-title" id="current-section-title">
           Loading...
         </div>
 
-        <div class="teleprompter__points-list">
-          <!-- Current point (highlighted) -->
-          <div class="teleprompter__point current" id="current-point">
-            <div class="point-text">Ready to start</div>
-          </div>
-
-          <!-- Upcoming points (preview) -->
-          <div id="upcoming-points" class="teleprompter__upcoming">
-            <!-- Dynamically populated -->
-          </div>
-        </div>
+        <div class="teleprompter__script" id="script-flow"></div>
       </div>
+    </div>
 
-      <!-- Bottom Info -->
-      <div class="teleprompter__footer">
-        <span id="progress-display" class="progress-text"></span>
-        <span id="speech-transcript" class="speech-text"></span>
-      </div>
+    <!-- Bottom Info -->
+    <div class="teleprompter__footer">
+      <span id="progress-display" class="progress-text"></span>
+      <span id="speech-transcript" class="speech-text"></span>
     </div>
 
     <!-- Debug Panel (Optional) -->
