@@ -229,6 +229,12 @@ function buildEditorNotesIndex() {
     elements.forEach((el) => {
       const tagName = el.tagName.toLowerCase();
 
+      // A paragraph inside a list item is already covered by the li
+      if (tagName === 'p' && el.closest('li')) {
+        el.querySelectorAll('img').forEach(pushImage);
+        return;
+      }
+
       if (tagName === 'img') {
         pushImage(el);
         return;
@@ -1199,7 +1205,7 @@ function setupControls() {
     } else if (e.key === 'r' || e.key === 'R') {
       resetScrollSpeed();
     } else if (e.key === 'c' || e.key === 'C') {
-      clearDisplay();
+      sendDisplayMessage({ type: 'blackout' });
     }
   });
 

@@ -202,6 +202,7 @@ function handleRemoteCommand(event) {
       }
       break;
     case 'displayMedia':
+      document.getElementById('blackout-overlay')?.remove();
       console.log('[Student] Received displayMedia:', data.media);
       pendingMedia = data.media;
       // Try to handle immediately if DOM is ready, otherwise it will be handled on player ready
@@ -209,7 +210,20 @@ function handleRemoteCommand(event) {
         handlePendingMedia();
       }
       break;
+    case 'blackout': {
+      const existing = document.getElementById('blackout-overlay');
+      if (existing) {
+        existing.remove();
+      } else {
+        const overlay = document.createElement('div');
+        overlay.id = 'blackout-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483647;cursor:none;';
+        document.body.appendChild(overlay);
+      }
+      break;
+    }
     case 'clearScreen':
+      document.getElementById('blackout-overlay')?.remove();
       if (typeof window.returnToDefaultView === 'function') {
         console.log('[Student] Clearing screen and returning to default view');
         window.returnToDefaultView();
