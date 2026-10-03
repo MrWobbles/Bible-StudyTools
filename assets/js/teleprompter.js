@@ -240,7 +240,9 @@ function buildEditorNotesIndex() {
         return;
       }
 
-      const text = el.textContent?.trim();
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll('ul, ol').forEach(n => n.remove());
+      const text = clone.textContent?.trim();
       if (text) {
         // Update section title on headings
         if (tagName.startsWith('h')) {
@@ -412,6 +414,8 @@ function buildLineHtml(node) {
   return Array.from(node.childNodes).map((child) => {
     if (child.nodeType === Node.TEXT_NODE) return wrapWordsInSpans(child.textContent);
     if (child.nodeType !== Node.ELEMENT_NODE || child.tagName === 'IMG') return '';
+    // Nested list items are emitted as their own lines
+    if (child.tagName === 'UL' || child.tagName === 'OL') return '';
     const inner = buildLineHtml(child);
     if (child.tagName === 'A') {
       const tileMedia = decodeTileMedia(child);
@@ -1137,8 +1141,24 @@ function advanceToPoint(pointIndex) {
   isTrackingFrozen = false;
 }
 
+// Small live preview of the student display, same approach as the teacher view
+function setupStudentPreview() {
+  if (document.getElementById('student-preview-shell')) return;
+  const shell = document.createElement('div');
+  shell.id = 'student-preview-shell';
+  shell.style.cssText = 'position:fixed;bottom:20px;right:20px;width:320px;height:180px;border:1px solid #ccc;z-index:1000;pointer-events:none;overflow:hidden;background:#000;';
+  const frame = document.createElement('iframe');
+  frame.id = 'student-preview';
+  frame.title = 'Student display preview';
+  frame.src = `${window.location.origin}/student.html?class=${encodeURIComponent(classId)}`;
+  frame.style.cssText = 'position:absolute;top:0;left:0;border:0;width:1280px;height:720px;transform:scale(0.25);transform-origin:top left;';
+  shell.appendChild(frame);
+  document.body.appendChild(shell);
+}
+
 // Setup manual controls
 function setupControls() {
+  setupStudentPreview();
   const toggleBtn = document.getElementById('toggle-listening');
   const nextBtn = document.getElementById('manual-next');
   const prevBtn = document.getElementById('manual-prev');
