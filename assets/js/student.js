@@ -883,6 +883,12 @@ async function getApiBibleMap() {
 }
 
 async function fetchVerseData(reference, preferredTranslations) {
+  // Dashes and nbsp from typed or pasted references break the lookup APIs
+  reference = String(reference || '')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/[\u00a0\u2000-\u200b]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const apiBibleMap = await getApiBibleMap();
 
   for (const translation of preferredTranslations) {
