@@ -602,8 +602,8 @@ function handlePendingMedia() {
 
     // Check if it's a local video file (not YouTube)
     const isLocalVideo = videoUrl && (
-      videoUrl.endsWith('.mp4') || 
-      videoUrl.endsWith('.webm') || 
+      videoUrl.endsWith('.mp4') ||
+      videoUrl.endsWith('.webm') ||
       videoUrl.endsWith('.ogg') ||
       videoUrl.startsWith('assets/') ||
       videoUrl.startsWith('./assets/')
@@ -861,7 +861,7 @@ async function renderVerseMedia(media) {
     playerDiv.innerHTML = `
       <div id="verse-stage-wrap" style="height:100%; width:100%; position:relative; overflow:hidden; background:#fff;">
         <div id="verse-stage" style="width:${VERSE_STAGE_WIDTH}px; height:${VERSE_STAGE_HEIGHT}px; position:absolute; top:0; left:0; background:#fff; transform-origin: top left;">
-          <div id="verse-content" class="verse-content" style="position:absolute; left:40px; right:40px; top:40px; bottom:120px; font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:hidden; color:#000; font-family:'Source Sans Pro','Segoe UI',Arial,sans-serif;"></div>
+          <div id="verse-content" class="verse-content" style="position:absolute; left:40px; right:40px; top:40px; bottom:120px; font-size:${verseFontSize}px; line-height:${verseLineHeight}; overflow:visible; word-wrap:break-word; overflow-wrap:break-word; color:#000; font-family:'Source Sans Pro','Segoe UI',Arial,sans-serif;"></div>
           <div class="verse-meta" style="position:absolute;bottom:30px;right:40px;text-align:right;">
             <h2 class="verse-title" style="color:#000;font-size:24px;margin:0 0 8px 0;">${escapeHtml(title)}</h2>
             <div class="verse-source" style="color:#666;font-size:18px;">${escapeHtml(sourceLabel)}</div>
@@ -904,7 +904,7 @@ const API_BIBLE_FALLBACKS = new Set(['web', 'kjv', 'esv', 'niv', 'nasb', 'nlt', 
 
 async function getApiBibleMap() {
   if (apiBibleMapCache) return apiBibleMapCache;
-  
+
   apiBibleMapCache = {
     'nkjv': '63097d2a0a2f7db3-01',
     'kjv': 'de4e12af7f28f599-01',
@@ -982,7 +982,7 @@ async function fetchVerseData(reference, preferredTranslations) {
 
 async function fetchFromApiBible(reference, bibleId, translation = '') {
   const url = `/api/bible/passages?bibleId=${encodeURIComponent(bibleId)}&reference=${encodeURIComponent(reference)}`;
-  
+
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -1161,15 +1161,30 @@ function splitLongLine(text, measurer, maxHeight) {
 
   for (const word of words) {
     const candidate = current ? `${current} ${word}` : word;
-    measurer.innerHTML = `<p style="margin:0; padding:0;">${candidate}</p>`;
+    measurer.innerHTML = `<p style="margin:0; padding:0; word-wrap: break-word; overflow-wrap: break-word;">${candidate}</p>`;
     const para = measurer.firstElementChild;
     const height = para ? para.getBoundingClientRect().height : 0;
 
     if (height <= maxHeight) {
       current = candidate;
     } else {
+      // If we have previous content, save it as a chunk and start fresh with the new word
       if (current) chunks.push(current);
-      current = word;
+
+      // If the word itself is larger than maxHeight, we still need to add it
+      // (it will wrap naturally due to CSS word-wrap)
+      measurer.innerHTML = `<p style="margin:0; padding:0; word-wrap: break-word; overflow-wrap: break-word;">${word}</p>`;
+      const wordPara = measurer.firstElementChild;
+      const wordHeight = wordPara ? wordPara.getBoundingClientRect().height : 0;
+
+      if (wordHeight > maxHeight) {
+        // Word is too long, add it as its own chunk
+        chunks.push(word);
+        current = '';
+      } else {
+        // Word fits, start accumulating on fresh chunk
+        current = word;
+      }
     }
   }
 
@@ -1222,13 +1237,19 @@ function buildVersePages(lines) {
   measurer.style.whiteSpace = 'normal';
   measurer.style.margin = '0';
   measurer.style.padding = '0';
+  measurer.style.boxSizing = 'border-box';
+  measurer.style.wordWrap = 'break-word';
+  measurer.style.overflowWrap = 'break-word';
   document.body.appendChild(measurer);
 
   let currentPage = document.createElement('div');
   currentPage.className = 'verse-page';
   currentPage.style.display = 'none';
   currentPage.style.height = '100%';
-  currentPage.style.overflow = 'hidden';
+  currentPage.style.overflow = 'visible';
+  currentPage.style.wordWrap = 'break-word';
+  currentPage.style.overflowWrap = 'break-word';
+  currentPage.style.boxSizing = 'border-box';
   let currentHeight = 0;
 
   const finalizePage = () => {
@@ -1239,7 +1260,10 @@ function buildVersePages(lines) {
     currentPage.className = 'verse-page';
     currentPage.style.display = 'none';
     currentPage.style.height = '100%';
-    currentPage.style.overflow = 'hidden';
+    currentPage.style.overflow = 'visible';
+    currentPage.style.wordWrap = 'break-word';
+    currentPage.style.overflowWrap = 'break-word';
+    currentPage.style.boxSizing = 'border-box';
     currentHeight = 0;
   };
 
@@ -1266,7 +1290,7 @@ function buildVersePages(lines) {
 
     // Add all chunks from this line
     linesToAdd.forEach((chunk, chunkIdx) => {
-      measurer.innerHTML = `<p style="margin:0; padding:0;">${chunk}</p>`;
+      measurer.innerHTML = `<p style="margin:0; padding:0; word-wrap: break-word; overflow-wrap: break-word;">${chunk}</p>`;
       const chunkPara = measurer.firstElementChild;
       const chunkHeight = chunkPara ? chunkPara.getBoundingClientRect().height : 0;
 
@@ -1278,6 +1302,8 @@ function buildVersePages(lines) {
       const p = document.createElement('p');
       p.style.margin = '0';
       p.style.padding = '0';
+      p.style.wordWrap = 'break-word';
+      p.style.overflowWrap = 'break-word';
       p.innerHTML = chunk;
       currentPage.appendChild(p);
       currentHeight += chunkHeight;
@@ -1413,9 +1439,9 @@ function extractVideoInfo(url) {
       const h = timeStr.match(/(\d+)h/i);
       const m = timeStr.match(/(\d+)m/i);
       const s = timeStr.match(/(\d+)s/i);
-      start = (h ? parseInt(h[1], 10) * 3600 : 0) + 
-              (m ? parseInt(m[1], 10) * 60 : 0) + 
-              (s ? parseInt(s[1], 10) : 0);
+      start = (h ? parseInt(h[1], 10) * 3600 : 0) +
+        (m ? parseInt(m[1], 10) * 60 : 0) +
+        (s ? parseInt(s[1], 10) : 0);
     }
   }
 

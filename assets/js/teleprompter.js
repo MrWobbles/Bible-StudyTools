@@ -24,7 +24,7 @@ let currentScrollPosition = 0;
 let scrollAnimationId = null;
 
 // Constant-speed scroll mode (default mode)
-let scrollVelocity = 60; // pixels per second
+let scrollVelocity = 23; // pixels per second
 let isScrolling = false; // Paused vs playing; user starts it with Play
 let isProgrammaticScroll = false; // True while a point-jump animation owns scrollTop
 let scrollRemainder = 0; // Sub-pixel carry so slow speeds still move
@@ -1200,6 +1200,27 @@ function setupControls() {
   if (playPauseBtn) {
     playPauseBtn.addEventListener('click', toggleScrolling);
   }
+
+  // Edit speed button
+  const editSpeedBtn = document.getElementById('edit-speed');
+  const speedEditControls = document.getElementById('speed-edit-controls');
+  const speedDoneBtn = document.getElementById('speed-done');
+
+  if (editSpeedBtn) {
+    editSpeedBtn.addEventListener('click', () => {
+      speedEditControls.style.display = speedEditControls.style.display === 'none' ? 'flex' : 'none';
+      if (speedEditControls.style.display === 'flex') {
+        document.getElementById('speed-input')?.focus();
+      }
+    });
+  }
+
+  if (speedDoneBtn) {
+    speedDoneBtn.addEventListener('click', () => {
+      speedEditControls.style.display = 'none';
+    });
+  }
+
   if (speedUpBtn) {
     speedUpBtn.addEventListener('click', (e) => changeScrollSpeed(e.shiftKey ? 1 : 5));
   }
@@ -1336,16 +1357,16 @@ function changeScrollSpeed(delta) {
 function setScrollSpeed(value) {
   scrollVelocity = Math.max(5, Math.min(300, Math.round(value)));
   updateSpeedDisplay();
-  showStatusMessage(`📊 Speed: ${scrollVelocity} px/s (${(scrollVelocity / 60 * 100).toFixed(0)}%)`, 1200);
+  showStatusMessage(`📊 Speed: ${scrollVelocity} px/s (${(scrollVelocity / 23 * 100).toFixed(0)}%)`, 1200);
   debug(`Speed changed to: ${scrollVelocity} px/s`);
 }
 
 // Reset scroll speed to default
 function resetScrollSpeed() {
-  scrollVelocity = 60;
+  scrollVelocity = 23;
   updateSpeedDisplay();
   showStatusMessage(`🔄 Speed reset to: ${scrollVelocity} px/s`, 1500);
-  debug('Speed reset to default: 60 px/s');
+  debug('Speed reset to default: 23 px/s');
 }
 
 // Update speed display element
@@ -1354,7 +1375,7 @@ function updateSpeedDisplay() {
   const speedInput = document.getElementById('speed-input');
   if (speedInput) speedInput.value = scrollVelocity;
   if (speedDisplay) {
-    const percentage = Math.round((scrollVelocity / 60) * 100);
+    const percentage = Math.round((scrollVelocity / 23) * 100);
     speedDisplay.textContent = `${scrollVelocity} px/s (${percentage}%)`;
   }
 }

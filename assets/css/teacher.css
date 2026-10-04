@@ -1285,6 +1285,27 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   font-family: "Courier New", monospace;
 }
 
+.teleprompter__speed-edit-controls {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+#speed-input {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-secondary);
+  color: var(--text-primary);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-family: "Courier New", monospace;
+}
+
+#speed-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background: var(--bg-surface-tertiary);
+}
+
 /* Main Content Area */
 .teleprompter__container {
   display: flex;
@@ -1504,12 +1525,31 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   opacity: 1;
 }
 
+.teleprompter__line--image {
+  position: relative;
+  margin-left: 120px;
+  padding-bottom: 1em;
+}
+
 .teleprompter__line--image img {
-  display: block;
-  max-width: 100%;
-  max-height: 60vh;
-  margin: 0 auto;
+  position: absolute;
+  left: -120px;
+  top: 0;
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
   border-radius: var(--radius-md);
+}
+
+.teleprompter__line--image::after {
+  content: "";
+  position: absolute;
+  left: -15px;
+  top: 50%;
+  width: 10px;
+  height: 2px;
+  background-color: var(--accent-purple);
+  opacity: 0.5;
 }
 
 .teleprompter__link {
