@@ -10,6 +10,7 @@ let isListening = false;
 let userInitiatedStop = false; // Track if user explicitly stopped, vs error/restart
 let listeningTimeout = null;
 let recognitionInstance = null;
+let speechRecognitionSetup = false;
 let spokenWords = []; // Track words that have been spoken
 let networkErrorCount = 0; // Track consecutive network errors
 const MAX_NETWORK_RETRIES = 3; // Stop retrying after this many network errors
@@ -145,17 +146,11 @@ async function initializePage() {
     renderInitialContent();
     debug(`✓ Rendered initial content`);
 
-    // Initialize on-device speech recognition (works offline)
-    await initializeOnDeviceSpeechRecognition();
-
-    setupSpeechRecognition();
-    debug(`✓ Speech recognition ready`);
-
     setupControls();
     debug(`✓ Controls initialized`);
 
     debug('✅ Teleprompter initialization complete!');
-    showStatusMessage('Ready to go! Click the microphone to start.', 3000);
+    showStatusMessage('Ready to go! Click the microphone to start speech recognition.', 3000);
   } catch (err) {
     console.error('Failed to initialize teleprompter:', err);
     errorLog.addError(`Initialization failed: ${err.message}`, { error: err.toString() });
@@ -365,7 +360,7 @@ function renderScriptFlow() {
 
   flow.innerHTML = allOutlinePoints.map((point, idx) => {
     if (point.type === 'image') {
-      return `<figure class="teleprompter__line teleprompter__line--image" data-point-index="${idx}"><img src="${escapeAttr(point.url)}" alt="${escapeAttr(point.title)}"></figure>`;
+      return `<figure class="teleprompter__line teleprompter__line--image" data-point-index="${idx}" style="background:red;height:1px;left:-100px;width:calc(100% + 100px);"><img src="${escapeAttr(point.url)}" alt="${escapeAttr(point.title)}"></figure>`;
     }
     const tag = point.type === 'heading' ? 'h2' : 'div';
     return `<${tag} class="teleprompter__line teleprompter__line--${point.type}" data-point-index="${idx}">${point.html ?? wrapWordsInSpans(point.text)}</${tag}>`;
@@ -1503,7 +1498,15 @@ function startScrollViewUpdater() {
 }
 
 // Scroll wheel support - manual velocity fallback (best practice)
-function toggleListening() {
+async function toggleListening() {
+  // Lazy-initialize speech recognition on first use
+  if (!speechRecognitionSetup) {
+    await initializeOnDeviceSpeechRecognition();
+    setupSpeechRecognition();
+    speechRecognitionSetup = true;
+    debug('✓ Speech recognition initialized on first use');
+  }
+
   if (!recognitionInstance) {
     errorLog.addError('Web Speech API not available');
     showStatusMessage('❌ Web Speech API not available', 3000);

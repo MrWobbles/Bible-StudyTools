@@ -1527,18 +1527,20 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
 
 .teleprompter__line--image {
   position: relative;
-  margin-left: 120px;
-  padding-bottom: 1em;
+  height: 100px;
+  margin: 1em 0;
 }
 
 .teleprompter__line--image img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin: 0 auto;
+  border-radius: var(--radius-md);
   position: absolute;
-  left: -120px;
-  top: 0;
   width: 100px;
   height: 100px;
-  object-fit: cover;
-  border-radius: var(--radius-md);
+  left: -50px;
 }
 
 .teleprompter__line--image::after {

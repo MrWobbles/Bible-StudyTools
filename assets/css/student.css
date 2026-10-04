@@ -50,10 +50,13 @@
   --duration-normal: 200ms;
   --duration-slow: 320ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --layer-card-primary: radial-gradient(circle at top left, rgba(168, 85, 255, 0.16), transparent 60%), radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.16), transparent 60%), #050814;
+  --layer-card-primary:
+    radial-gradient(circle at top left, rgba(168, 85, 255, 0.16), transparent 60%),
+    radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.16), transparent 60%), #050814;
   --layer-card-secondary: #050814;
   --layer-card-metric: linear-gradient(135deg, rgba(24, 24, 37, 0.96), rgba(15, 23, 42, 0.98));
-  --layer-chip-neon: radial-gradient(circle at top left, rgba(248, 250, 252, 0.18), transparent 55%), rgba(15, 23, 42, 0.6);
+  --layer-chip-neon:
+    radial-gradient(circle at top left, rgba(248, 250, 252, 0.18), transparent 55%), rgba(15, 23, 42, 0.6);
   --layer-surface-toolbar: rgba(15, 23, 42, 0.96);
 }
 
@@ -72,7 +75,7 @@
   --bg-overlay: rgba(8, 12, 18, 0.56);
 }
 
-html[data-theme=light] {
+html[data-theme="light"] {
   --control-bg: rgba(15, 23, 42, 0.03);
   --control-bg-hover: rgba(15, 23, 42, 0.08);
   --control-border: rgba(148, 163, 184, 0.8);
@@ -87,7 +90,7 @@ html[data-theme=light] {
   --bg-overlay: rgba(248, 250, 252, 0.34);
 }
 
-html[data-theme=monokai-dark] {
+html[data-theme="monokai-dark"] {
   --accent-purple: #ae81ff;
   --accent-purple-soft: #9f7aea;
   --accent-blue: #66d9ef;
@@ -116,7 +119,7 @@ html[data-theme=monokai-dark] {
   --bg-overlay: rgba(25, 26, 21, 0.56);
 }
 
-html[data-theme=dracula-dark] {
+html[data-theme="dracula-dark"] {
   --accent-purple: #bd93f9;
   --accent-purple-soft: #a682f5;
   --accent-blue: #8be9fd;
@@ -145,7 +148,7 @@ html[data-theme=dracula-dark] {
   --bg-overlay: rgba(31, 27, 46, 0.56);
 }
 
-html[data-theme=nord-dark] {
+html[data-theme="nord-dark"] {
   --accent-purple: #b48ead;
   --accent-purple-soft: #a58aa0;
   --accent-blue: #88c0d0;
@@ -185,7 +188,15 @@ body {
 }
 
 body {
-  font-family: "Source Sans Pro", "SF Pro Display", system-ui, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  font-family:
+    "Source Sans Pro",
+    "SF Pro Display",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Inter",
+    "Segoe UI",
+    sans-serif;
   font-size: 16px;
   line-height: 1.5;
   color: var(--text-primary);
@@ -204,7 +215,9 @@ body::after {
 
 body::before {
   z-index: -2;
-  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(3, 6, 14, 0.65), rgba(10, 20, 36, 0.55)), url("../images/nature-background.jpg");
+  background-image:
+    linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)),
+    linear-gradient(145deg, rgba(3, 6, 14, 0.65), rgba(10, 20, 36, 0.55)), url("../images/nature-background.jpg");
   background-size: auto, auto, cover;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
@@ -213,19 +226,23 @@ body::before {
 
 body::after {
   z-index: -1;
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 52%), radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.06), transparent 36%);
+  background-image:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 52%),
+    radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.06), transparent 36%);
   opacity: 0.9;
 }
 
-html[data-theme=light] body::before {
-  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)), url("../images/nature-background.jpg");
+html[data-theme="light"] body::before {
+  background-image:
+    linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)), url("../images/nature-background.jpg");
   background-size: auto, auto, cover;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
   background-attachment: fixed;
 }
 
-html[data-theme=light] body::after {
+html[data-theme="light"] body::after {
   opacity: 0.35;
 }
 
@@ -397,38 +414,50 @@ button,
   transition: all var(--duration-fast) var(--ease-standard);
 }
 
-:where(a[href],
-button,
-.btn,
-.pill-link,
-[role=button],
-[role=link],
-input[type=button],
-input[type=submit],
-input[type=reset],
-summary,
-label[for],
-[onclick],
-[data-action],
-[data-tab],
-.class-item,
-.lessonplan-card,
-.media-item,
-.outline-item,
-.list-item,
-.toolbar-btn,
-.outline-tab,
-.modal-close) {
+:where(
+  a[href],
+  button,
+  .btn,
+  .pill-link,
+  [role="button"],
+  [role="link"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  summary,
+  label[for],
+  [onclick],
+  [data-action],
+  [data-tab],
+  .class-item,
+  .lessonplan-card,
+  .media-item,
+  .outline-item,
+  .list-item,
+  .toolbar-btn,
+  .outline-tab,
+  .modal-close
+) {
   cursor: pointer;
 }
 
-:where(button, .btn, .pill-link, input, select, textarea, a[href], [role=button], [role=link]):focus-visible {
+:where(button, .btn, .pill-link, input, select, textarea, a[href], [role="button"], [role="link"]):focus-visible {
   outline: 2px solid var(--accent-color, #3b82f6);
   outline-offset: 2px;
 }
 
-:where(button, .btn, .pill-link, input, select, textarea, a[href], [role=button], [role=link]):disabled,
-:where(button, .btn, .pill-link, input, select, textarea, a[href], [role=button], [role=link])[aria-disabled=true] {
+:where(button, .btn, .pill-link, input, select, textarea, a[href], [role="button"], [role="link"]):disabled,
+:where(
+  button,
+  .btn,
+  .pill-link,
+  input,
+  select,
+  textarea,
+  a[href],
+  [role="button"],
+  [role="link"]
+)[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -444,7 +473,7 @@ label[for],
   }
 }
 @media (forced-colors: active) {
-  :where(button, .btn, .pill-link, a[href], input, select, textarea, [role=button], [role=link]):focus-visible {
+  :where(button, .btn, .pill-link, a[href], input, select, textarea, [role="button"], [role="link"]):focus-visible {
     outline-color: Highlight;
   }
 }
@@ -474,7 +503,7 @@ button.primary,
   letter-spacing: 0.08em;
 }
 
-html[data-theme=light] :where(.btn-primary, button.primary, .btn--primary) {
+html[data-theme="light"] :where(.btn-primary, button.primary, .btn--primary) {
   border-color: var(--accent-color, #2563eb);
   background: var(--accent-color, #2563eb);
   color: #ffffff;
@@ -486,7 +515,7 @@ button.primary:hover,
   background: rgba(255, 255, 255, 0.88);
 }
 
-html[data-theme=light] :where(.btn-primary, button.primary, .btn--primary):hover {
+html[data-theme="light"] :where(.btn-primary, button.primary, .btn--primary):hover {
   background: var(--accent-color-hover, #1d4ed8);
 }
 
@@ -519,7 +548,7 @@ textarea,
   font: inherit;
 }
 
-html[data-theme=light] :is(input, select, textarea, .toolbar-select, .quick-verse-input, .quick-verse-select) {
+html[data-theme="light"] :is(input, select, textarea, .toolbar-select, .quick-verse-input, .quick-verse-select) {
   background: rgba(255, 255, 255, 0.92);
 }
 
@@ -616,7 +645,7 @@ body.page--student {
   --surface-border: rgba(255, 255, 255, 0.1);
   --header-border: rgba(255, 255, 255, 0.1);
 }
-html[data-theme=light] body.page--student {
+html[data-theme="light"] body.page--student {
   --page-bg: #f5f7fb;
   --panel-bg: #ffffff;
   --text-primary: #0f172a;
@@ -643,7 +672,7 @@ body.page--student .video-card {
 body.page--student .player-shell {
   border-radius: 4px;
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
-  background: #01060f url("../data/bg-img.png") center/20% repeat;
+  background: #01060f;
   aspect-ratio: 16/9;
   overflow: hidden;
 }
@@ -688,7 +717,8 @@ body.page--student.fullscreen-mode {
   padding: 0;
   background: #000;
 }
-body.page--student.fullscreen-mode::before, body.page--student.fullscreen-mode::after {
+body.page--student.fullscreen-mode::before,
+body.page--student.fullscreen-mode::after {
   display: none;
 }
 body.page--student.fullscreen-mode .app__header,
