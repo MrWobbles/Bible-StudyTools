@@ -25,7 +25,9 @@ let scrollAnimationId = null;
 
 // Constant-speed scroll mode (default mode)
 let scrollVelocity = 60; // pixels per second
-let isScrolling = true; // Paused vs playing
+let isScrolling = false; // Paused vs playing; user starts it with Play
+let isProgrammaticScroll = false; // True while a point-jump animation owns scrollTop
+let scrollRemainder = 0; // Sub-pixel carry so slow speeds still move
 let lastScrollTime = Date.now();
 let scrollLoopId = null;
 
@@ -212,30 +214,63 @@ function buildEditorNotesIndex() {
     let currentSection = classConfig.title || 'Notes';
 
     // Iterate through all block-level elements
-    const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li');
-    elements.forEach((el) => {
-      const text = el.textContent?.trim();
-      if (!text) return;
+    const elements = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, img');
+    const seenImages = new Set();
+    const pushImage = (img) => {
+      if (seenImages.has(img)) return;
+      seenImages.add(img);
+      const url = safeMediaUrl(img.getAttribute('src'));
+      if (!url) return;
+      blocks.push({
+        text: '',
+        type: 'image',
+        url,
+        title: img.getAttribute('alt') || 'Image',
+        sectionTitle: currentSection
+      });
+    };
 
+    elements.forEach((el) => {
       const tagName = el.tagName.toLowerCase();
 
-      // Update section title on headings
-      if (tagName.startsWith('h')) {
-        currentSection = text;
-        // Add heading as a point
-        blocks.push({
-          text: text,
-          type: 'heading',
-          sectionTitle: currentSection
-        });
-      } else if (tagName === 'p' || tagName === 'li') {
-        // Add paragraph/list item as a point
-        blocks.push({
-          text: text,
-          type: tagName === 'li' ? 'bullet' : 'paragraph',
-          sectionTitle: currentSection
-        });
+      // A paragraph inside a list item is already covered by the li
+      if (tagName === 'p' && el.closest('li')) {
+        el.querySelectorAll('img').forEach(pushImage);
+        return;
       }
+
+      if (tagName === 'img') {
+        pushImage(el);
+        return;
+      }
+
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll('ul, ol').forEach(n => n.remove());
+      const text = clone.textContent?.trim();
+      if (text) {
+        // Update section title on headings
+        if (tagName.startsWith('h')) {
+          currentSection = text;
+          blocks.push({
+            text: text,
+            html: buildLineHtml(el),
+            type: 'heading',
+            sectionTitle: currentSection
+          });
+        } else if (tagName === 'p' || tagName === 'li') {
+          blocks.push({
+            text: text,
+            html: buildLineHtml(el),
+            verse: Array.from(el.querySelectorAll('a')).map(getVerseRef).find(Boolean) || '',
+            media: Array.from(el.querySelectorAll('a')).map(decodeTileMedia).find(Boolean) || null,
+            type: tagName === 'li' ? 'bullet' : 'paragraph',
+            sectionTitle: currentSection
+          });
+        }
+      }
+
+      // Images nested in a text block follow it in reading order
+      el.querySelectorAll('img').forEach(pushImage);
     });
 
     // If no blocks found, try splitting by sentences
@@ -259,6 +294,11 @@ function buildEditorNotesIndex() {
     allOutlinePoints = blocks.map((block, idx) => ({
       index: idx,
       text: block.text,
+      html: block.html,
+      verse: block.verse,
+      media: block.media,
+      url: block.url,
+      title: block.title,
       type: block.type,
       sectionTitle: block.sectionTitle,
       fullPoint: block
@@ -285,9 +325,11 @@ function renderInitialContent() {
 function updateCurrentPointDisplay() {
   if (allOutlinePoints.length === 0) {
     document.getElementById('current-section-title').textContent = 'No content found';
-    document.getElementById('current-point').innerHTML = '<div class="point-text">Load some editor notes to get started.</div>';
+    document.getElementById('script-flow').innerHTML = '<div class="point-text">Load some editor notes to get started.</div>';
     return;
   }
+
+  renderScriptFlow();
 
   // Clamp indices to valid range
   if (currentPointIndex >= allOutlinePoints.length) {
@@ -302,14 +344,10 @@ function updateCurrentPointDisplay() {
   // Update section title
   document.getElementById('current-section-title').textContent = currentPoint.sectionTitle || 'Content';
 
-  // Update current point (large, prominent display)
-  const currentPointEl = document.getElementById('current-point');
-  const pointTextHTML = wrapWordsInSpans(currentPoint.text);
-
-  currentPointEl.innerHTML = `
-    <div class="point-type-badge">${currentPoint.type || 'text'}</div>
-    <div class="point-text">${pointTextHTML}</div>
-  `;
+  // Highlight the current line
+  document.querySelectorAll('#script-flow .teleprompter__line.current').forEach(el => el.classList.remove('current'));
+  const currentPointEl = document.querySelector(`#script-flow [data-point-index="${currentPointIndex}"]`);
+  if (currentPointEl) currentPointEl.classList.add('current');
 
   // Update progress
   document.getElementById('progress-display').textContent =
@@ -318,30 +356,192 @@ function updateCurrentPointDisplay() {
   // Reset spoken words for new point
   spokenWords = [];
 
-  // Render upcoming points preview
-  renderUpcomingPoints();
-
-  // Scroll into view (smooth scroll)
-  currentPointEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-// Render upcoming points in preview area
-function renderUpcomingPoints() {
-  const upcomingContainer = document.getElementById('upcoming-points');
-  upcomingContainer.innerHTML = '';
+// Render every point once into one continuous scrollable script
+function renderScriptFlow() {
+  const flow = document.getElementById('script-flow');
+  if (flow.dataset.rendered === String(allOutlinePoints.length)) return;
 
-  for (let i = 1; i <= CONFIG.maxUpcomingPoints; i++) {
-    const idx = currentPointIndex + i;
-    if (idx >= allOutlinePoints.length) break;
+  flow.innerHTML = allOutlinePoints.map((point, idx) => {
+    if (point.type === 'image') {
+      return `<figure class="teleprompter__line teleprompter__line--image" data-point-index="${idx}"><img src="${escapeAttr(point.url)}" alt="${escapeAttr(point.title)}"></figure>`;
+    }
+    const tag = point.type === 'heading' ? 'h2' : 'div';
+    return `<${tag} class="teleprompter__line teleprompter__line--${point.type}" data-point-index="${idx}">${point.html ?? wrapWordsInSpans(point.text)}</${tag}>`;
+  }).join('');
+  flow.dataset.rendered = String(allOutlinePoints.length);
+}
 
-    const point = allOutlinePoints[idx];
-    const el = document.createElement('div');
-    el.className = 'teleprompter__point upcoming';
-    el.innerHTML = `
-      <div class="point-type-badge">${point.type || 'text'}</div>
-      <div class="point-text">${point.text}</div>
-    `;
-    upcomingContainer.appendChild(el);
+function escapeAttr(value) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Only allow http(s), same-site paths and inline images
+function safeMediaUrl(raw) {
+  const value = (raw || '').trim();
+  if (!value) return '';
+  if (/^data:image\//i.test(value)) return value;
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href;
+  } catch (err) {
+    return '';
+  }
+  return '';
+}
+
+// Older saved notes lost data-verse, so a bare "#" link falls back to its text
+function getVerseRef(a) {
+  const explicit = a.dataset?.verse?.trim();
+  if (explicit) return explicit;
+  const href = (a.getAttribute('href') || '').trim();
+  const text = a.textContent.trim();
+  if ((href === '' || href === '#') && /^[1-3]?\s?[A-Za-z]+\.?\s+\d+/.test(text)) return text;
+  return '';
+}
+
+// Editor media tiles carry the full media object in a bst-media: href
+function decodeTileMedia(a) {
+  const href = (a.getAttribute('href') || '').trim();
+  if (!href.startsWith('bst-media:')) return null;
+  try {
+    const media = JSON.parse(decodeURIComponent(href.slice('bst-media:'.length)));
+    return media && typeof media === 'object' ? media : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// Build a line's HTML, keeping links clickable and word-wrapping text
+function buildLineHtml(node) {
+  return Array.from(node.childNodes).map((child) => {
+    if (child.nodeType === Node.TEXT_NODE) return wrapWordsInSpans(child.textContent);
+    if (child.nodeType !== Node.ELEMENT_NODE || child.tagName === 'IMG') return '';
+    // Nested list items are emitted as their own lines
+    if (child.tagName === 'UL' || child.tagName === 'OL') return '';
+    const inner = buildLineHtml(child);
+    if (child.tagName === 'A') {
+      const tileMedia = decodeTileMedia(child);
+      if (tileMedia) {
+        const label = tileMedia.title || tileMedia.reference || tileMedia.type || 'Media';
+        return `<a class="teleprompter__link teleprompter__link--tile" href="#" data-media="${escapeAttr(encodeURIComponent(JSON.stringify(tileMedia)))}">${wrapWordsInSpans(label)}</a>`;
+      }
+      const verse = getVerseRef(child);
+      if (verse) {
+        return `<a class="teleprompter__link teleprompter__link--verse" href="#" data-verse="${escapeAttr(verse)}">${inner}</a>`;
+      }
+      const url = safeMediaUrl(child.getAttribute('href'));
+      if (!url) return inner;
+      return `<a class="teleprompter__link" href="${escapeAttr(url)}" data-url="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+    }
+    return inner;
+  }).join('');
+}
+
+// Display channel shared with student.html
+let displayChannel = null;
+let shownMediaId = null;
+
+function getDisplayChannelKey() {
+  return classConfig.channelName || `class${classId}-control`;
+}
+
+function sendDisplayMessage(message) {
+  const payload = { ...message, sentAt: Date.now() };
+  if (!displayChannel) {
+    if (window.bst?.createBroadcastChannel) {
+      displayChannel = window.bst.createBroadcastChannel(getDisplayChannelKey());
+    } else if ('BroadcastChannel' in window) {
+      displayChannel = new BroadcastChannel(getDisplayChannelKey());
+    }
+  }
+  if (displayChannel) displayChannel.postMessage(payload);
+  try { localStorage.setItem(`${getDisplayChannelKey()}-storage`, JSON.stringify(payload)); } catch (err) { }
+}
+
+function showImageOnDisplay(point) {
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { type: 'image', title: point.title || 'Image', url: point.url, sources: [{ url: point.url }], fullscreen: true }
+  });
+}
+
+function showVerseOnDisplay(reference, translationOverride) {
+  let translation = translationOverride || 'nkjv';
+  if (!translationOverride) {
+    try { translation = localStorage.getItem('bible-translation-preference') || 'nkjv'; } catch (err) { }
+  }
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { type: 'verse', reference, translation, title: reference, fullscreen: true }
+  });
+}
+
+function showMediaOnDisplay(media) {
+  if (media.type === 'verse') {
+    showVerseOnDisplay(media.reference || media.title || '', media.translation);
+    return;
+  }
+  const type = media.type === 'images' ? 'image' : media.type;
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { ...media, type, fullscreen: type === 'image' }
+  });
+}
+
+function showLinkOnDisplay(url) {
+  const lower = url.toLowerCase();
+  let type = 'link';
+  if (lower.includes('youtube.com') || lower.includes('youtu.be') || /\.(mp4|webm|ogg)(\?|$)/.test(lower)) type = 'video';
+  else if (/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/.test(lower)) type = 'image';
+  sendDisplayMessage({
+    type: 'displayMedia',
+    media: { type, title: 'Link', url, sources: [{ url }], fullscreen: type === 'image' }
+  });
+}
+
+function clearDisplay() {
+  shownMediaId = null;
+  sendDisplayMessage({ type: 'clearScreen' });
+}
+
+// Images show when reached; a verse shows once the line before it is current
+function triggerMediaForIndex(index) {
+  let active = null;
+  const last = Math.min(index + 1, allOutlinePoints.length - 1);
+  for (let i = 0; i <= last; i++) {
+    const point = allOutlinePoints[i];
+    if (point.type === 'image' && i <= index) {
+      active = { id: `image-${i}`, show: () => showImageOnDisplay(point) };
+    } else if (point.media && Math.max(0, i - 1) <= index) {
+      active = { id: `media-${i}`, show: () => showMediaOnDisplay(point.media) };
+    } else if (point.verse && Math.max(0, i - 1) <= index) {
+      active = { id: `verse-${i}`, show: () => showVerseOnDisplay(point.verse) };
+    }
+  }
+
+  const activeId = active ? active.id : null;
+  if (activeId === shownMediaId) return;
+  const hadMedia = shownMediaId !== null;
+  shownMediaId = activeId;
+  if (active) active.show();
+  else if (hadMedia) sendDisplayMessage({ type: 'clearScreen' });
+}
+
+// Keep the current index in sync with the line at the reading position while scrolling
+function syncCurrentPointToScroll(container) {
+  const readingLine = container.getBoundingClientRect().top + container.clientHeight * 0.30;
+  const lines = document.querySelectorAll('#script-flow .teleprompter__line');
+  let found = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].getBoundingClientRect().top <= readingLine) found = i;
+    else break;
+  }
+  if (found !== currentPointIndex) {
+    currentPointIndex = found;
+    updateCurrentPointDisplay();
+    triggerMediaForIndex(found);
   }
 }
 
@@ -354,7 +554,7 @@ function wrapWordsInSpans(text) {
       return word;
     }
     // Wrap actual words in spans with data-word attribute
-    const sanitizedWord = word.replace(/[<>]/g, ''); // Basic XSS protection
+    const sanitizedWord = word.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return `<span class="teleprompter__word" data-word-idx="${idx}">${sanitizedWord}</span>`;
   }).join('');
 }
@@ -371,7 +571,7 @@ function markWordsAsRead(transcript) {
   const transcriptWords = transcript.toLowerCase().split(/\s+/).filter(w => w.length > 0);
 
   // Get all word spans
-  const wordSpans = document.querySelectorAll('.teleprompter__word');
+  const wordSpans = document.querySelectorAll('#script-flow .teleprompter__line.current .teleprompter__word');
   if (wordSpans.length === 0) return;
 
   // Build current point text words (normalized)
@@ -761,8 +961,11 @@ function smoothScrollToPoint(pointIndex) {
   if (!pointElement) return;
 
   const container = document.getElementById('content-area');
-  const targetOffset = pointElement.offsetTop - (container.clientHeight * 0.30); // Keep at 30% from top
+  const containerTop = container.getBoundingClientRect().top;
+  const targetOffset = container.scrollTop + pointElement.getBoundingClientRect().top - containerTop - (container.clientHeight * 0.30); // Keep at 30% from top
   targetScrollPosition = Math.max(0, targetOffset);
+  currentScrollPosition = container.scrollTop;
+  isProgrammaticScroll = true;
 
   // Cancel any existing animation
   if (scrollAnimationId) {
@@ -790,6 +993,8 @@ function smoothScrollToPoint(pointIndex) {
     } else {
       container.scrollTop = targetScrollPosition;
       currentScrollPosition = targetScrollPosition;
+      isProgrammaticScroll = false;
+      scrollRemainder = 0;
     }
   }
 
@@ -934,13 +1139,30 @@ function advanceToPoint(pointIndex) {
 
   currentPointIndex = pointIndex;
   updateCurrentPointDisplay();
+  triggerMediaForIndex(pointIndex);
   smoothScrollToPoint(pointIndex); // Use Lerp scrolling instead of instant snap
   consecutiveHighConfidenceMatches = 0; // Reset streak on manual advance
   isTrackingFrozen = false;
 }
 
+// Small live preview of the student display, same approach as the teacher view
+function setupStudentPreview() {
+  if (document.getElementById('student-preview-shell')) return;
+  const shell = document.createElement('div');
+  shell.id = 'student-preview-shell';
+  shell.style.cssText = 'position:fixed;bottom:20px;right:20px;width:320px;height:180px;border:1px solid #ccc;z-index:1000;pointer-events:none;overflow:hidden;background:#000;';
+  const frame = document.createElement('iframe');
+  frame.id = 'student-preview';
+  frame.title = 'Student display preview';
+  frame.src = `${window.location.origin}/student.html?class=${encodeURIComponent(classId)}`;
+  frame.style.cssText = 'position:absolute;top:0;left:0;border:0;width:1280px;height:720px;transform:scale(0.25);transform-origin:top left;';
+  shell.appendChild(frame);
+  document.body.appendChild(shell);
+}
+
 // Setup manual controls
 function setupControls() {
+  setupStudentPreview();
   const toggleBtn = document.getElementById('toggle-listening');
   const nextBtn = document.getElementById('manual-next');
   const prevBtn = document.getElementById('manual-prev');
@@ -959,6 +1181,10 @@ function setupControls() {
   nextBtn.addEventListener('click', () => advanceToPoint(currentPointIndex + 1));
   prevBtn.addEventListener('click', () => advanceToPoint(currentPointIndex - 1));
   resetBtn.addEventListener('click', () => advanceToPoint(0));
+  document.getElementById('open-display')?.addEventListener('click', () => {
+    window.open(`student.html?class=${classId}`, 'display-screen', 'width=1280,height=720');
+  });
+  document.getElementById('clear-display')?.addEventListener('click', clearDisplay);
   closeBtn.addEventListener('click', () => {
     if (isListening) toggleListening();
     if (scrollLoopId) cancelAnimationFrame(scrollLoopId);
@@ -975,17 +1201,35 @@ function setupControls() {
     playPauseBtn.addEventListener('click', toggleScrolling);
   }
   if (speedUpBtn) {
-    speedUpBtn.addEventListener('click', () => changeScrollSpeed(10)); // +10 px/s
+    speedUpBtn.addEventListener('click', (e) => changeScrollSpeed(e.shiftKey ? 1 : 5));
   }
   if (speedDownBtn) {
-    speedDownBtn.addEventListener('click', () => changeScrollSpeed(-10)); // -10 px/s
+    speedDownBtn.addEventListener('click', (e) => changeScrollSpeed(e.shiftKey ? -1 : -5));
   }
   if (speedResetBtn) {
     speedResetBtn.addEventListener('click', () => resetScrollSpeed());
   }
+  const speedInput = document.getElementById('speed-input');
+  if (speedInput) {
+    const applyTypedSpeed = () => {
+      const value = Number(speedInput.value);
+      if (Number.isFinite(value) && speedInput.value !== '') setScrollSpeed(value);
+      else updateSpeedDisplay();
+    };
+    speedInput.addEventListener('change', applyTypedSpeed);
+    speedInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { applyTypedSpeed(); speedInput.blur(); }
+    });
+    speedInput.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+  }
+  document.getElementById('verse-prev')?.addEventListener('click', () => sendDisplayMessage({ type: 'versePrevious' }));
+  document.getElementById('verse-next')?.addEventListener('click', () => sendDisplayMessage({ type: 'verseNext' }));
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    if (e.target.matches?.('input[type="range"]')) e.target.blur();
+    const step = e.shiftKey ? 1 : 5;
     if (e.key === ' ') {
       e.preventDefault();
       toggleScrolling(); // Space for play/pause instead of speech toggle
@@ -993,37 +1237,92 @@ function setupControls() {
       e.preventDefault();
       toggleViewMode(); // Tab for view mode toggle
     } else if (e.key === 'ArrowRight' || e.key === '+' || e.key === '=') {
-      changeScrollSpeed(10);
-    } else if (e.key === 'ArrowLeft' || e.key === '-') {
-      changeScrollSpeed(-10);
+      e.preventDefault();
+      changeScrollSpeed(step);
+    } else if (e.key === 'ArrowLeft' || e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      changeScrollSpeed(-step);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      sendDisplayMessage({ type: 'verseNext' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      sendDisplayMessage({ type: 'versePrevious' });
     } else if (e.key === 'r' || e.key === 'R') {
       resetScrollSpeed();
+    } else if (e.key === 'c' || e.key === 'C') {
+      sendDisplayMessage({ type: 'blackout' });
     }
   });
 
-  // Scroll wheel support - manual velocity control
+  // Scroll sync and link clicks
   const contentArea = document.getElementById('content-area');
   if (contentArea) {
-    contentArea.addEventListener('wheel', (e) => {
-      // Scroll wheel controls speed
-      if (e.deltaY < 0) {
-        changeScrollSpeed(5); // Scroll up = speed up
-      } else if (e.deltaY > 0) {
-        changeScrollSpeed(-5); // Scroll down = slow down
-      }
+    contentArea.addEventListener('scroll', () => {
+      if (!isProgrammaticScroll) syncCurrentPointToScroll(contentArea);
     }, { passive: true });
+
+    contentArea.addEventListener('click', (e) => {
+      const link = e.target.closest('a.teleprompter__link');
+      if (!link) return;
+      e.preventDefault();
+      if (link.dataset.media) {
+        try { showMediaOnDisplay(JSON.parse(decodeURIComponent(link.dataset.media))); } catch (err) { }
+      } else if (link.dataset.verse) showVerseOnDisplay(link.dataset.verse);
+      else showLinkOnDisplay(link.dataset.url);
+    });
   }
 
   updateSpeedDisplay();
   startScrollLoop(); // Start constant-speed scrolling by default
+  initClockAndMarker();
+}
+
+function initClockAndMarker() {
+  const marker = document.getElementById('reading-marker');
+  const area = document.getElementById('content-area');
+  const clockEl = document.getElementById('clock-display');
+  const timerEl = document.getElementById('timer-display');
+
+  // Matches the 30% reading line used by syncCurrentPointToScroll
+  const placeMarker = () => {
+    if (!marker || !area) return;
+    marker.style.top = `${area.offsetTop + area.clientHeight * 0.30}px`;
+  };
+  placeMarker();
+  window.addEventListener('resize', placeMarker);
+
+  let timerMs = 0;
+  let last = Date.now();
+  const pad = (n) => String(n).padStart(2, '0');
+  const tick = () => {
+    const now = Date.now();
+    if (isScrolling) timerMs += now - last;
+    last = now;
+    if (clockEl) clockEl.textContent = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (timerEl) {
+      const total = Math.floor(timerMs / 1000);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      timerEl.textContent = h ? `${h}:${pad(m)}:${pad(total % 60)}` : `${pad(m)}:${pad(total % 60)}`;
+    }
+  };
+  const reset = () => { timerMs = 0; last = Date.now(); tick(); };
+  timerEl?.addEventListener('click', reset);
+  timerEl?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.stopPropagation(); reset(); }
+  });
+  tick();
+  setInterval(tick, 500);
 }
 
 // Toggle scrolling on/off (play/pause)
 function toggleScrolling() {
   isScrolling = !isScrolling;
+  lastScrollTime = Date.now();
   const btn = document.getElementById('play-pause-scroll');
   if (btn) {
-    btn.textContent = isScrolling ? '⏸️ Pause' : '▶️ Play';
+    btn.innerHTML = `<span class="material-icons">${isScrolling ? 'pause' : 'play_arrow'}</span><span class="btn-label">${isScrolling ? 'Pause' : 'Play'}</span>`;
   }
   debug(`${isScrolling ? '▶️ PLAYING' : '⏸️ PAUSED'} at ${scrollVelocity} px/s`);
   showStatusMessage(`${isScrolling ? '▶️ Playing' : '⏸️ Paused'} - Speed: ${scrollVelocity} px/s`, 1500);
@@ -1031,9 +1330,11 @@ function toggleScrolling() {
 
 // Adjust scroll speed
 function changeScrollSpeed(delta) {
-  const minSpeed = 10; // Minimum 10 px/s
-  const maxSpeed = 200; // Maximum 200 px/s
-  scrollVelocity = Math.max(minSpeed, Math.min(maxSpeed, scrollVelocity + delta));
+  setScrollSpeed(scrollVelocity + delta);
+}
+
+function setScrollSpeed(value) {
+  scrollVelocity = Math.max(5, Math.min(300, Math.round(value)));
   updateSpeedDisplay();
   showStatusMessage(`📊 Speed: ${scrollVelocity} px/s (${(scrollVelocity / 60 * 100).toFixed(0)}%)`, 1200);
   debug(`Speed changed to: ${scrollVelocity} px/s`);
@@ -1050,6 +1351,8 @@ function resetScrollSpeed() {
 // Update speed display element
 function updateSpeedDisplay() {
   const speedDisplay = document.getElementById('speed-display');
+  const speedInput = document.getElementById('speed-input');
+  if (speedInput) speedInput.value = scrollVelocity;
   if (speedDisplay) {
     const percentage = Math.round((scrollVelocity / 60) * 100);
     speedDisplay.textContent = `${scrollVelocity} px/s (${percentage}%)`;
@@ -1059,14 +1362,14 @@ function updateSpeedDisplay() {
 // Constant-speed scroll loop (runs continuously)
 function startScrollLoop() {
   function scroll() {
-    if (!isScrolling) {
-      scrollLoopId = requestAnimationFrame(scroll);
-      return;
-    }
-
     const now = Date.now();
     const deltaTime = (now - lastScrollTime) / 1000; // Convert to seconds
     lastScrollTime = now;
+
+    if (!isScrolling || isProgrammaticScroll) {
+      scrollLoopId = requestAnimationFrame(scroll);
+      return;
+    }
 
     // Choose scroll target based on view mode
     const scrollTarget = viewMode === 'scroll'
@@ -1074,8 +1377,12 @@ function startScrollLoop() {
       : document.getElementById('content-area');
 
     if (scrollTarget) {
-      // Update scroll position based on velocity
-      scrollTarget.scrollTop += scrollVelocity * deltaTime;
+      scrollRemainder += scrollVelocity * deltaTime;
+      const whole = Math.floor(scrollRemainder);
+      if (whole > 0) {
+        scrollRemainder -= whole;
+        scrollTarget.scrollTop += whole;
+      }
     }
 
     scrollLoopId = requestAnimationFrame(scroll);

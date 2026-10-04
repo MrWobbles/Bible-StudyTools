@@ -155,7 +155,18 @@ function initializeEditor() {
       Color,
       Underline,
       Highlight.configure({ multicolor: true }),
-      Link.configure({
+      Link.extend({
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            'data-verse': {
+              default: null,
+              parseHTML: (el) => el.getAttribute('data-verse'),
+              renderHTML: (attrs) => (attrs['data-verse'] ? { 'data-verse': attrs['data-verse'] } : {}),
+            },
+          };
+        },
+      }).configure({
         openOnClick: false,
         HTMLAttributes: {
           class: 'editor-link',
@@ -1052,7 +1063,7 @@ async function fetchVerseFromLabs(reference, translation) {
 
 async function fetchVerseFromBibleApi(reference, translation) {
   const version = String(translation || 'web').toLowerCase();
-  const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(version)}`;
+  const url = `/api/bible/simple?reference=${encodeURIComponent(reference)}&translation=${encodeURIComponent(version)}`;
 
   try {
     const res = await fetch(url);

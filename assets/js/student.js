@@ -202,6 +202,7 @@ function handleRemoteCommand(event) {
       }
       break;
     case 'displayMedia':
+      document.getElementById('blackout-overlay')?.remove();
       console.log('[Student] Received displayMedia:', data.media);
       pendingMedia = data.media;
       // Try to handle immediately if DOM is ready, otherwise it will be handled on player ready
@@ -209,7 +210,20 @@ function handleRemoteCommand(event) {
         handlePendingMedia();
       }
       break;
+    case 'blackout': {
+      const existing = document.getElementById('blackout-overlay');
+      if (existing) {
+        existing.remove();
+      } else {
+        const overlay = document.createElement('div');
+        overlay.id = 'blackout-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:2147483647;cursor:none;';
+        document.body.appendChild(overlay);
+      }
+      break;
+    }
     case 'clearScreen':
+      document.getElementById('blackout-overlay')?.remove();
       if (typeof window.returnToDefaultView === 'function') {
         console.log('[Student] Clearing screen and returning to default view');
         window.returnToDefaultView();
@@ -404,6 +418,28 @@ function goFullscreen() {
 }
 
 function returnToDefaultView() {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
+  const shownImg = playerDiv.querySelector(':scope > img');
+  if (shownImg && !playerDiv.dataset.fadingOut) {
+    playerDiv.dataset.fadingOut = '1';
+    shownImg.style.transition = 'opacity 450ms ease, transform 450ms ease';
+    shownImg.style.opacity = '0';
+    shownImg.style.transform = 'scale(0.98)';
+    pendingMedia = null;
+    setTimeout(() => {
+      delete playerDiv.dataset.fadingOut;
+      if (pendingMedia) return;
+      resetToDefaultViewNow();
+    }, 450);
+    return;
+  }
+
+  resetToDefaultViewNow();
+}
+
+function resetToDefaultViewNow() {
   const playerDiv = document.querySelector('.player-shell');
   if (!playerDiv) return;
 
@@ -643,7 +679,19 @@ function handlePendingMedia() {
         player.destroy();
         player = null;
       }
-      playerDiv.innerHTML = `<img src="${imgUrl}" style="width:100%; height:100%; object-fit:contain;" alt="${pendingMedia.title || 'Image'}">`;
+      playerDiv.innerHTML = '';
+      const img = document.createElement('img');
+      img.alt = pendingMedia.title || 'Image';
+      img.style.cssText = 'width:100%; height:100%; object-fit:contain; opacity:0; transform:scale(0.98); transition:opacity 600ms ease, transform 600ms ease;';
+      const reveal = () => requestAnimationFrame(() => {
+        img.style.opacity = '1';
+        img.style.transform = 'scale(1)';
+      });
+      img.onload = reveal;
+      img.onerror = reveal;
+      img.src = imgUrl;
+      playerDiv.appendChild(img);
+      if (pendingMedia.fullscreen) document.body.classList.add('fullscreen-mode');
       pendingMedia = null;
     }
   } else if (pendingMedia.type === 'pdf' || pendingMedia.type === 'document') {
@@ -782,6 +830,8 @@ async function renderVerseMedia(media) {
   const reference = (media.reference || media.title || '').trim();
   if (!reference) return;
 
+  if (media.fullscreen) document.body.classList.add('fullscreen-mode');
+
   if (player) {
     player.destroy();
     player = null;
@@ -880,6 +930,12 @@ async function getApiBibleMap() {
 }
 
 async function fetchVerseData(reference, preferredTranslations) {
+  // Dashes and nbsp from typed or pasted references break the lookup APIs
+  reference = String(reference || '')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/[\u00a0\u2000-\u200b]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const apiBibleMap = await getApiBibleMap();
 
   for (const translation of preferredTranslations) {
@@ -1000,7 +1056,7 @@ async function fetchFromLabs(reference) {
 
 async function fetchFromBibleApi(reference, translation) {
   const version = String(translation || '').toLowerCase();
-  const url = `https://bible-api.com/${encodeURIComponent(reference)}?translation=${encodeURIComponent(version)}`;
+  const url = `/api/bible/simple?reference=${encodeURIComponent(reference)}&translation=${encodeURIComponent(version)}`;
 
   try {
     const res = await fetch(url);
