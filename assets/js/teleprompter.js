@@ -1069,7 +1069,7 @@ function startScrollLoop() {
     lastScrollTime = now;
 
     // Choose scroll target based on view mode
-    const scrollTarget = viewMode === 'scroll' 
+    const scrollTarget = viewMode === 'scroll'
       ? document.getElementById('scroll-viewport')
       : document.getElementById('content-area');
 
@@ -1091,7 +1091,7 @@ function toggleViewMode() {
   const wordView = document.getElementById('teleprompter-content');
   const scrollView = document.getElementById('scroll-view-container');
   const btn = document.getElementById('toggle-view-mode');
-  
+
   if (viewMode === 'scroll') {
     container.setAttribute('data-view-mode', 'scroll');
     wordView.style.display = 'none';
@@ -1116,9 +1116,9 @@ function toggleViewMode() {
 function renderScrollView() {
   const container = document.getElementById('all-points-container');
   if (!container) return;
-  
+
   container.innerHTML = '';
-  
+
   allOutlinePoints.forEach((point, idx) => {
     const pointEl = document.createElement('div');
     pointEl.className = 'teleprompter__point';
@@ -1128,7 +1128,7 @@ function renderScrollView() {
     `;
     container.appendChild(pointEl);
   });
-  
+
   updateScrollViewClasses();
 }
 
@@ -1136,20 +1136,20 @@ function renderScrollView() {
 function updateScrollViewClasses() {
   const viewport = document.getElementById('scroll-viewport');
   const points = document.querySelectorAll('#all-points-container .teleprompter__point');
-  
+
   if (!viewport || points.length === 0) return;
-  
+
   const viewportCenter = viewport.scrollTop + viewport.clientHeight / 2;
-  
+
   points.forEach((point, idx) => {
     const rect = point.getBoundingClientRect();
     const pointCenter = viewport.scrollTop + rect.top - viewport.getBoundingClientRect().top + rect.height / 2;
     const distance = Math.abs(pointCenter - viewportCenter);
     const maxDistance = viewport.clientHeight;
-    
+
     // Remove all classes first
     point.classList.remove('scroll-center', 'scroll-near', 'scroll-far', 'scroll-fading');
-    
+
     // Add appropriate class based on distance
     if (distance < 100) {
       point.classList.add('scroll-center');
