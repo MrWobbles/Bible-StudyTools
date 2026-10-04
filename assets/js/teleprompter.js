@@ -1410,7 +1410,7 @@ function startScrollLoop() {
 // Toggle view mode between 'word' and 'scroll'
 function toggleViewMode() {
   viewMode = viewMode === 'word' ? 'scroll' : 'word';
-  const container = document.getElementById('teleprompter-container');
+  const container = document.getElementById('content-area');
   const wordView = document.getElementById('teleprompter-content');
   const scrollView = document.getElementById('scroll-view-container');
   const btn = document.getElementById('toggle-view-mode');
