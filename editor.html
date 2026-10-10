@@ -57,6 +57,10 @@
         </div>
       </div>
       <div class="header-right">
+        <button id="btn-focus-mode" class="btn btn-secondary" type="button" aria-pressed="false"
+          title="Expand the editor to fill the window">
+          <span class="material-symbols-outlined">fullscreen</span>Focus
+        </button>
         <label class="btn btn-secondary theme-select-btn" for="theme-select-editor">
           <span class="material-symbols-outlined">palette</span>
           <span>Theme</span>
@@ -230,6 +234,7 @@
         </div>
         <textarea id="editor-code-view" class="editor-code-view" style="display: none; width: 100%; flex: 1; font-family: monospace; padding: 24px; box-sizing: border-box; resize: none; border: none; outline: none; background: transparent; color: inherit;"></textarea>
       </main>
+      <div class="focus-mode-hint" aria-live="polite">Focus mode — hold Escape for 2 seconds to exit</div>
     </div>
   </div>
 

@@ -1053,6 +1053,60 @@ body.page--editor .editor-media-tile .material-symbols-outlined {
 body.page--editor .editor-media-tile:hover {
   background: rgba(59, 130, 246, 0.24);
 }
+body.page--editor .focus-mode-hint {
+  display: none;
+}
+body.page--editor.is-focus-mode {
+  overflow: hidden;
+}
+body.page--editor.is-focus-mode .editor-container {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+body.page--editor.is-focus-mode .editor-header,
+body.page--editor.is-focus-mode .outline-navigator {
+  display: none;
+}
+body.page--editor.is-focus-mode .editor-main {
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  gap: 0;
+}
+body.page--editor.is-focus-mode .editor-content {
+  height: 100%;
+  border-radius: 0;
+}
+body.page--editor.is-focus-mode .editor {
+  padding: clamp(20px, 5vw, 64px);
+}
+body.page--editor.is-focus-mode .prose {
+  max-width: none;
+}
+body.page--editor.is-focus-mode .focus-mode-hint {
+  display: block;
+  position: fixed;
+  z-index: 101;
+  right: 16px;
+  bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--panel-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  pointer-events: none;
+}
 body.page--editor .modal-body {
   padding: 16px;
 }

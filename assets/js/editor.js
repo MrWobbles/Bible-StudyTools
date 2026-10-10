@@ -103,6 +103,8 @@ let eventListenersInitialized = false;
 let displayControlChannel = null;
 let displayControlChannelName = '';
 let autoSaveInterval = null;
+let focusModeExitTimer = null;
+let focusModeEscapeHandled = false;
 
 // Initialize editor on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -489,6 +491,10 @@ function setupEventListeners() {
   }
   eventListenersInitialized = true;
 
+  document.getElementById('btn-focus-mode').addEventListener('click', () => {
+    setEditorFocusMode(!document.body.classList.contains('is-focus-mode'));
+  });
+
     // Verse Lookup by Thought button
     document.getElementById('btn-verse-lookup-thought').addEventListener('click', async () => {
       await handleVerseLookupByThought();
@@ -759,11 +765,43 @@ function setupEventListeners() {
     }
 
     if (e.key === 'Escape') {
+      if (document.body.classList.contains('is-focus-mode')) {
+        e.preventDefault();
+        if (focusModeExitTimer === null) {
+          focusModeExitTimer = window.setTimeout(() => {
+            focusModeExitTimer = null;
+            focusModeEscapeHandled = true;
+            setEditorFocusMode(false);
+          }, 2000);
+        }
+        return;
+      }
+      if (focusModeEscapeHandled) {
+        e.preventDefault();
+        return;
+      }
       const openModalElement = document.querySelector('.modal.is-open');
       if (openModalElement?.id) {
         closeModal(openModalElement.id);
       }
     }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (e.key !== 'Escape') return;
+    if (focusModeExitTimer !== null) {
+      window.clearTimeout(focusModeExitTimer);
+      focusModeExitTimer = null;
+    }
+    focusModeEscapeHandled = false;
+  });
+
+  window.addEventListener('blur', () => {
+    if (focusModeExitTimer !== null) {
+      window.clearTimeout(focusModeExitTimer);
+      focusModeExitTimer = null;
+    }
+    focusModeEscapeHandled = false;
   });
 
   document.addEventListener('paste', (e) => {
@@ -786,6 +824,18 @@ function setupEventListeners() {
 
 function markEditorInteraction() {
   lastEditorInteractionAt = Date.now();
+}
+
+function setEditorFocusMode(enabled) {
+  const focusModeButton = document.getElementById('btn-focus-mode');
+  document.body.classList.toggle('is-focus-mode', enabled);
+  focusModeButton.setAttribute('aria-pressed', String(enabled));
+
+  if (enabled) {
+    editor?.commands.focus();
+  } else {
+    focusModeButton.focus();
+  }
 }
 
 function hasRecentEditorInteraction() {
