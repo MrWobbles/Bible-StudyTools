@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('editor save and shortcuts P0', () => {
-  test('shows modified status, saves on button and Ctrl+S, opens search with Ctrl+F', async ({ page }) => {
+  test('shows modified status, saves, formats text, and opens editor modals with shortcuts', async ({ page }) => {
     const runId = Date.now();
     let classesState = {
       classes: [
@@ -38,6 +38,14 @@ test.describe('editor save and shortcuts P0', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(classesState)
+      });
+    });
+
+    await page.route('**/api/auth/me**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: { id: 'editor-shortcuts-test', role: 'admin' } })
       });
     });
 
@@ -79,5 +87,14 @@ test.describe('editor save and shortcuts P0', () => {
 
     await page.keyboard.press('Control+f');
     await expect(page.locator('#search-modal')).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await prose.click();
+    await page.keyboard.press('Control+a');
+    await page.keyboard.press('Control+i');
+    await expect(prose.locator('em')).toHaveText(/Initial editor content/);
+
+    await page.keyboard.press('Control+Alt+i');
+    await expect(page.locator('#image-modal')).toBeVisible();
   });
 });

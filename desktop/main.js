@@ -79,6 +79,20 @@ function createWindow() {
 
   // Function to set up handlers for a window
   function setupWindowHandlers(window) {
+    window.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return;
+
+      const key = input.key.toLowerCase();
+      const opensDevTools =
+        (input.control || input.meta) && input.shift && !input.alt && key === 'i';
+      const isF12 = key === 'f12' && !input.control && !input.meta && !input.alt && !input.shift;
+
+      if (opensDevTools || isF12) {
+        event.preventDefault();
+        window.webContents.toggleDevTools();
+      }
+    });
+
     // Handle new windows (e.g., View Student/Teacher links)
     window.webContents.setWindowOpenHandler(({ url }) => {
       return {

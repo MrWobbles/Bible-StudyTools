@@ -728,8 +728,8 @@ function setupEventListeners() {
       openModal('verse-modal');
     }
 
-    // Ctrl+I to open image insertion modal
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+    // Ctrl+Alt+I to open image insertion modal without overriding Ctrl+I italic.
+    if ((e.ctrlKey || e.metaKey) && e.altKey && !e.shiftKey && e.key.toLowerCase() === 'i') {
       e.preventDefault();
       openModal('image-modal');
     }
