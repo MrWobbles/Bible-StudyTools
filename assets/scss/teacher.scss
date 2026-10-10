@@ -1,5 +1,6 @@
 @use 'tokens';
 @use 'base';
+@use 'teleprompter';
 
 body.page--teacher {
   --page-bg: #0f1419;
@@ -569,3 +570,5 @@ body.page--teacher {
     }
   }
 }
+
+@include teleprompter.styles;

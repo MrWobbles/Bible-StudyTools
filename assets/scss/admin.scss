@@ -59,6 +59,43 @@ body.page--admin {
     align-items: center;
   }
 
+  .theme-select-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 4px 20px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--glass-border-strong);
+    background: var(--control-bg);
+    color: var(--control-text);
+  }
+
+  .theme-select-pill select {
+    appearance: none;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    min-width: 118px;
+    cursor: pointer;
+    line-height: 1.2;
+  }
+
+  #theme-select-admin {
+    min-height: 24px;
+  }
+
+  .theme-select-pill select:focus {
+    outline: none;
+  }
+
+  .theme-select-pill select option {
+    background: var(--input-bg);
+    color: var(--control-text);
+  }
+
   .title-group h1 {
     font-size: 24px;
     line-height: 1.1;
