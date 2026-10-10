@@ -499,6 +499,7 @@ body.page--editor {
     }
 
     .editor {
+      max-height: none;
       padding: clamp(20px, 5vw, 64px);
     }
 

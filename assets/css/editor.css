@@ -1088,6 +1088,7 @@ body.page--editor.is-focus-mode .editor-content {
   border-radius: 0;
 }
 body.page--editor.is-focus-mode .editor {
+  max-height: none;
   padding: clamp(20px, 5vw, 64px);
 }
 body.page--editor.is-focus-mode .prose {
