@@ -796,6 +796,14 @@ body.page--teacher .editor-line-content {
 body.page--teacher .editor-line-content a {
   color: var(--accent-color);
 }
+body.page--teacher .editor-line-content img {
+  display: block;
+  width: 100px;
+  height: 100px;
+  max-width: 100%;
+  margin: 1em 0;
+  border-radius: var(--radius-md);
+}
 body.page--teacher .editor-line-content .editor-media-tile {
   display: inline-flex;
   align-items: center;

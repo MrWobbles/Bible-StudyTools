@@ -961,6 +961,15 @@ body.page--editor .prose {
   margin: 0 auto;
   color: var(--text-primary);
 }
+body.page--editor .prose img,
+body.page--editor .tiptap img {
+  display: block;
+  width: 100px;
+  height: 100px;
+  max-width: 100%;
+  margin: 1em 0;
+  border-radius: var(--radius-md);
+}
 html[data-theme="light"] body.page--editor .save-status.saved {
   color: #166534;
 }

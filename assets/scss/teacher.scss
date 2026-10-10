@@ -184,6 +184,15 @@ body.page--teacher {
     color: var(--accent-color);
   }
 
+  .editor-line-content img {
+    display: block;
+    width: 100px;
+    height: 100px;
+    max-width: 100%;
+    margin: 1em 0;
+    border-radius: var(--radius-md);
+  }
+
   .editor-line-content .editor-media-tile {
     display: inline-flex;
     align-items: center;

@@ -337,6 +337,16 @@ body.page--editor {
     color: var(--text-primary);
   }
 
+  .prose img,
+  .tiptap img {
+    display: block;
+    width: 100px;
+    height: 100px;
+    max-width: 100%;
+    margin: 1em 0;
+    border-radius: var(--radius-md);
+  }
+
   html[data-theme='light'] & {
     .save-status.saved {
       color: #166534;
