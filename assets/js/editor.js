@@ -90,6 +90,13 @@ const QAPauseMarker = Node.create({
 let editor = null;
 let currentDocument = null;
 let isDirty = false;
+let editorRevision = '';
+let editorChangeCounter = 0;
+let isApplyingEditorState = false;
+let saveInProgress = false;
+let draftSaveTimeout = null;
+let pendingEditorConflict = null;
+let editorDraftUpdates = {};
 let currentClassId = null; // Can be either GUID or legacy classNumber
 let currentNoteId = null; // Note ID when editing notes
 let allClasses = [];
@@ -123,6 +130,13 @@ window.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   loadDocument();
   initializeAutoSave();
+  window.addEventListener('pagehide', persistEditorDraft);
+  window.addEventListener('beforeunload', (event) => {
+    if (!isDirty) return;
+    persistEditorDraft();
+    event.preventDefault();
+    event.returnValue = '';
+  });
 });
 
 // Auto-save functionality
@@ -139,6 +153,183 @@ function initializeAutoSave() {
   }, 300000); // Auto-save every 5 minutes
 
   console.log('Auto-save initialized: will save every 5 minutes if changes are detected.');
+}
+
+function getEditorDraftKey() {
+  const docType = isNoteMode ? 'notes' : currentClassId ? 'classes' : 'local';
+  const recordId = currentNoteId || currentClassId || 'general-content';
+  return `bst-editor-draft:${docType}:${encodeURIComponent(recordId)}`;
+}
+
+function getCodeViewHtml() {
+  if (!isCodeView) return null;
+  const codeTextarea = document.getElementById('editor-code-view');
+  if (codeMirrorInstance) return codeMirrorInstance.getValue();
+  return codeTextarea?.value ?? editor.getHTML();
+}
+
+function getEditorContent() {
+  return {
+    html: editor.getHTML(),
+    json: editor.getJSON(),
+    text: editor.getText()
+  };
+}
+
+function markEditorDirty() {
+  isDirty = true;
+  editorChangeCounter += 1;
+  updateSaveStatus('Modified');
+  scheduleEditorDraftSave();
+}
+
+function scheduleEditorDraftSave() {
+  if (draftSaveTimeout) {
+    clearTimeout(draftSaveTimeout);
+  }
+  draftSaveTimeout = window.setTimeout(persistEditorDraft, 400);
+}
+
+function persistEditorDraft() {
+  if (!editor || (!isDirty && !Object.keys(editorDraftUpdates).length)) return;
+  if (draftSaveTimeout) {
+    clearTimeout(draftSaveTimeout);
+    draftSaveTimeout = null;
+  }
+
+  try {
+    localStorage.setItem(getEditorDraftKey(), JSON.stringify({
+      html: getCodeViewHtml() ?? editor.getHTML(),
+      revision: editorRevision,
+      updates: editorDraftUpdates,
+      updatedAt: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.error('Could not preserve the local editor draft:', error);
+    updateSaveStatus('Warning: local draft could not be stored');
+  }
+}
+
+function clearEditorDraft() {
+  try {
+    localStorage.removeItem(getEditorDraftKey());
+  } catch (error) {
+    console.error('Could not clear the saved local editor draft:', error);
+  }
+}
+
+function setEditorContent(content) {
+  isApplyingEditorState = true;
+  try {
+    editor.commands.setContent(content);
+  } finally {
+    isApplyingEditorState = false;
+  }
+}
+
+function getHtmlText(html) {
+  const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  return parsed.body.textContent || '';
+}
+
+function openEditorConflict({ kind, localHtml, latestDocument, latestRevision, localUpdates = {} }) {
+  const latestHtml = latestDocument?.content?.html || '';
+  pendingEditorConflict = { kind, localHtml, latestDocument, latestRevision, localUpdates };
+  document.getElementById('editor-conflict-message').textContent = kind === 'draft'
+    ? 'A saved local draft was found. Compare it with the latest server version before choosing what to continue with.'
+    : 'Another session saved this document after you opened it. Your changes are still here and have not been overwritten.';
+  const pendingSettings = Object.keys(localUpdates).length
+    ? `\n\nPending class settings:\n${JSON.stringify(localUpdates, null, 2)}`
+    : '';
+  document.getElementById('editor-conflict-local').textContent = `${getHtmlText(localHtml)}${pendingSettings}`;
+  document.getElementById('editor-conflict-latest').textContent = getHtmlText(latestHtml);
+  document.getElementById('editor-conflict-merge').value = localHtml;
+  document.getElementById('btn-conflict-keep-local').textContent = kind === 'draft'
+    ? 'Restore my draft'
+    : 'Keep my version and save';
+  openModal('editor-conflict-modal');
+}
+
+function checkForLocalEditorDraft(latestDocument) {
+  let draft;
+  try {
+    const stored = localStorage.getItem(getEditorDraftKey());
+    if (stored) draft = JSON.parse(stored);
+  } catch (error) {
+    console.error('Could not read the saved local editor draft:', error);
+    updateSaveStatus('Warning: local draft could not be read');
+    return;
+  }
+
+  if (!draft || typeof draft.html !== 'string') return;
+  const latestHtml = latestDocument?.content?.html || '';
+  if (draft.html !== latestHtml || Object.keys(draft.updates || {}).length) {
+    openEditorConflict({
+      kind: 'draft',
+      localHtml: draft.html,
+      latestDocument,
+      latestRevision: editorRevision,
+      localUpdates: draft.updates || {}
+    });
+  } else {
+    clearEditorDraft();
+  }
+}
+
+async function keepLocalEditorVersion() {
+  if (!pendingEditorConflict) return;
+  const conflict = pendingEditorConflict;
+  pendingEditorConflict = null;
+  closeModal('editor-conflict-modal');
+  if (conflict.kind === 'draft') {
+    setEditorContent(conflict.localHtml);
+  }
+  editorRevision = conflict.latestRevision;
+  editorDraftUpdates = { ...conflict.localUpdates };
+  markEditorDirty();
+  if (Object.keys(conflict.localUpdates).length) {
+    await saveEditorMetadata(conflict.localUpdates);
+  } else {
+    await saveDocument();
+  }
+}
+
+function useLatestEditorVersion() {
+  if (!pendingEditorConflict) return;
+  const conflict = pendingEditorConflict;
+  pendingEditorConflict = null;
+  setEditorContent(conflict.latestDocument?.content?.json || conflict.latestDocument?.content?.html || '<p></p>');
+  editorRevision = conflict.latestRevision;
+  if (isNoteMode) {
+    const noteIndex = allNotes.findIndex(note => note.id === currentNoteId || note.noteId === currentNoteId);
+    if (noteIndex !== -1) allNotes[noteIndex] = conflict.latestDocument;
+  } else if (currentClassId) {
+    const classIndex = allClasses.findIndex(cls => cls.id === currentClassId || cls.classNumber == currentClassId);
+    if (classIndex !== -1) allClasses[classIndex] = conflict.latestDocument;
+    generatedOutline = conflict.latestDocument.generatedOutline || null;
+  }
+  isDirty = false;
+  editorDraftUpdates = {};
+  clearEditorDraft();
+  closeModal('editor-conflict-modal');
+  updateSaveStatus('Saved');
+  updateOutlineNavigator();
+}
+
+async function applyMergedEditorVersion() {
+  if (!pendingEditorConflict) return;
+  const conflict = pendingEditorConflict;
+  const mergedHtml = document.getElementById('editor-conflict-merge').value;
+  pendingEditorConflict = null;
+  closeModal('editor-conflict-modal');
+  setEditorContent(mergedHtml);
+  editorRevision = conflict.latestRevision;
+  markEditorDirty();
+  if (Object.keys(conflict.localUpdates).length) {
+    await saveEditorMetadata(conflict.localUpdates);
+  } else {
+    await saveDocument();
+  }
 }
 
 // Initialize TipTap Editor
@@ -196,8 +387,9 @@ function initializeEditor() {
       },
     },
     onUpdate: ({ editor }) => {
-      isDirty = true;
-      updateSaveStatus('Modified');
+      if (!isApplyingEditorState) {
+        markEditorDirty();
+      }
       updateOutlineNavigator();
     },
     onSelectionUpdate: ({ editor }) => {
@@ -619,6 +811,9 @@ function setupEventListeners() {
 
   // Save button
   document.getElementById('btn-save').addEventListener('click', saveDocument);
+  document.getElementById('btn-conflict-keep-local')?.addEventListener('click', keepLocalEditorVersion);
+  document.getElementById('btn-conflict-use-latest')?.addEventListener('click', useLatestEditorVersion);
+  document.getElementById('btn-conflict-apply-merge')?.addEventListener('click', applyMergedEditorVersion);
 
   // View Teacher button
   document.getElementById('btn-view-teacher').addEventListener('click', viewTeacher);
@@ -643,6 +838,7 @@ function setupEventListeners() {
   document.querySelectorAll('.modal').forEach(modal => {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
+        if (modal.hasAttribute('data-no-dismiss')) return;
         closeModal(modal.id);
       }
     });
@@ -686,8 +882,7 @@ function setupEventListeners() {
   const codeTextarea = document.getElementById('editor-code-view');
   if (codeTextarea) {
     codeTextarea.addEventListener('input', () => {
-      isDirty = true;
-      updateSaveStatus('Modified');
+      markEditorDirty();
     });
   }
 
@@ -765,6 +960,10 @@ function setupEventListeners() {
     }
 
     if (e.key === 'Escape') {
+      if (pendingEditorConflict) {
+        e.preventDefault();
+        return;
+      }
       if (document.body.classList.contains('is-focus-mode')) {
         e.preventDefault();
         if (focusModeExitTimer === null) {
@@ -1383,23 +1582,6 @@ function loadBibleTranslationSetting() {
   select.value = translation;
 }
 
-async function saveClasses() {
-  const saveResponse = await window.BSTApi.fetch('/api/save/classes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ classes: allClasses })
-  }, { requireAdmin: true });
-
-  if (!saveResponse.ok) {
-    const errorData = await saveResponse.json().catch(() => ({}));
-    throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
-  }
-
-  return saveResponse.json().catch(() => ({}));
-}
-
 // Save Bible translation setting
 async function saveBibleTranslationSetting() {
   const select = document.getElementById('bible-translation-select');
@@ -1409,16 +1591,7 @@ async function saveBibleTranslationSetting() {
 
   try {
     if (currentClassId) {
-      // Load current classes
-      const data = await window.BSTApi.getClasses();
-      allClasses = normalizeClassesData(data);
-
-      // Find and update the class
-      const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
-      if (classIndex !== -1) {
-        allClasses[classIndex].bibleTranslation = translation;
-
-        await saveClasses();
+      if (await saveEditorMetadata({ bibleTranslation: translation })) {
         console.log('Bible translation preference saved:', translation);
         updateSaveStatus('Translation saved');
         setTimeout(() => updateSaveStatus('Saved'), 2000);
@@ -1845,8 +2018,7 @@ function toggleCodeView() {
       // Sync changes from CodeMirror back to textarea
       codeMirrorInstance.on('change', () => {
         codeTextarea.value = codeMirrorInstance.getValue();
-        isDirty = true;
-        updateSaveStatus('Modified');
+        markEditorDirty();
       });
     }
     
@@ -1871,94 +2043,44 @@ function toggleCodeView() {
     codeBtn.classList.remove('is-active');
     
     // Save document since we might have made changes in code view
-    isDirty = true;
-    updateSaveStatus('Modified');
+    markEditorDirty();
   }
 }
 
 // Save Document
 async function saveDocument() {
-  if (!editor) return;
+  if (!editor || saveInProgress || pendingEditorConflict) return;
+  saveInProgress = true;
 
   updateSaveStatus('Saving...');
 
-  if (isCodeView) {
-    const codeTextarea = document.getElementById('editor-code-view');
-    if (codeTextarea) {
-      editor.commands.setContent(codeTextarea.value);
-    }
+  const codeViewHtml = getCodeViewHtml();
+  if (codeViewHtml !== null) {
+    editor.commands.setContent(codeViewHtml);
   }
 
-  const content = {
-    html: editor.getHTML(),
-    json: editor.getJSON(),
-    text: editor.getText(),
-  };
+  const content = getEditorContent();
+  const savedChangeCounter = editorChangeCounter;
 
   try {
     if (isNoteMode && currentNoteId) {
-      // Load current notes
-      const response = await window.BSTApi.fetch('/api/data/notes');
-      if (!response.ok) {
-        throw new Error(`Failed to load notes data: ${response.status}`);
-      }
-      const data = await response.json();
-      allNotes = data.notes || [];
-
-      // Find and update the note
-      const noteIndex = allNotes.findIndex(n => n.id === currentNoteId);
-      if (noteIndex !== -1) {
-        allNotes[noteIndex].content = content;
-        allNotes[noteIndex].lastModified = new Date().toISOString();
-
-        console.log('Saving note to server...');
-        const saveResponse = await window.BSTApi.fetch('/api/save/notes', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ notes: allNotes })
-        }, { requireAdmin: true });
-
-        if (!saveResponse.ok) {
-          const errorData = await saveResponse.json().catch(() => ({}));
-          throw new Error(`Server error: ${saveResponse.status} ${saveResponse.statusText} - ${errorData.error || 'Unknown error'}`);
-        }
-
-        isDirty = false;
-        updateSaveStatus('Saved');
-        console.log('Note content saved:', content);
-      } else {
-        throw new Error('Note not found');
-      }
+      const saved = await window.BSTApi.saveEditorDocument('notes', currentNoteId, {
+        expectedRevision: editorRevision,
+        content
+      });
+      editorRevision = saved.revision;
+      const noteIndex = allNotes.findIndex(note => note.id === currentNoteId || note.noteId === currentNoteId);
+      if (noteIndex !== -1) allNotes[noteIndex] = saved.document;
     } else if (currentClassId) {
-      // Load current classes
-      const response = await window.BSTApi.fetch('/api/data/classes');
-      if (!response.ok) {
-        throw new Error(`Failed to load classes data: ${response.status}`);
+      if (generatedOutline && generatedOutline.length > 0) {
+        editorDraftUpdates = { ...editorDraftUpdates, generatedOutline };
       }
-      const data = await response.json();
-      allClasses = data.classes || [];
-
-      // Find and update the class (support both id and classNumber)
-      const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
-      if (classIndex !== -1) {
-        allClasses[classIndex].content = content;
-
-        // Also save the generated outline if it exists (to separate field)
-        if (generatedOutline && generatedOutline.length > 0) {
-          allClasses[classIndex].generatedOutline = generatedOutline;
-        }
-
-        console.log('Saving document to server...');
-        await saveClasses();
-
-        isDirty = false;
-        updateSaveStatus('Saved');
-        console.log('Class content saved:', content);
-      } else {
-        throw new Error('Class not found');
-      }
+      const savePayload = { expectedRevision: editorRevision, content, ...editorDraftUpdates };
+      if (Object.keys(editorDraftUpdates).length) persistEditorDraft();
+      const saved = await window.BSTApi.saveEditorDocument('classes', currentClassId, savePayload);
+      editorRevision = saved.revision;
+      const classIndex = allClasses.findIndex(cls => cls.id === currentClassId || cls.classNumber == currentClassId);
+      if (classIndex !== -1) allClasses[classIndex] = saved.document;
     } else {
       // Fallback to localStorage if no class number or note ID
       currentDocument = {
@@ -1969,12 +2091,93 @@ async function saveDocument() {
         lastModified: new Date().toISOString(),
       };
       localStorage.setItem('bible-study-content', JSON.stringify(currentDocument));
+    }
+
+    if (editorChangeCounter === savedChangeCounter) {
       isDirty = false;
+      editorDraftUpdates = {};
+      clearEditorDraft();
       updateSaveStatus('Saved');
+    } else {
+      isDirty = true;
+      persistEditorDraft();
+      updateSaveStatus('Modified');
     }
   } catch (error) {
+    if (error.status === 409 && error.payload?.latestDocument) {
+      isDirty = true;
+      persistEditorDraft();
+      updateSaveStatus('Conflict detected - compare versions');
+      openEditorConflict({
+        kind: 'conflict',
+        localHtml: content.html,
+        latestDocument: error.payload.latestDocument,
+        latestRevision: error.payload.latestRevision,
+        localUpdates: editorDraftUpdates
+      });
+      return;
+    }
     console.error('Save failed:', error);
+    if (isDirty) persistEditorDraft();
     updateSaveStatus('Save failed: ' + error.message);
+  } finally {
+    saveInProgress = false;
+  }
+}
+
+async function saveEditorMetadata(updates) {
+  if (!currentClassId || saveInProgress || pendingEditorConflict) return false;
+  saveInProgress = true;
+  updateSaveStatus('Saving...');
+  const codeViewHtml = getCodeViewHtml();
+  if (codeViewHtml !== null) editor.commands.setContent(codeViewHtml);
+  editorDraftUpdates = { ...editorDraftUpdates, ...updates };
+  persistEditorDraft();
+  const savedChangeCounter = editorChangeCounter;
+  try {
+    const saved = await window.BSTApi.saveEditorDocument('classes', currentClassId, {
+      expectedRevision: editorRevision,
+      content: getEditorContent(),
+      ...updates
+    });
+    editorRevision = saved.revision;
+    const classIndex = allClasses.findIndex(cls => cls.id === currentClassId || cls.classNumber == currentClassId);
+    if (classIndex !== -1) allClasses[classIndex] = saved.document;
+
+    if (editorChangeCounter === savedChangeCounter) {
+      isDirty = false;
+      editorDraftUpdates = {};
+      clearEditorDraft();
+      updateSaveStatus('Saved');
+    } else {
+      isDirty = true;
+      persistEditorDraft();
+      updateSaveStatus('Modified');
+    }
+    return true;
+  } catch (error) {
+    if (error.status === 409 && error.payload?.latestDocument) {
+      isDirty = true;
+      editorDraftUpdates = { ...editorDraftUpdates, ...updates };
+      persistEditorDraft();
+      updateSaveStatus('Conflict detected - compare versions');
+      openEditorConflict({
+        kind: 'conflict',
+        localHtml: editor.getHTML(),
+        latestDocument: error.payload.latestDocument,
+        latestRevision: error.payload.latestRevision,
+        localUpdates: updates
+      });
+      return false;
+    }
+    console.error('Editor metadata save failed:', error);
+    isDirty = true;
+    editorChangeCounter += 1;
+    persistEditorDraft();
+    updateSaveStatus('Save failed: ' + error.message);
+    return false;
+  } finally {
+    saveInProgress = false;
   }
 }
 
@@ -1993,7 +2196,7 @@ function updateSaveStatus(status) {
       statusEl.classList.add('saving');
     } else if (status === 'Modified') {
       statusEl.classList.add('modified');
-    } else if (status.startsWith('Warning:')) {
+    } else if (status.startsWith('Warning:') || status.startsWith('Conflict')) {
       statusEl.classList.add('warning');
     } else if (status.includes('failed')) {
       statusEl.classList.add('error');
@@ -2004,44 +2207,55 @@ function updateSaveStatus(status) {
 // Load Document
 async function loadDocument() {
   try {
+    let loadedEditorDocument = null;
     if (isNoteMode && currentNoteId) {
-      // Load note data
-      const data = await window.BSTApi.getNotes();
+      const [data, versioned] = await Promise.all([
+        window.BSTApi.getNotes(),
+        window.BSTApi.getEditorDocument('notes', currentNoteId)
+      ]);
       allNotes = data.notes || [];
-
-      // Find note by id
-      const note = allNotes.find(n => n.id === currentNoteId);
+      const noteIndex = allNotes.findIndex(note => note.id === currentNoteId || note.noteId === currentNoteId);
+      if (noteIndex !== -1) allNotes[noteIndex] = versioned.document;
+      loadedEditorDocument = versioned.document;
+      editorRevision = versioned.revision;
+      const note = loadedEditorDocument;
       if (note) {
         // Update document title
         document.getElementById('document-title').textContent = note.title || 'Note';
 
         // Load content
         if (note.content && (note.content.json || note.content.html)) {
-          editor.commands.setContent(note.content.json || note.content.html);
+          setEditorContent(note.content.json || note.content.html);
         } else {
           // No content yet, show a starter template for notes
-          editor.commands.setContent(getNoteStarterTemplate(note));
+          setEditorContent(getNoteStarterTemplate(note));
         }
       } else {
-        editor.commands.setContent('<p>Note not found. Creating new content...</p>');
+        setEditorContent('<p>Note not found. Creating new content...</p>');
       }
     } else if (currentClassId) {
-      // Load class data
-      const data = await window.BSTApi.getClasses();
+      const [data, versioned] = await Promise.all([
+        window.BSTApi.getClasses(),
+        window.BSTApi.getEditorDocument('classes', currentClassId)
+      ]);
       allClasses = normalizeClassesData(data);
+      const classIndex = allClasses.findIndex(cls => cls.id === currentClassId || cls.classNumber == currentClassId);
+      if (classIndex !== -1) allClasses[classIndex] = versioned.document;
+      loadedEditorDocument = versioned.document;
+      editorRevision = versioned.revision;
 
       // Find class by id or classNumber (backward compatibility)
-      const cls = allClasses.find(c => c.id === currentClassId || c.classNumber == currentClassId);
+      const cls = loadedEditorDocument;
       if (cls) {
         // Update document title
         document.getElementById('document-title').textContent = cls.title || 'Class Content';
 
         // Load content
         if (cls.content && (cls.content.json || cls.content.html)) {
-          editor.commands.setContent(cls.content.json || cls.content.html);
+          setEditorContent(cls.content.json || cls.content.html);
         } else {
           // No content yet, show a starter template
-          editor.commands.setContent(getStarterTemplate(cls));
+          setEditorContent(getStarterTemplate(cls));
         }
 
         // Load generatedOutline if it exists
@@ -2052,7 +2266,7 @@ async function loadDocument() {
 
         renderEditorMediaSidebar(cls);
       } else {
-        editor.commands.setContent('<p>Class not found. Creating new content...</p>');
+        setEditorContent('<p>Class not found. Creating new content...</p>');
         renderEditorMediaSidebar(null);
       }
     } else {
@@ -2061,9 +2275,11 @@ async function loadDocument() {
 
       if (saved) {
         currentDocument = JSON.parse(saved);
-        editor.commands.setContent(currentDocument.content.json || currentDocument.content.html);
+        setEditorContent(currentDocument.content.json || currentDocument.content.html);
+        loadedEditorDocument = currentDocument;
       } else {
-        editor.commands.setContent(getSampleContent());
+        setEditorContent(getSampleContent());
+        loadedEditorDocument = { content: { html: editor.getHTML() } };
       }
 
       renderEditorMediaSidebar(null);
@@ -2075,11 +2291,13 @@ async function loadDocument() {
     } else {
       updateOutlineNavigator();
     }
-    updateSaveStatus('Saved');
+    isDirty = false;
+    checkForLocalEditorDraft(loadedEditorDocument);
+    if (!pendingEditorConflict) updateSaveStatus('Saved');
     updateToolbarActiveStates(editor);
   } catch (error) {
     console.error('Load failed:', error);
-    editor.commands.setContent('<p>Failed to load content. Start editing here...</p>');
+    setEditorContent('<p>Failed to load content. Start editing here...</p>');
     renderEditorMediaSidebar(null);
   }
 }
@@ -2469,15 +2687,6 @@ async function applyOutlineToClass() {
   }
 
   try {
-    // Load current classes
-    const response = await window.BSTApi.fetch('/api/data/classes');
-    if (!response.ok) {
-      throw new Error(`Failed to load classes data: ${response.status}`);
-    }
-    const data = await response.json();
-    allClasses = data.classes || [];
-    console.log(`Loaded ${allClasses.length} classes from classes.json`);
-
     // Find and update the class (support both id and classNumber)
     const classIndex = allClasses.findIndex(c => c.id === currentClassId || c.classNumber == currentClassId);
     console.log(`Looking for class with id/classNumber: ${currentClassId}, found at index: ${classIndex}`);
@@ -2491,8 +2700,12 @@ async function applyOutlineToClass() {
       console.log(`Updated class at index ${classIndex} with outline`);
       console.log('Outline structure:', generatedOutline);
 
-      console.log('Sending to server: classes payload');
-      await saveClasses();
+      console.log('Saving outline with the current document revision');
+      const saved = await saveEditorMetadata({
+        generatedOutline,
+        outline: generatedOutline
+      });
+      if (!saved) return;
 
       // Update the outline navigator to reflect new structure
       updateOutlineNavigatorFromGenerated(generatedOutline);

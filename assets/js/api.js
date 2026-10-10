@@ -3,6 +3,7 @@
   const STORAGE_KEY_ACCESS = 'bst-supabase-access-token';
   const STORAGE_KEY_REFRESH = 'bst-supabase-refresh-token';
   const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+  let refreshInProgress = null;
 
   function isLoopbackHost(hostname) {
     return LOOPBACK_HOSTS.has(hostname) || hostname.endsWith('.localhost');
@@ -79,27 +80,43 @@
   }
 
   async function refreshAuthSession() {
+    if (refreshInProgress) {
+      return refreshInProgress;
+    }
+
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
       return false;
     }
 
-    const response = await fetch('/api/auth/refresh', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ refreshToken })
-    });
+    refreshInProgress = (async () => {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refreshToken })
+      });
 
-    if (!response.ok) {
-      clearAuthSession();
-      return false;
+      if (!response.ok) {
+        const currentRefreshToken = getRefreshToken();
+        if (currentRefreshToken && currentRefreshToken !== refreshToken) {
+          return true;
+        }
+        clearAuthSession();
+        return false;
+      }
+
+      const payload = await response.json();
+      setAuthSession(payload.session);
+      return true;
+    })();
+
+    try {
+      return await refreshInProgress;
+    } finally {
+      refreshInProgress = null;
     }
-
-    const payload = await response.json();
-    setAuthSession(payload.session);
-    return true;
   }
 
   async function promptAndLogin() {
@@ -299,6 +316,29 @@
     return fetchJson('/api/data/notes', {}, { requireAdmin: true });
   }
 
+  async function getEditorDocument(docType, recordId) {
+    return fetchJson(`/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}`, {}, {
+      requireAdmin: true
+    });
+  }
+
+  async function saveEditorDocument(docType, recordId, payload) {
+    const response = await fetchWithSecurity(`/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }, { requireAdmin: true });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(result?.error || `Request failed: ${response.status}`);
+      error.status = response.status;
+      error.payload = result;
+      throw error;
+    }
+    return result;
+  }
+
   async function upsertSupabaseClass(classId, classPayload) {
     return fetchJson(`/api/supabase/classes/${encodeURIComponent(classId)}`, {
       method: 'PUT',
@@ -430,6 +470,8 @@
     getClasses,
     getLessonPlans,
     getNotes,
+    getEditorDocument,
+    saveEditorDocument,
     upsertSupabaseClass,
     deleteSupabaseClass,
     upsertSupabaseLessonPlan,

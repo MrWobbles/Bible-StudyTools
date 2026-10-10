@@ -17,6 +17,8 @@ const {
   connectDB,
   isConnected,
   loadDoc,
+  getEditorRecord,
+  saveEditorRecordIfRevision,
   saveDoc,
   upsertClassRecord,
   deleteClassRecord,
@@ -128,6 +130,25 @@ const noteRecordSchema = z.object({
 const notesSaveSchema = z.object({
   notes: z.array(noteRecordSchema).max(MAX_NOTES_PER_PAYLOAD)
 }).passthrough();
+
+const editorContentSchema = z.object({
+  html: z.string().max(8_000_000),
+  json: z.any(),
+  text: z.string().max(8_000_000)
+});
+
+const editorSaveSchema = z.object({
+  expectedRevision: boundedIdSchema.max(100),
+  content: editorContentSchema.optional(),
+  generatedOutline: z.array(z.any()).optional(),
+  outline: z.array(z.any()).optional(),
+  bibleTranslation: baseStringSchema.max(40).optional()
+}).refine(payload => (
+  payload.content !== undefined ||
+  payload.generatedOutline !== undefined ||
+  payload.outline !== undefined ||
+  payload.bibleTranslation !== undefined
+), { message: 'At least one editor field must be provided.' });
 
 // Middleware - JSON parsing first
 // classes.json can exceed the default 100kb when outlines/content are expanded
@@ -1248,6 +1269,72 @@ function requireSupabaseConnection(res) {
 }
 
 // ===== API ENDPOINTS =====
+
+app.get('/api/editor/:docType/:recordId', requireAuthenticatedAccess, async (req, res) => {
+  const docType = String(req.params.docType || '');
+  if (!['classes', 'notes'].includes(docType)) {
+    return res.status(400).json({ error: 'Editor document type must be "classes" or "notes".' });
+  }
+  if (!isConnected()) {
+    return res.status(503).json({ error: 'Supabase is disconnected. Editor revisions are unavailable.' });
+  }
+
+  try {
+    const result = await getEditorRecord(docType, req.params.recordId, getRequestOwnerOptions(req));
+    if (!result) {
+      return res.status(404).json({ error: 'Editor document not found.' });
+    }
+    return res.json(result);
+  } catch (err) {
+    return sendApiError(res, err, 'Failed to load editor document');
+  }
+});
+
+app.put('/api/editor/:docType/:recordId', requireAuthenticatedAccess, async (req, res) => {
+  const docType = String(req.params.docType || '');
+  if (!['classes', 'notes'].includes(docType)) {
+    return res.status(400).json({ error: 'Editor document type must be "classes" or "notes".' });
+  }
+  if (!isConnected()) {
+    return res.status(503).json({ error: 'Supabase is disconnected. Editor revisions are unavailable.' });
+  }
+
+  const parsed = parseBodyWithSchema(editorSaveSchema, req.body, 'Invalid editor save payload');
+  if (!parsed.ok) {
+    return res.status(parsed.status).json({ error: parsed.error, details: parsed.details });
+  }
+
+  try {
+    const result = await saveEditorRecordIfRevision(
+      docType,
+      req.params.recordId,
+      parsed.data.expectedRevision,
+      parsed.data,
+      getRequestOwnerOptions(req)
+    );
+
+    if (result.status === 'conflict') {
+      return res.status(409).json({
+        error: 'This document changed in another session. Compare versions before saving.',
+        latestDocument: result.document,
+        latestRevision: result.revision
+      });
+    }
+    if (result.status === 'not-found') {
+      return res.status(404).json({ error: 'Editor document not found.' });
+    }
+    if (result.status === 'unavailable') {
+      return res.status(503).json({ error: 'Supabase is disconnected. Editor revisions are unavailable.' });
+    }
+    if (result.status !== 'saved') {
+      return res.status(400).json({ error: 'Editor save requires a valid revision.' });
+    }
+
+    return res.json({ success: true, document: result.document, revision: result.revision });
+  } catch (err) {
+    return sendApiError(res, err, 'Failed to save editor document');
+  }
+});
 
 app.get('/api/data/:fileName', async (req, res) => {
   // Allow GET requests on localhost without authentication for testing

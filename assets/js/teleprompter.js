@@ -1246,8 +1246,12 @@ function setupControls() {
   document.addEventListener('keydown', (e) => {
     if (e.target.matches?.('input[type="range"]')) e.target.blur();
     const step = e.shiftKey ? 1 : 5;
-    if (e.key === ' ') {
+    if (e.key === ' ' || e.code === 'Space') {
+      if (e.target.matches?.('input:not([type="range"]), textarea, select, [contenteditable="true"]')) return;
       e.preventDefault();
+      if (e.repeat) return;
+      // Drop focus from buttons so Space doesn't also click them on release
+      if (e.target.matches?.('button, a, [role="button"]')) e.target.blur();
       toggleScrolling(); // Space for play/pause instead of speech toggle
     } else if (e.key === 'Tab') {
       e.preventDefault();
@@ -1375,6 +1379,24 @@ function updateSpeedDisplay() {
   }
 }
 
+// Auto-pause once when a verse link reaches the reading line
+const pausedVerseLinks = new WeakSet();
+function pauseAtVerseLink(container) {
+  const readingLine = container.getBoundingClientRect().top + container.clientHeight * 0.30;
+  let shouldPause = false;
+  document.querySelectorAll('#script-flow a[data-verse]').forEach((link) => {
+    const top = link.getBoundingClientRect().top;
+    if (top > readingLine) {
+      pausedVerseLinks.delete(link); // scrolled back above it; re-arm
+    } else if (!pausedVerseLinks.has(link)) {
+      pausedVerseLinks.add(link);
+      // Ignore links already well past (e.g. after a jump)
+      if (readingLine - top < 120) shouldPause = true;
+    }
+  });
+  return shouldPause;
+}
+
 // Constant-speed scroll loop (runs continuously)
 function startScrollLoop() {
   function scroll() {
@@ -1399,6 +1421,7 @@ function startScrollLoop() {
         scrollRemainder -= whole;
         scrollTarget.scrollTop += whole;
       }
+      if (pauseAtVerseLink(scrollTarget)) toggleScrolling();
     }
 
     scrollLoopId = requestAnimationFrame(scroll);

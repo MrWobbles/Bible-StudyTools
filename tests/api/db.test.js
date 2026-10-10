@@ -13,7 +13,11 @@ function createInMemorySupabase(seed = {}) {
   const applyFilters = (rows, filters) => {
     return rows.filter((row) => filters.every((filter) => {
       if (filter.type === 'eq') {
-        return row[filter.field] === filter.value;
+        const jsonPathMatch = String(filter.field).match(/^data->>(.+)$/);
+        const value = jsonPathMatch
+          ? String(row.data?.[jsonPathMatch[1]] ?? '')
+          : row[filter.field];
+        return value === filter.value;
       }
       if (filter.type === 'in') {
         return Array.isArray(filter.values) && filter.values.includes(row[filter.field]);
@@ -40,9 +44,14 @@ function createInMemorySupabase(seed = {}) {
     }
 
     select(fields, options = {}) {
-      this.operation = 'select';
       this.selectFields = fields;
       this.selectOptions = options || {};
+      return this;
+    }
+
+    update(payload) {
+      this.operation = 'update';
+      this.updatePayload = payload;
       return this;
     }
 
@@ -108,6 +117,23 @@ function createInMemorySupabase(seed = {}) {
 
     async execute() {
       const rows = tables[this.tableName] || [];
+
+      if (this.operation === 'update') {
+        const updated = [];
+        rows.forEach((row, index) => {
+          if (applyFilters([row], this.filters).length) {
+            rows[index] = { ...row, ...clone(this.updatePayload) };
+            updated.push(clone(rows[index]));
+          }
+        });
+        let selected = updated;
+        if (typeof this.selectFields === 'string' && this.selectFields !== '*') {
+          const fields = this.selectFields.split(',').map(field => field.trim()).filter(Boolean);
+          selected = selected.map(row => Object.fromEntries(fields.map(field => [field, row[field]])));
+        }
+        tables[this.tableName] = rows;
+        return { data: selected, error: null };
+      }
 
       if (this.operation === 'delete') {
         const filtered = applyFilters(rows, this.filters);
@@ -234,6 +260,35 @@ describe('db Supabase normalized storage behavior', () => {
     const loaded = await dbModule.loadDoc('classes');
     expect(Array.isArray(loaded.classes)).toBe(true);
     expect(loaded.classes.map((item) => item.id)).toEqual(['class-1', 'class-2']);
+  });
+
+  it('saves editor content only when its loaded revision is current', async () => {
+    await dbModule.connectDB();
+    await dbModule.saveDoc('classes', {
+      classes: [{ id: 'class-1', classNumber: 1, content: { html: '<p>Original</p>' } }]
+    });
+
+    const loaded = await dbModule.getEditorRecord('classes', 'class-1');
+    expect(loaded.document.content.html).toBe('<p>Original</p>');
+    expect(loaded.revision).toBeTruthy();
+
+    const saved = await dbModule.saveEditorRecordIfRevision(
+      'classes',
+      'class-1',
+      loaded.revision,
+      { content: { html: '<p>Updated</p>', json: {}, text: 'Updated' } }
+    );
+    expect(saved.status).toBe('saved');
+    expect(saved.document.content.html).toBe('<p>Updated</p>');
+
+    const staleSave = await dbModule.saveEditorRecordIfRevision(
+      'classes',
+      'class-1',
+      loaded.revision,
+      { content: { html: '<p>Stale overwrite</p>', json: {}, text: 'Stale overwrite' } }
+    );
+    expect(staleSave.status).toBe('conflict');
+    expect(staleSave.document.content.html).toBe('<p>Updated</p>');
   });
 
   it('removes deleted class references from lesson plans', async () => {

@@ -75,6 +75,51 @@ body.page--editor {
     color: var(--status-error);
   }
 
+  .save-status.warning {
+    color: var(--status-warning);
+  }
+
+  .editor-conflict-modal {
+    z-index: 1100;
+
+    .modal-content {
+      width: min(1100px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+    }
+
+    .editor-conflict-comparison {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .editor-conflict-comparison section {
+      min-width: 0;
+    }
+
+    .editor-conflict-comparison pre {
+      min-height: 140px;
+      max-height: 240px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      padding: 12px;
+      border: 1px solid var(--glass-border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--input-bg);
+      color: var(--text-primary);
+    }
+
+    #editor-conflict-merge {
+      width: 100%;
+      min-height: 160px;
+      margin-top: 8px;
+      font-family: Consolas, "Courier New", monospace;
+    }
+  }
+
   .editor-main {
     grid-template-columns: 280px 1fr;
     flex: 1;
@@ -299,6 +344,10 @@ body.page--editor {
 
     .save-status.error {
       color: #991b1b;
+    }
+
+    .save-status.warning {
+      color: #92400e;
     }
 
     .editor {

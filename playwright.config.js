@@ -22,7 +22,11 @@ module.exports = defineConfig({
     env: {
       ...process.env,
       PORT: String(port),
-      BST_DISABLE_BROWSER_OPEN: '1'
+      BST_REQUIRE_ADMIN_ON_LOOPBACK: '0',
+      BST_DISABLE_BROWSER_OPEN: '1',
+      SUPABASE_URL: '',
+      SUPABASE_ANON_KEY: '',
+      SUPABASE_SERVICE_ROLE_KEY: ''
     }
   }
 });

@@ -32,6 +32,15 @@ test.describe('editor save and shortcuts P0', () => {
     };
 
     let saveCalls = 0;
+    let editorRevision = 'revision-1';
+
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: { id: 'editor-shortcuts-test', role: 'admin' } })
+      });
+    });
 
     await page.route('**/api/data/classes', async (route) => {
       await route.fulfill({
@@ -41,29 +50,32 @@ test.describe('editor save and shortcuts P0', () => {
       });
     });
 
-    await page.route('**/api/auth/me**', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ user: { id: 'editor-shortcuts-test', role: 'admin' } })
-      });
-    });
-
-    await page.route('**/api/save/classes', async (route) => {
+    await page.route('**/api/editor/classes/1', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ document: classesState.classes[0], revision: editorRevision })
+        });
+        return;
+      }
       const payload = route.request().postDataJSON() || {};
-      classesState = {
-        classes: Array.isArray(payload.classes) ? payload.classes : []
-      };
+      classesState.classes[0].content = payload.content;
       saveCalls += 1;
+      editorRevision = `revision-${saveCalls + 1}`;
 
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true, cloudSync: { ok: true } })
+        body: JSON.stringify({
+          success: true,
+          document: classesState.classes[0],
+          revision: editorRevision
+        })
       });
     });
 
-    await page.goto('/editor.html?class=1');
+    await page.goto('/editor.html?class=1', { waitUntil: 'commit' });
     await expect(page.locator('#save-status')).toHaveText(/saved/i);
 
     const prose = page.locator('#editor .ProseMirror');

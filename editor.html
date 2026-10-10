@@ -333,6 +333,34 @@
     </div>
   </div>
 
+  <div id="editor-conflict-modal" class="modal editor-conflict-modal" data-no-dismiss aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="editor-conflict-title">Document changed</h3>
+      </div>
+      <div class="modal-body">
+        <p id="editor-conflict-message"></p>
+        <div class="editor-conflict-comparison">
+          <section>
+            <h4>Your version</h4>
+            <pre id="editor-conflict-local"></pre>
+          </section>
+          <section>
+            <h4>Latest saved version</h4>
+            <pre id="editor-conflict-latest"></pre>
+          </section>
+        </div>
+        <label for="editor-conflict-merge">Combine versions (HTML)</label>
+        <textarea id="editor-conflict-merge" rows="8" spellcheck="false"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-conflict-keep-local" class="btn btn-primary" type="button">Keep my version and save</button>
+        <button id="btn-conflict-apply-merge" class="btn btn-secondary" type="button">Save combined version</button>
+        <button id="btn-conflict-use-latest" class="btn btn-secondary" type="button">Use latest version</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Image Upload Modal -->
   <div id="image-modal" class="modal">
     <div class="modal-content">

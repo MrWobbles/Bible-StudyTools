@@ -1,8 +1,8 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('editor save flow P1', () => {
-  test('saves classes through aggregate endpoint without skip-cloud header', async ({ page }) => {
-    let saveHeaderValue = null;
+  test('saves class content with its loaded revision', async ({ page }) => {
+    let savePayload = null;
     let classesState = {
       classes: [
         {
@@ -31,6 +31,14 @@ test.describe('editor save flow P1', () => {
       ]
     };
 
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: { id: 'editor-save-test', role: 'admin' } })
+      });
+    });
+
     await page.route('**/api/data/classes', async (route) => {
       await route.fulfill({
         status: 200,
@@ -39,30 +47,34 @@ test.describe('editor save flow P1', () => {
       });
     });
 
-    await page.route('**/api/save/classes', async (route) => {
-      saveHeaderValue = route.request().headers()['x-bst-skip-cloud-sync'] || '';
-      const payload = route.request().postDataJSON() || {};
-      classesState = {
-        classes: Array.isArray(payload.classes) ? payload.classes : []
-      };
-
+    await page.route('**/api/editor/classes/1', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ document: classesState.classes[0], revision: 'revision-1' })
+        });
+        return;
+      }
+      savePayload = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ success: true })
+        body: JSON.stringify({ success: true, document: classesState.classes[0], revision: 'revision-2' })
       });
     });
 
-    await page.goto('/editor.html?class=1');
+    await page.goto('/editor.html?class=1', { waitUntil: 'commit' });
     await page.locator('#editor .ProseMirror').click();
     await page.keyboard.type(' Saved from editor.');
     await page.locator('#btn-save').click();
 
     await expect(page.locator('#save-status')).toHaveText(/saved/i);
-    expect(saveHeaderValue).toBe('');
+    expect(savePayload.expectedRevision).toBe('revision-1');
+    expect(savePayload.content.html).toContain('Saved from editor.');
   });
 
-  test('shows an error when aggregate save fails', async ({ page }) => {
+  test('shows an error when revision-checked save fails', async ({ page }) => {
     const classesState = {
       classes: [
         {
@@ -91,6 +103,14 @@ test.describe('editor save flow P1', () => {
       ]
     };
 
+    await page.route('**/api/auth/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: { id: 'editor-save-test', role: 'admin' } })
+      });
+    });
+
     await page.route('**/api/data/classes', async (route) => {
       await route.fulfill({
         status: 200,
@@ -99,17 +119,28 @@ test.describe('editor save flow P1', () => {
       });
     });
 
-    await page.route('**/api/save/classes', async (route) => {
+    await page.route('**/api/editor/classes/1', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ document: classesState.classes[0], revision: 'revision-1' })
+        });
+        return;
+      }
       await route.fulfill({
         status: 503,
         contentType: 'application/json',
-        body: JSON.stringify({ error: 'Supabase is disconnected. Cannot save classes.' })
+        body: JSON.stringify({ error: 'Supabase is disconnected. Cannot save editor content.' })
       });
     });
 
-    await page.goto('/editor.html?class=1');
+    await page.goto('/editor.html?class=1', { waitUntil: 'commit' });
+    await page.locator('#editor .ProseMirror').waitFor();
+    await page.locator('#editor .ProseMirror').click();
+    await page.keyboard.type(' Unsaved after server failure.');
     await page.locator('#btn-save').click();
 
-    await expect(page.locator('#save-status')).toHaveText(/error/i);
+    await expect(page.locator('#save-status')).toHaveText(/failed/i);
   });
 });

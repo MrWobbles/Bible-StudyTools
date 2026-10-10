@@ -8,6 +8,7 @@ describe('server API', () => {
   let videoDir;
   let app;
   let serverModule;
+  let originalRequireAdminOnLoopback;
 
   beforeEach(async () => {
     tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'bst-api-test-'));
@@ -15,8 +16,10 @@ describe('server API', () => {
 
     await fs.mkdir(videoDir, { recursive: true });
 
+    originalRequireAdminOnLoopback = process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK;
     process.env.BST_VIDEO_DIR = videoDir;
     process.env.BST_DISABLE_BROWSER_OPEN = '1';
+    process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK = '0';
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -34,6 +37,11 @@ describe('server API', () => {
 
     delete process.env.BST_VIDEO_DIR;
     delete process.env.BST_DISABLE_BROWSER_OPEN;
+    if (originalRequireAdminOnLoopback === undefined) {
+      delete process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK;
+    } else {
+      process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK = originalRequireAdminOnLoopback;
+    }
     delete require.cache[require.resolve('../../server')];
     delete require.cache[require.resolve('../../db')];
 

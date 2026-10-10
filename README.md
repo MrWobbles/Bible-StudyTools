@@ -244,6 +244,11 @@ This app requires your own Supabase project for cloud storage and authentication
 - Highlight a phrase in the editor, then use the "Verse Lookup by Thought" button or press `Alt+T`
 - Select verses from the modal and click "Insert Selected"
 
+### 8. Editor Drafts and Conflicts
+- Editor changes are saved locally as a recovery draft while you work; successful server saves clear that draft.
+- Class and note content saves use the revision loaded by the editor. If another session saves first, the stale save is rejected and the editor offers both versions before allowing an overwrite or manual HTML combination.
+- Recovery drafts are stored in that browser's local storage and are not shared across browsers or devices.
+
 ### Troubleshooting
 - If you see errors about connecting to Ollama, ensure the server is running and the model is pulled
 - For more help, see the [Ollama documentation](https://ollama.com/docs)

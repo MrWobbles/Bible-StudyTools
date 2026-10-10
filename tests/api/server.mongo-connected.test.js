@@ -10,6 +10,7 @@ describe('server API with connected Supabase (mocked)', () => {
   let serverModule;
   let dbMock;
   let dbModulePath;
+  let originalRequireAdminOnLoopback;
 
   beforeEach(async () => {
     tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'bst-api-supabase-test-'));
@@ -17,13 +18,24 @@ describe('server API with connected Supabase (mocked)', () => {
 
     await fs.mkdir(videoDir, { recursive: true });
 
+    originalRequireAdminOnLoopback = process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK;
     process.env.BST_VIDEO_DIR = videoDir;
     process.env.BST_DISABLE_BROWSER_OPEN = '1';
+    process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK = '0';
 
     dbMock = {
       connectDB: vi.fn(async () => true),
       isConnected: vi.fn(() => true),
       loadDoc: vi.fn(async () => null),
+      getEditorRecord: vi.fn(async () => ({
+        document: { id: 'class-1', content: { html: '<p>Current</p>' } },
+        revision: '2026-10-10T12:00:00.000Z'
+      })),
+      saveEditorRecordIfRevision: vi.fn(async () => ({
+        status: 'saved',
+        document: { id: 'class-1', content: { html: '<p>Updated</p>' } },
+        revision: '2026-10-10T12:01:00.000Z'
+      })),
       saveDoc: vi.fn(async () => true),
       upsertClassRecord: vi.fn(async (_classId, classData) => classData),
       deleteClassRecord: vi.fn(async () => true),
@@ -57,6 +69,11 @@ describe('server API with connected Supabase (mocked)', () => {
 
     delete process.env.BST_VIDEO_DIR;
     delete process.env.BST_DISABLE_BROWSER_OPEN;
+    if (originalRequireAdminOnLoopback === undefined) {
+      delete process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK;
+    } else {
+      process.env.BST_REQUIRE_ADMIN_ON_LOOPBACK = originalRequireAdminOnLoopback;
+    }
 
     if (dbModulePath) {
       delete require.cache[dbModulePath];
@@ -79,6 +96,51 @@ describe('server API with connected Supabase (mocked)', () => {
       { id: 'class-99', title: 'Connected Upsert' },
       'api-partial-upsert'
     );
+  });
+
+  it('loads and revision-checks editor documents', async () => {
+    const loaded = await request(app)
+      .get('/api/editor/classes/class-1')
+      .expect(200);
+
+    expect(loaded.body.revision).toBe('2026-10-10T12:00:00.000Z');
+    expect(dbMock.getEditorRecord).toHaveBeenCalledWith('classes', 'class-1', null);
+
+    const saved = await request(app)
+      .put('/api/editor/classes/class-1')
+      .send({
+        expectedRevision: '2026-10-10T12:00:00.000Z',
+        content: { html: '<p>Updated</p>', json: {}, text: 'Updated' }
+      })
+      .expect(200);
+
+    expect(saved.body.revision).toBe('2026-10-10T12:01:00.000Z');
+    expect(dbMock.saveEditorRecordIfRevision).toHaveBeenCalledWith(
+      'classes',
+      'class-1',
+      '2026-10-10T12:00:00.000Z',
+      { expectedRevision: '2026-10-10T12:00:00.000Z', content: { html: '<p>Updated</p>', json: {}, text: 'Updated' } },
+      null
+    );
+  });
+
+  it('returns the latest document when an editor save conflicts', async () => {
+    dbMock.saveEditorRecordIfRevision.mockResolvedValueOnce({
+      status: 'conflict',
+      document: { id: 'class-1', content: { html: '<p>Other session</p>' } },
+      revision: '2026-10-10T12:02:00.000Z'
+    });
+
+    const response = await request(app)
+      .put('/api/editor/classes/class-1')
+      .send({
+        expectedRevision: '2026-10-10T12:00:00.000Z',
+        content: { html: '<p>My edit</p>', json: {}, text: 'My edit' }
+      })
+      .expect(409);
+
+    expect(response.body.latestDocument.content.html).toContain('Other session');
+    expect(response.body.latestRevision).toBe('2026-10-10T12:02:00.000Z');
   });
 
   it('deletes class via partial Supabase endpoint when connected', async () => {
