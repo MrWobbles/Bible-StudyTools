@@ -129,6 +129,46 @@
     });
   }
 
+  async function handleOAuthReturn() {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const oauthError = hash.get('error_description') || hash.get('error');
+    const accessToken = hash.get('access_token');
+    if (!oauthError && !accessToken) {
+      return false;
+    }
+
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+
+    if (oauthError) {
+      setStatus(oauthError.replace(/\+/g, ' '), true);
+      return true;
+    }
+
+    setStatus('Signing in with Google...', false);
+    try {
+      const response = await fetch('/api/auth/google-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken,
+          refreshToken: hash.get('refresh_token') || '',
+          expiresIn: Number(hash.get('expires_in')) || 3600
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Google sign in failed.');
+      }
+      window.BSTApi.setAuthSession(payload.session);
+      setStatus('Signed in. Redirecting...', false);
+      window.location.replace(getRedirectTarget());
+    } catch (err) {
+      window.BSTApi.clearAuthSession?.();
+      setStatus(err?.message || 'Google sign in failed.', true);
+    }
+    return true;
+  }
+
   async function init() {
     setupTabs();
     activateTab('signin');
@@ -136,6 +176,10 @@
     document.getElementById('signin-form')?.addEventListener('submit', handleLoginSubmit);
     document.getElementById('signup-form')?.addEventListener('submit', handleSignupSubmit);
     document.getElementById('request-form')?.addEventListener('submit', handleRequestSubmit);
+
+    if (await handleOAuthReturn()) {
+      return;
+    }
 
     try {
       await window.BSTApi.getCurrentUser();

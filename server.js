@@ -927,6 +927,40 @@ function isSupabaseUserAuthorized(user) {
   return false;
 }
 
+function getSupabaseUserProviders(user) {
+  const providers = new Set();
+  const primary = String(user?.app_metadata?.provider || '').trim().toLowerCase();
+  if (primary) providers.add(primary);
+  const list = Array.isArray(user?.app_metadata?.providers) ? user.app_metadata.providers : [];
+  list.forEach((p) => providers.add(String(p || '').trim().toLowerCase()));
+  return providers;
+}
+
+// Accounts with no email/password identity were self-created through an OAuth provider
+// and must be explicitly approved (existing profile, admin, or allow-listed email).
+async function isOAuthOnlyUserApproved(user) {
+  if (isSupabaseAdminUser(user)) {
+    return true;
+  }
+
+  if (SUPABASE_ALLOWED_EMAILS.has(getSupabaseUserEmail(user))) {
+    return true;
+  }
+
+  if (!supabaseServiceClient) {
+    return false;
+  }
+
+  const { data, error } = await supabaseServiceClient
+    .from(USER_PROFILES_TABLE)
+    .select('user_id')
+    .eq('user_id', String(user.id || ''))
+    .limit(1)
+    .maybeSingle();
+
+  return !error && Boolean(data);
+}
+
 async function getSupabaseUserFromToken(accessToken, options = {}) {
   if (!SUPABASE_AUTH_ENABLED || !accessToken) {
     return null;
@@ -947,6 +981,10 @@ async function getSupabaseUserFromToken(accessToken, options = {}) {
 
     const user = await response.json();
     if (!isSupabaseUserAuthorized(user)) {
+      return null;
+    }
+
+    if (!getSupabaseUserProviders(user).has('email') && !(await isOAuthOnlyUserApproved(user))) {
       return null;
     }
 
@@ -1858,6 +1896,55 @@ app.post('/api/auth/refresh', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: 'Failed to refresh Supabase session.' });
   }
+});
+
+function getPublicBaseUrl(req) {
+  const configured = String(process.env.BST_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (configured) {
+    return configured;
+  }
+
+  const proto = String(req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+  return `${proto}://${req.get('host')}`;
+}
+
+app.get('/api/auth/google', (req, res) => {
+  if (!SUPABASE_AUTH_ENABLED) {
+    return res.status(503).json({ error: 'Supabase auth is not configured on this server.' });
+  }
+
+  const redirectTo = `${getPublicBaseUrl(req)}/auth.html`;
+  const params = new URLSearchParams({ provider: 'google', redirect_to: redirectTo });
+  return res.redirect(`${SUPABASE_URL}/auth/v1/authorize?${params.toString()}`);
+});
+
+// Exchanges the tokens Supabase returned after Google sign-in for a server session.
+// Only accounts that are already approved (profile, admin, or allow-listed) are accepted.
+app.post('/api/auth/google-session', async (req, res) => {
+  if (!SUPABASE_AUTH_ENABLED) {
+    return res.status(503).json({ error: 'Supabase auth is not configured on this server.' });
+  }
+
+  const accessToken = String(req.body?.accessToken || '').trim();
+  const refreshToken = String(req.body?.refreshToken || '').trim();
+  if (!accessToken) {
+    return res.status(400).json({ error: 'accessToken is required' });
+  }
+
+  const user = await getSupabaseUserFromToken(accessToken);
+  if (!user) {
+    return res.status(403).json({
+      error: 'This Google account is not approved. Request an invite, or ask an admin to create your account with this email.'
+    });
+  }
+
+  setAuthCookie(res, accessToken, Number.parseInt(String(req.body?.expiresIn || 3600), 10) || 3600);
+
+  return res.json({
+    success: true,
+    session: { accessToken, refreshToken, user: toPublicAuthUser(user) },
+    defaultRedirect: '/admin.html'
+  });
 });
 
 app.post('/api/auth/logout', (req, res) => {
