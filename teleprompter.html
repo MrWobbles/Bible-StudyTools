@@ -33,6 +33,12 @@
     <!-- Control Bar (Top) -->
     <header class="teleprompter__header">
       <div class="teleprompter__controls">
+        <!-- View Mode Toggle -->
+        <button id="toggle-view-mode" class="btn-primary" title="Toggle scroll view (Tab)">
+          <span class="material-icons">splitscreen</span>
+          <span class="btn-label">Scroll View</span>
+        </button>
+
         <!-- Speech Recognition Controls -->
         <button id="toggle-listening" class="btn-primary" title="Start/Stop listening (Space)">
           <span class="material-icons">mic</span>
@@ -70,17 +76,27 @@
             <span class="material-icons">play_arrow</span>
             <span class="btn-label">Play</span>
           </button>
-          <button id="speed-down" class="btn-secondary" title="Slow down (-, Shift for fine)" style="min-width: 40px;">
-            <span class="material-icons">remove</span>
+          <span id="speed-display" class="speed-text" title="Current scroll speed">23 px/s (38%)</span>
+          <button id="edit-speed" class="btn-secondary" title="Edit speed" style="min-width: 40px;">
+            <span class="material-icons">edit</span>
           </button>
-          <input id="speed-input" type="number" min="5" max="300" step="1" value="60" title="Scroll speed (px/s)" style="width: 70px;" />
-          <span id="speed-display" class="speed-text" title="Current scroll speed">60 px/s (100%)</span>
-          <button id="speed-up" class="btn-secondary" title="Speed up (+, Shift for fine)" style="min-width: 40px;">
-            <span class="material-icons">add</span>
-          </button>
-          <button id="speed-reset" class="btn-secondary" title="Reset speed (R)">
-            <span class="material-icons">restore</span>
-          </button>
+          <div id="speed-edit-controls" class="teleprompter__speed-edit-controls" style="display: none;">
+            <button id="speed-down" class="btn-secondary" title="Slow down (-, Shift for fine)"
+              style="min-width: 40px;">
+              <span class="material-icons">remove</span>
+            </button>
+            <input id="speed-input" type="number" min="5" max="300" step="1" value="23" title="Scroll speed (px/s)"
+              style="width: 70px;" />
+            <button id="speed-up" class="btn-secondary" title="Speed up (+, Shift for fine)" style="min-width: 40px;">
+              <span class="material-icons">add</span>
+            </button>
+            <button id="speed-reset" class="btn-secondary" title="Reset speed (R)">
+              <span class="material-icons">restore</span>
+            </button>
+            <button id="speed-done" class="btn-secondary" title="Done editing">
+              <span class="material-icons">check</span>
+            </button>
+          </div>
         </div>
       </div>
       <div class="teleprompter__status">
@@ -95,13 +111,23 @@
     </header>
 
     <!-- Main Content Area -->
-<div class="teleprompter__container" id="content-area">
-      <div class="teleprompter__content" id="teleprompter-content">
+    <div class="teleprompter__container" id="content-area" data-view-mode="word">
+      <!-- Word View Mode (Default) -->
+      <div class="teleprompter__content teleprompter__content--word-view" id="teleprompter-content">
         <div class="teleprompter__section-title" id="current-section-title">
           Loading...
         </div>
 
         <div class="teleprompter__script" id="script-flow"></div>
+      </div>
+
+      <!-- Scroll View Mode -->
+      <div class="teleprompter__scroll-view" id="scroll-view-container" style="display: none;">
+        <div class="teleprompter__scroll-viewport" id="scroll-viewport">
+          <div class="teleprompter__all-points" id="all-points-container">
+            <!-- All points rendered here -->
+          </div>
+        </div>
       </div>
     </div>
 
@@ -116,12 +142,13 @@
       <span id="progress-display" class="progress-text"></span>
       <span id="speech-transcript" class="speech-text"></span>
     </div>
+  </div>
 
-    <!-- Debug Panel (Optional) -->
-    <div id="debug-panel" class="teleprompter__debug" style="display: none;">
-      <div class="debug-title">Debug Info</div>
-      <div id="debug-output" class="debug-output"></div>
-    </div>
+  <!-- Debug Panel (Optional) -->
+  <div id="debug-panel" class="teleprompter__debug" style="display: none;">
+    <div class="debug-title">Debug Info</div>
+    <div id="debug-output" class="debug-output"></div>
+  </div>
   </div>
 
   <script src="assets/js/api.js"></script>

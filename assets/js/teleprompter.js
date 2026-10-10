@@ -10,6 +10,7 @@ let isListening = false;
 let userInitiatedStop = false; // Track if user explicitly stopped, vs error/restart
 let listeningTimeout = null;
 let recognitionInstance = null;
+let speechRecognitionSetup = false;
 let spokenWords = []; // Track words that have been spoken
 let networkErrorCount = 0; // Track consecutive network errors
 const MAX_NETWORK_RETRIES = 3; // Stop retrying after this many network errors
@@ -24,12 +25,16 @@ let currentScrollPosition = 0;
 let scrollAnimationId = null;
 
 // Constant-speed scroll mode (default mode)
-let scrollVelocity = 60; // pixels per second
+let scrollVelocity = 23; // pixels per second
 let isScrolling = false; // Paused vs playing; user starts it with Play
 let isProgrammaticScroll = false; // True while a point-jump animation owns scrollTop
 let scrollRemainder = 0; // Sub-pixel carry so slow speeds still move
 let lastScrollTime = Date.now();
 let scrollLoopId = null;
+
+// View mode state
+let viewMode = 'word'; // 'word' or 'scroll'
+let scrollUpdateId = null;
 
 // Error tracking for diagnostics
 const errorLog = {
@@ -141,17 +146,11 @@ async function initializePage() {
     renderInitialContent();
     debug(`✓ Rendered initial content`);
 
-    // Initialize on-device speech recognition (works offline)
-    await initializeOnDeviceSpeechRecognition();
-
-    setupSpeechRecognition();
-    debug(`✓ Speech recognition ready`);
-
     setupControls();
     debug(`✓ Controls initialized`);
 
     debug('✅ Teleprompter initialization complete!');
-    showStatusMessage('Ready to go! Click the microphone to start.', 3000);
+    showStatusMessage('Ready to go! Click the microphone to start speech recognition.', 3000);
   } catch (err) {
     console.error('Failed to initialize teleprompter:', err);
     errorLog.addError(`Initialization failed: ${err.message}`, { error: err.toString() });
@@ -361,7 +360,7 @@ function renderScriptFlow() {
 
   flow.innerHTML = allOutlinePoints.map((point, idx) => {
     if (point.type === 'image') {
-      return `<figure class="teleprompter__line teleprompter__line--image" data-point-index="${idx}"><img src="${escapeAttr(point.url)}" alt="${escapeAttr(point.title)}"></figure>`;
+      return `<figure class="teleprompter__line teleprompter__line--image" data-point-index="${idx}" style="background:red;height:1px;left:-100px;width:calc(100% + 100px);"><img src="${escapeAttr(point.url)}" alt="${escapeAttr(point.title)}"></figure>`;
     }
     const tag = point.type === 'heading' ? 'h2' : 'div';
     return `<${tag} class="teleprompter__line teleprompter__line--${point.type}" data-point-index="${idx}">${point.html ?? wrapWordsInSpans(point.text)}</${tag}>`;
@@ -1164,6 +1163,7 @@ function setupControls() {
   const prevBtn = document.getElementById('manual-prev');
   const resetBtn = document.getElementById('reset-scroll');
   const closeBtn = document.getElementById('close-teleprompter');
+  const viewModeToggleBtn = document.getElementById('toggle-view-mode');
 
   // New: Speed controls for constant-speed scroll mode
   const playPauseBtn = document.getElementById('play-pause-scroll');
@@ -1186,10 +1186,36 @@ function setupControls() {
     window.close();
   });
 
+  // View mode toggle
+  if (viewModeToggleBtn) {
+    viewModeToggleBtn.addEventListener('click', toggleViewMode);
+  }
+
   // Speed control listeners
   if (playPauseBtn) {
     playPauseBtn.addEventListener('click', toggleScrolling);
   }
+
+  // Edit speed button
+  const editSpeedBtn = document.getElementById('edit-speed');
+  const speedEditControls = document.getElementById('speed-edit-controls');
+  const speedDoneBtn = document.getElementById('speed-done');
+
+  if (editSpeedBtn) {
+    editSpeedBtn.addEventListener('click', () => {
+      speedEditControls.style.display = speedEditControls.style.display === 'none' ? 'flex' : 'none';
+      if (speedEditControls.style.display === 'flex') {
+        document.getElementById('speed-input')?.focus();
+      }
+    });
+  }
+
+  if (speedDoneBtn) {
+    speedDoneBtn.addEventListener('click', () => {
+      speedEditControls.style.display = 'none';
+    });
+  }
+
   if (speedUpBtn) {
     speedUpBtn.addEventListener('click', (e) => changeScrollSpeed(e.shiftKey ? 1 : 5));
   }
@@ -1223,6 +1249,9 @@ function setupControls() {
     if (e.key === ' ') {
       e.preventDefault();
       toggleScrolling(); // Space for play/pause instead of speech toggle
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      toggleViewMode(); // Tab for view mode toggle
     } else if (e.key === 'ArrowRight' || e.key === '+' || e.key === '=') {
       e.preventDefault();
       changeScrollSpeed(step);
@@ -1323,16 +1352,16 @@ function changeScrollSpeed(delta) {
 function setScrollSpeed(value) {
   scrollVelocity = Math.max(5, Math.min(300, Math.round(value)));
   updateSpeedDisplay();
-  showStatusMessage(`📊 Speed: ${scrollVelocity} px/s (${(scrollVelocity / 60 * 100).toFixed(0)}%)`, 1200);
+  showStatusMessage(`📊 Speed: ${scrollVelocity} px/s (${(scrollVelocity / 23 * 100).toFixed(0)}%)`, 1200);
   debug(`Speed changed to: ${scrollVelocity} px/s`);
 }
 
 // Reset scroll speed to default
 function resetScrollSpeed() {
-  scrollVelocity = 60;
+  scrollVelocity = 23;
   updateSpeedDisplay();
   showStatusMessage(`🔄 Speed reset to: ${scrollVelocity} px/s`, 1500);
-  debug('Speed reset to default: 60 px/s');
+  debug('Speed reset to default: 23 px/s');
 }
 
 // Update speed display element
@@ -1341,7 +1370,7 @@ function updateSpeedDisplay() {
   const speedInput = document.getElementById('speed-input');
   if (speedInput) speedInput.value = scrollVelocity;
   if (speedDisplay) {
-    const percentage = Math.round((scrollVelocity / 60) * 100);
+    const percentage = Math.round((scrollVelocity / 23) * 100);
     speedDisplay.textContent = `${scrollVelocity} px/s (${percentage}%)`;
   }
 }
@@ -1358,13 +1387,17 @@ function startScrollLoop() {
       return;
     }
 
-    const contentArea = document.getElementById('content-area');
-    if (contentArea) {
+    // Choose scroll target based on view mode
+    const scrollTarget = viewMode === 'scroll'
+      ? document.getElementById('scroll-viewport')
+      : document.getElementById('content-area');
+
+    if (scrollTarget) {
       scrollRemainder += scrollVelocity * deltaTime;
       const whole = Math.floor(scrollRemainder);
       if (whole > 0) {
         scrollRemainder -= whole;
-        contentArea.scrollTop += whole;
+        scrollTarget.scrollTop += whole;
       }
     }
 
@@ -1374,12 +1407,106 @@ function startScrollLoop() {
   scroll();
 }
 
+// Toggle view mode between 'word' and 'scroll'
+function toggleViewMode() {
+  viewMode = viewMode === 'word' ? 'scroll' : 'word';
+  const container = document.getElementById('content-area');
+  const wordView = document.getElementById('teleprompter-content');
+  const scrollView = document.getElementById('scroll-view-container');
+  const btn = document.getElementById('toggle-view-mode');
+
+  if (viewMode === 'scroll') {
+    container.setAttribute('data-view-mode', 'scroll');
+    wordView.style.display = 'none';
+    scrollView.style.display = 'flex';
+    if (btn) btn.textContent = '📋 Scroll View';
+    renderScrollView();
+    startScrollViewUpdater();
+    debug('🔄 Switched to SCROLL view');
+    showStatusMessage('📋 Scroll View - Center line highlighted', 1500);
+  } else {
+    container.setAttribute('data-view-mode', 'word');
+    wordView.style.display = 'block';
+    scrollView.style.display = 'none';
+    if (btn) btn.textContent = '✏️ Word View';
+    if (scrollUpdateId) cancelAnimationFrame(scrollUpdateId);
+    debug('🔄 Switched to WORD view');
+    showStatusMessage('✏️ Word View - Speech recognition mode', 1500);
+  }
+}
+
+// Render all points in scroll view
+function renderScrollView() {
+  const container = document.getElementById('all-points-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  allOutlinePoints.forEach((point, idx) => {
+    const pointEl = document.createElement('div');
+    pointEl.className = 'teleprompter__point';
+    pointEl.setAttribute('data-point-index', idx);
+    pointEl.innerHTML = `
+      <div class="point-text">${point.text}</div>
+    `;
+    container.appendChild(pointEl);
+  });
+
+  updateScrollViewClasses();
+}
+
+// Update visual hierarchy based on scroll position
+function updateScrollViewClasses() {
+  const viewport = document.getElementById('scroll-viewport');
+  const points = document.querySelectorAll('#all-points-container .teleprompter__point');
+
+  if (!viewport || points.length === 0) return;
+
+  const viewportCenter = viewport.scrollTop + viewport.clientHeight / 2;
+
+  points.forEach((point, idx) => {
+    const rect = point.getBoundingClientRect();
+    const pointCenter = viewport.scrollTop + rect.top - viewport.getBoundingClientRect().top + rect.height / 2;
+    const distance = Math.abs(pointCenter - viewportCenter);
+    const maxDistance = viewport.clientHeight;
+
+    // Remove all classes first
+    point.classList.remove('scroll-center', 'scroll-near', 'scroll-far', 'scroll-fading');
+
+    // Add appropriate class based on distance
+    if (distance < 100) {
+      point.classList.add('scroll-center');
+    } else if (distance < 250) {
+      point.classList.add('scroll-near');
+    } else if (distance < 500) {
+      point.classList.add('scroll-far');
+    } else {
+      point.classList.add('scroll-fading');
+    }
+  });
+}
+
+// Start continuous scroll view updater
+function startScrollViewUpdater() {
+  function update() {
+    if (viewMode === 'scroll') {
+      updateScrollViewClasses();
+      scrollUpdateId = requestAnimationFrame(update);
+    }
+  }
+  update();
+}
+
 // Scroll wheel support - manual velocity fallback (best practice)
+async function toggleListening() {
+  // Lazy-initialize speech recognition on first use
+  if (!speechRecognitionSetup) {
+    await initializeOnDeviceSpeechRecognition();
+    setupSpeechRecognition();
+    speechRecognitionSetup = true;
+    debug('✓ Speech recognition initialized on first use');
+  }
 
-
-// Toggle listening on/off
-// Toggle listening on/off
-function toggleListening() {
   if (!recognitionInstance) {
     errorLog.addError('Web Speech API not available');
     showStatusMessage('❌ Web Speech API not available', 3000);

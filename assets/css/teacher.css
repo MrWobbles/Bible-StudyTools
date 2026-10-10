@@ -1285,6 +1285,27 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   font-family: "Courier New", monospace;
 }
 
+.teleprompter__speed-edit-controls {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+#speed-input {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-secondary);
+  color: var(--text-primary);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-family: "Courier New", monospace;
+}
+
+#speed-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background: var(--bg-surface-tertiary);
+}
+
 /* Main Content Area */
 .teleprompter__container {
   display: flex;
@@ -1401,6 +1422,85 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   gap: var(--space-lg);
 }
 
+/* Scroll View Mode */
+.teleprompter__scroll-view {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.teleprompter__scroll-viewport {
+  flex-grow: 1;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.teleprompter__all-points {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 50vh 0;
+  gap: var(--space-md);
+}
+
+/* Scroll View Point Sizing */
+.teleprompter__scroll-view .teleprompter__point {
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--bg-surface-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  transition: all var(--duration-normal) var(--ease-standard);
+  font-size: 18px;
+  opacity: 0.4;
+  transform: scale(0.85);
+  line-height: 1.6;
+}
+
+.teleprompter__scroll-view .teleprompter__point.scroll-center {
+  font-size: 32px;
+  font-weight: 700;
+  transform: scale(1.25);
+  opacity: 1;
+  background: linear-gradient(135deg, rgba(168, 85, 255, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%);
+  border: 2px solid var(--accent-purple);
+  box-shadow: 0 0 30px rgba(168, 85, 255, 0.3);
+  padding: var(--space-xl);
+}
+
+.teleprompter__scroll-view .teleprompter__point.scroll-near {
+  font-size: 24px;
+  font-weight: 600;
+  transform: scale(1.15);
+  opacity: 0.7;
+}
+
+.teleprompter__scroll-view .teleprompter__point.scroll-far {
+  font-size: 16px;
+  font-weight: 400;
+  transform: scale(0.9);
+  opacity: 0.5;
+}
+
+.teleprompter__scroll-view .teleprompter__point.scroll-fading {
+  opacity: 0.2;
+}
+
+.teleprompter__scroll-view .point-text {
+  font-size: inherit;
+  font-weight: inherit;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.teleprompter__scroll-view .point-type-badge {
+  display: none;
+}
+
 /* Continuous auto-scroll script */
 .teleprompter__script {
   display: flex;
@@ -1425,12 +1525,33 @@ html[data-theme="light"] body.page--teacher .quick-verse-select option {
   opacity: 1;
 }
 
+.teleprompter__line--image {
+  position: relative;
+  height: 100px;
+  margin: 1em 0;
+}
+
 .teleprompter__line--image img {
   display: block;
   max-width: 100%;
   max-height: 60vh;
   margin: 0 auto;
   border-radius: var(--radius-md);
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  left: -50px;
+}
+
+.teleprompter__line--image::after {
+  content: "";
+  position: absolute;
+  left: -15px;
+  top: 50%;
+  width: 10px;
+  height: 2px;
+  background-color: var(--accent-purple);
+  opacity: 0.5;
 }
 
 .teleprompter__link {
