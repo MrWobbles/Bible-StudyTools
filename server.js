@@ -1527,7 +1527,12 @@ app.get('/api/background/random', async (req, res) => {
       headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`, 'Accept-Version': 'v1' }
     });
     if (!response.ok) {
-      return res.status(response.status === 403 ? 429 : 502).json({ error: 'Unsplash request failed' });
+      const detail = await response.text().catch(() => '');
+      console.error(`Unsplash request failed: ${response.status} ${detail.slice(0, 200)}`);
+      return res.status(response.status === 403 ? 429 : 502).json({
+        error: 'Unsplash request failed',
+        upstreamStatus: response.status
+      });
     }
     const data = await response.json();
     const photo = {
