@@ -222,6 +222,9 @@
             <button class="toolbar-btn" id="btn-verse-lookup-thought" title="Verse Lookup by Thought">
               <span class="material-symbols-outlined">lightbulb</span>
             </button>
+            <button class="toolbar-btn" id="btn-version-history" title="Version History">
+              <span class="material-symbols-outlined">history</span>
+            </button>
             <button class="toolbar-btn" id="btn-code-view" title="Toggle Code View">
               <span class="material-symbols-outlined">code</span>
             </button>
@@ -329,6 +332,23 @@
             class="material-symbols-outlined">done_all</span>Replace All</button>
         <button class="btn btn-secondary modal-close" data-modal="search-modal"><span
             class="material-symbols-outlined">close</span>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="version-history-modal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Version History</h3>
+        <button class="modal-close" data-modal="version-history-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="version-history-status"></p>
+        <ul id="version-history-list" style="list-style: none; padding: 0; margin: 0 0 12px; max-height: 180px; overflow-y: auto;"></ul>
+        <pre id="version-history-preview" style="white-space: pre-wrap; max-height: 240px; overflow-y: auto;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-version-restore" class="btn btn-primary" type="button" disabled>Restore this version</button>
       </div>
     </div>
   </div>

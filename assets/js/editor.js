@@ -888,6 +888,10 @@ function setupEventListeners() {
     openModal('search-modal');
   });
 
+  // Version history button
+  document.getElementById('btn-version-history')?.addEventListener('click', openVersionHistory);
+  document.getElementById('btn-version-restore')?.addEventListener('click', restoreSelectedVersion);
+
   // Generate Outline button - now opens modal with options
   document.getElementById('btn-generate-outline').addEventListener('click', openOutlineModal);
 
@@ -2110,6 +2114,88 @@ function toggleCodeView() {
     // Save document since we might have made changes in code view
     markEditorDirty();
   }
+}
+
+// Version history
+let selectedVersionHtml = null;
+
+function getVersionDocTarget() {
+  if (isNoteMode && currentNoteId) return { docType: 'notes', recordId: currentNoteId };
+  if (currentClassId) return { docType: 'classes', recordId: currentClassId };
+  return null;
+}
+
+async function openVersionHistory() {
+  const target = getVersionDocTarget();
+  const status = document.getElementById('version-history-status');
+  const list = document.getElementById('version-history-list');
+  const preview = document.getElementById('version-history-preview');
+  const restoreBtn = document.getElementById('btn-version-restore');
+  selectedVersionHtml = null;
+  restoreBtn.disabled = true;
+  list.textContent = '';
+  preview.textContent = '';
+  openModal('version-history-modal');
+
+  if (!target) {
+    status.textContent = 'Version history is only available for saved classes and notes.';
+    return;
+  }
+
+  status.textContent = 'Loading...';
+  try {
+    const { versions } = await window.BSTApi.listEditorVersions(target.docType, target.recordId);
+    status.textContent = versions.length
+      ? 'Select a version to preview it. Restoring saves it as a new version.'
+      : 'No versions yet. A version is recorded each time you save.';
+    versions.forEach(version => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-secondary';
+      button.style.cssText = 'width: 100%; text-align: left; margin-bottom: 4px;';
+      const when = version.createdAt ? new Date(version.createdAt).toLocaleString() : 'Unknown time';
+      button.textContent = `${when} (${version.kind === 'snapshot' ? 'full copy' : 'change'}, ${version.bytes} B)`;
+      button.addEventListener('click', () => previewVersion(target, version.seq, status));
+      item.appendChild(button);
+      list.appendChild(item);
+    });
+  } catch (error) {
+    status.textContent = `Could not load version history: ${error.message}`;
+  }
+}
+
+async function previewVersion(target, seq, status) {
+  const preview = document.getElementById('version-history-preview');
+  const restoreBtn = document.getElementById('btn-version-restore');
+  selectedVersionHtml = null;
+  restoreBtn.disabled = true;
+  preview.textContent = 'Loading...';
+  try {
+    const version = await window.BSTApi.getEditorVersion(target.docType, target.recordId, seq);
+    selectedVersionHtml = version.html;
+    preview.textContent = getHtmlText(version.html);
+    restoreBtn.disabled = false;
+  } catch (error) {
+    preview.textContent = '';
+    status.textContent = `Could not load that version: ${error.message}`;
+  }
+}
+
+async function restoreSelectedVersion() {
+  if (selectedVersionHtml === null) return;
+  const html = selectedVersionHtml;
+  closeModal('version-history-modal');
+  if (isCodeView) {
+    if (codeMirrorInstance) codeMirrorInstance.setValue(html);
+    else {
+      const codeView = document.getElementById('editor-code-view');
+      if (codeView) codeView.value = html;
+    }
+  }
+  setEditorContent(html);
+  markEditorDirty();
+  await saveDocument();
 }
 
 // Save Document

@@ -19,6 +19,8 @@ const {
   loadDoc,
   getEditorRecord,
   saveEditorRecordIfRevision,
+  listEditorVersions,
+  getEditorVersion,
   saveDoc,
   upsertClassRecord,
   deleteClassRecord,
@@ -1290,6 +1292,54 @@ app.get('/api/editor/:docType/:recordId', requireAuthenticatedAccess, async (req
     return res.json(result);
   } catch (err) {
     return sendApiError(res, err, 'Failed to load editor document');
+  }
+});
+
+app.get('/api/editor/:docType/:recordId/versions', requireAuthenticatedAccess, async (req, res) => {
+  const docType = String(req.params.docType || '');
+  if (!['classes', 'notes'].includes(docType)) {
+    return res.status(400).json({ error: 'Editor document type must be "classes" or "notes".' });
+  }
+  if (!isConnected()) {
+    return res.status(503).json({ error: 'Supabase is disconnected. Version history is unavailable.' });
+  }
+
+  try {
+    const versions = await listEditorVersions(docType, req.params.recordId, getRequestOwnerOptions(req));
+    if (!versions) {
+      return res.status(404).json({ error: 'Editor document not found.' });
+    }
+    return res.json({ versions });
+  } catch (err) {
+    return sendApiError(res, err, 'Failed to load version history');
+  }
+});
+
+app.get('/api/editor/:docType/:recordId/versions/:seq', requireAuthenticatedAccess, async (req, res) => {
+  const docType = String(req.params.docType || '');
+  if (!['classes', 'notes'].includes(docType)) {
+    return res.status(400).json({ error: 'Editor document type must be "classes" or "notes".' });
+  }
+  if (!/^\d{1,9}$/.test(String(req.params.seq || ''))) {
+    return res.status(400).json({ error: 'Version must be a non-negative integer.' });
+  }
+  if (!isConnected()) {
+    return res.status(503).json({ error: 'Supabase is disconnected. Version history is unavailable.' });
+  }
+
+  try {
+    const version = await getEditorVersion(
+      docType,
+      req.params.recordId,
+      Number(req.params.seq),
+      getRequestOwnerOptions(req)
+    );
+    if (!version) {
+      return res.status(404).json({ error: 'Version not found.' });
+    }
+    return res.json(version);
+  } catch (err) {
+    return sendApiError(res, err, 'Failed to load version');
   }
 });
 

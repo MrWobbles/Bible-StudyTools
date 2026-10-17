@@ -291,6 +291,37 @@ describe('db Supabase normalized storage behavior', () => {
     expect(staleSave.document.content.html).toBe('<p>Updated</p>');
   });
 
+  it('keeps compact version history with a snapshot every 5 versions', async () => {
+    await dbModule.connectDB();
+    await dbModule.saveDoc('classes', {
+      classes: [{ id: 'class-1', classNumber: 1, content: { html: '<p>v0</p>' } }]
+    });
+
+    let revision = (await dbModule.getEditorRecord('classes', 'class-1')).revision;
+    const longBody = '<p>' + 'word '.repeat(400) + '</p>';
+    for (let i = 1; i <= 7; i += 1) {
+      const html = `${longBody}<p>edit ${i}</p>`;
+      const saved = await dbModule.saveEditorRecordIfRevision(
+        'classes', 'class-1', revision, { content: { html, json: {}, text: '' } }
+      );
+      expect(saved.status).toBe('saved');
+      revision = saved.revision;
+    }
+
+    const versions = await dbModule.listEditorVersions('classes', 'class-1');
+    expect(versions.map(v => v.seq)).toEqual([7, 6, 5, 4, 3, 2, 1, 0]);
+    expect(versions.filter(v => v.kind === 'snapshot').map(v => v.seq).sort()).toEqual([0, 5]);
+    const delta = versions.find(v => v.seq === 3);
+    expect(delta.bytes).toBeLessThan(200);
+
+    for (let i = 1; i <= 7; i += 1) {
+      const version = await dbModule.getEditorVersion('classes', 'class-1', i);
+      expect(version.html).toBe(`${longBody}<p>edit ${i}</p>`);
+    }
+    expect((await dbModule.getEditorVersion('classes', 'class-1', 0)).html).toBe('<p>v0</p>');
+    expect(await dbModule.getEditorVersion('classes', 'class-1', 99)).toBeNull();
+  });
+
   it('removes deleted class references from lesson plans', async () => {
     await dbModule.connectDB();
 

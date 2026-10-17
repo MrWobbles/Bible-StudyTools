@@ -47,6 +47,20 @@ create table if not exists public.bst_app_data_history (
 create index if not exists bst_app_data_history_doc_id_recorded_at_idx
   on public.bst_app_data_history (doc_id, recorded_at desc);
 
+-- Compact editor version history: a full snapshot every 5th version (seq % 5 = 0),
+-- and a text patch from the previous version for the rest.
+create table if not exists public.bst_editor_versions (
+  id bigint generated always as identity primary key,
+  doc_id text not null,
+  record_id text not null,
+  seq integer not null,
+  kind text not null check (kind in ('snapshot', 'delta')),
+  body text not null,
+  bytes integer not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique (doc_id, record_id, seq)
+);
+
 create table if not exists public.bst_user_profiles (
   user_id uuid primary key references auth.users (id) on delete cascade,
   username text not null unique,
@@ -144,6 +158,7 @@ alter table public.bst_classes enable row level security;
 alter table public.bst_lesson_plans enable row level security;
 alter table public.bst_notes enable row level security;
 alter table public.bst_app_data_history enable row level security;
+alter table public.bst_editor_versions enable row level security;
 alter table public.bst_user_profiles enable row level security;
 alter table public.bst_signup_invites enable row level security;
 alter table public.bst_signup_requests enable row level security;
@@ -152,6 +167,7 @@ alter table public.bst_classes force row level security;
 alter table public.bst_lesson_plans force row level security;
 alter table public.bst_notes force row level security;
 alter table public.bst_app_data_history force row level security;
+alter table public.bst_editor_versions force row level security;
 alter table public.bst_user_profiles force row level security;
 alter table public.bst_signup_invites force row level security;
 alter table public.bst_signup_requests force row level security;

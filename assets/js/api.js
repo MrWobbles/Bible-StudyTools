@@ -322,6 +322,18 @@
     });
   }
 
+  async function listEditorVersions(docType, recordId) {
+    return fetchJson(`/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}/versions`, {}, {
+      requireAdmin: true
+    });
+  }
+
+  async function getEditorVersion(docType, recordId, seq) {
+    return fetchJson(`/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}/versions/${encodeURIComponent(seq)}`, {}, {
+      requireAdmin: true
+    });
+  }
+
   async function saveEditorDocument(docType, recordId, payload) {
     const response = await fetchWithSecurity(`/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}`, {
       method: 'PUT',
@@ -472,7 +484,8 @@
     getNotes,
     getEditorDocument,
     saveEditorDocument,
-    upsertSupabaseClass,
+    listEditorVersions,
+    getEditorVersion,
     deleteSupabaseClass,
     upsertSupabaseLessonPlan,
     deleteSupabaseLessonPlan,
