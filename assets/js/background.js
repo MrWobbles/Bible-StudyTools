@@ -165,7 +165,11 @@
       if (reduceMotion) layer.style.transition = 'none';
       void layer.offsetWidth;
       layer.classList.add('is-visible');
-      applyPalette(hues);
+      if (window.BSTPalette && window.BSTPalette.withFade) {
+        window.BSTPalette.withFade(() => applyPalette(hues), FADE_MS, false);
+      } else {
+        applyPalette(hues);
+      }
       showCredit(photo);
       setTimeout(() => {
         setImage(photo);

@@ -274,6 +274,18 @@ html:is([data-theme=light], [data-theme=sepia]) .bst-bg-fade {
   background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)), var(--bst-bg-image);
 }
 
+html.bst-color-fade *,
+html.bst-color-fade *::before,
+html.bst-color-fade *::after {
+  transition: background-color var(--bst-fade-ms, 0.8s) ease, color var(--bst-fade-ms, 0.8s) ease, border-color var(--bst-fade-ms, 0.8s) ease, box-shadow var(--bst-fade-ms, 0.8s) ease, fill var(--bst-fade-ms, 0.8s) ease, stroke var(--bst-fade-ms, 0.8s) ease !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--bst-fade-ms, 0.8s);
+  animation-timing-function: ease-in-out;
+}
+
 .bst-bg-fade.is-visible {
   opacity: 1;
 }

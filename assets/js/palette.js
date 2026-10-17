@@ -292,7 +292,31 @@
     }
   }
 
-  const api = { generate, apply, clear, applyFromCache, contrast, luminance, hslToRgb, toHex };
+  const FADE_MS = 800;
+  let fadeTimer = null;
+
+  // Cross-fades every colour change. Whole-page view transition when available (also fades gradients
+  // and the photo overlay), otherwise a temporary colour-transition class.
+  function withFade(change, ms, useViewTransition) {
+    const duration = ms || FADE_MS;
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const html = document.documentElement;
+    if (reduce || !document.body) {
+      change();
+      return;
+    }
+    html.style.setProperty('--bst-fade-ms', duration + 'ms');
+    if (useViewTransition !== false && typeof document.startViewTransition === 'function') {
+      document.startViewTransition(change);
+      return;
+    }
+    html.classList.add('bst-color-fade');
+    clearTimeout(fadeTimer);
+    change();
+    fadeTimer = setTimeout(() => html.classList.remove('bst-color-fade'), duration + 100);
+  }
+
+  const api = { withFade, generate, apply, clear, applyFromCache, contrast, luminance, hslToRgb, toHex };
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;

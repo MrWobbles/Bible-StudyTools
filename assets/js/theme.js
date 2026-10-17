@@ -33,8 +33,15 @@
   function applyTheme(theme) {
     const previousTheme = document.documentElement.getAttribute('data-theme') || DARK;
     const nextTheme = normalizeTheme(theme);
-    document.documentElement.setAttribute('data-theme', nextTheme);
-    document.body?.setAttribute('data-theme', nextTheme);
+    const commitTheme = () => {
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      document.body?.setAttribute('data-theme', nextTheme);
+    };
+    if (nextTheme !== previousTheme && window.BSTPalette && window.BSTPalette.withFade) {
+      window.BSTPalette.withFade(commitTheme);
+    } else {
+      commitTheme();
+    }
 
     try {
       localStorage.setItem(THEME_KEY, nextTheme);
