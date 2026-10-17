@@ -2,28 +2,6 @@
 @use 'base';
 
 body.page--editor {
-  --page-bg: #0f1419;
-  --panel-bg: #1a1f28;
-  --text-primary: #f8f9fa;
-  --text-secondary: #9ca3af;
-  --accent-color: #3b82f6;
-  --accent-color-hover: #2563eb;
-  --focus-ring: rgba(59, 130, 246, 0.16);
-  --surface-border: rgba(255, 255, 255, 0.1);
-  --header-border: rgba(255, 255, 255, 0.1);
-
-  html[data-theme='light'] & {
-    --page-bg: #f5f7fb;
-    --panel-bg: #ffffff;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --accent-color: #2563eb;
-    --accent-color-hover: #1d4ed8;
-    --focus-ring: rgba(37, 99, 235, 0.2);
-    --surface-border: rgba(148, 163, 184, 0.5);
-    --header-border: rgba(148, 163, 184, 0.5);
-  }
-
   .editor-container {
     min-height: 100vh;
     display: flex;
@@ -165,7 +143,7 @@ body.page--editor {
   .sidebar-media {
     margin-top: 16px;
     padding-top: 14px;
-    border-top: 1px solid rgba(55, 65, 81, 0.55);
+    border-top: 1px solid var(--glass-border);
   }
 
   .sidebar-media-help {
@@ -192,7 +170,7 @@ body.page--editor {
 
   .editor-media-item .material-symbols-outlined {
     font-size: 20px;
-    color: var(--accent-color);
+    color: var(--accent-text);
     flex: 0 0 auto;
   }
 
@@ -249,7 +227,7 @@ body.page--editor {
   }
 
   .outline-item a:hover {
-    background: rgba(56, 189, 248, 0.12);
+    background: var(--accent-blue-tint);
     color: var(--text-primary);
   }
 
@@ -324,13 +302,13 @@ body.page--editor {
 
   .toolbar-btn--qa {
     border-color: var(--glass-border-strong);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--control-bg-hover);
     box-shadow: none;
     color: var(--text-primary);
   }
 
   .toolbar-btn--qa:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: var(--control-bg-hover);
     border-color: var(--glass-border-strong);
   }
 
@@ -387,21 +365,21 @@ body.page--editor {
     border-radius: var(--radius-md);
   }
 
-  html[data-theme='light'] & {
+  html:is([data-theme='light'], [data-theme='sepia']) & {
     .save-status.saved {
-      color: #166534;
+      color: var(--status-success);
     }
 
     .save-status.error {
-      color: #991b1b;
+      color: var(--status-error);
     }
 
     .save-status.warning {
-      color: #92400e;
+      color: var(--status-warning);
     }
 
     .editor {
-      background: rgba(255, 255, 255, 0.9);
+      background: var(--bg-surface-elevated);
     }
 
     .prose,
@@ -424,7 +402,7 @@ body.page--editor {
     .tiptap h4,
     .tiptap h5,
     .tiptap h6 {
-      color: #0f172a;
+      color: var(--text-primary);
     }
 
     .prose [style*='color: rgb(248, 249, 250)'],
@@ -453,14 +431,14 @@ body.page--editor {
     .tiptap [style*='color:#fff'],
     .tiptap [style*='color: white'],
     .tiptap [style*='color:white'] {
-      color: #0f172a !important;
+      color: var(--text-primary) !important;
     }
 
     .suggestions,
     #search-results,
     #outline-preview {
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--glass-border);
+      background: var(--bg-surface-elevated);
     }
   }
 
@@ -476,10 +454,10 @@ body.page--editor {
     gap: 12px;
     margin: 16px 0;
     padding: 12px 14px;
-    border: 1px solid var(--accent-color);
-    border-left: 4px solid var(--accent-color);
+    border: 1px solid var(--accent-text);
+    border-left: 4px solid var(--accent-text);
     border-radius: 12px;
-    background: rgba(59, 130, 246, 0.14);
+    background: var(--accent-tint);
     cursor: pointer;
   }
 
@@ -490,7 +468,7 @@ body.page--editor {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
+    color: var(--on-accent);
     background: var(--accent-color);
     flex: 0 0 auto;
   }
@@ -512,7 +490,7 @@ body.page--editor {
   }
 
   .qa-pause-marker:hover {
-    background: rgba(59, 130, 246, 0.2);
+    background: var(--accent-tint-strong);
   }
 
   .editor-media-tile {
@@ -523,7 +501,7 @@ body.page--editor {
     padding: 3px 9px;
     border: 1px solid var(--glass-border-strong);
     border-radius: 999px;
-    background: rgba(59, 130, 246, 0.14);
+    background: var(--accent-tint);
     color: var(--text-primary);
     text-decoration: none;
     font-size: 0.9em;
@@ -536,7 +514,7 @@ body.page--editor {
   }
 
   .editor-media-tile:hover {
-    background: rgba(59, 130, 246, 0.24);
+    background: var(--accent-tint-strong);
   }
 
   .focus-mode-hint {
@@ -611,8 +589,8 @@ body.page--editor {
   #search-results,
   #outline-preview {
     border-radius: 10px;
-    border: 1px solid rgba(55, 65, 81, 0.8);
-    background: rgba(2, 6, 23, 0.92);
+    border: 1px solid var(--glass-border-strong);
+    background: var(--bg-surface-subtle);
     padding: 10px;
   }
 

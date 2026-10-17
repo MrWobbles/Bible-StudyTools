@@ -3,28 +3,6 @@
 @use 'teleprompter';
 
 body.page--teacher {
-  --page-bg: #0f1419;
-  --panel-bg: #1a1f28;
-  --text-primary: #f8f9fa;
-  --text-secondary: #9ca3af;
-  --accent-color: #3b82f6;
-  --accent-color-hover: #2563eb;
-  --focus-ring: rgba(59, 130, 246, 0.16);
-  --surface-border: rgba(255, 255, 255, 0.1);
-  --header-border: rgba(255, 255, 255, 0.1);
-
-  html[data-theme='light'] & {
-    --page-bg: #f5f7fb;
-    --panel-bg: #ffffff;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --accent-color: #2563eb;
-    --accent-color-hover: #1d4ed8;
-    --focus-ring: rgba(37, 99, 235, 0.2);
-    --surface-border: rgba(148, 163, 184, 0.5);
-    --header-border: rgba(148, 163, 184, 0.5);
-  }
-
   padding: 16px 16px 100px;
 
   .layout {
@@ -120,7 +98,7 @@ body.page--teacher {
   .card.notes {
     margin-top: 18px !important;
     border: 0;
-    border-top: 1px solid rgba(55, 65, 81, 0.5);
+    border-top: 1px solid var(--glass-border);
     border-radius: 0;
     background: transparent;
     box-shadow: none;
@@ -162,7 +140,7 @@ body.page--teacher {
   }
 
   .editor-line-marker:hover {
-    background: rgba(240, 180, 41, 0.12);
+    background: color-mix(in srgb, var(--accent-amber) 12%, transparent);
     color: var(--text-primary);
     transform: none;
   }
@@ -174,7 +152,7 @@ body.page--teacher {
 
   .editor-line-content {
     min-width: 0;
-    border-left: 1px solid rgba(55, 65, 81, 0.75);
+    border-left: 1px solid var(--glass-border-strong);
     padding-left: 12px;
     margin: 0;
     line-height: 1.55;
@@ -182,7 +160,7 @@ body.page--teacher {
   }
 
   .editor-line-content a {
-    color: var(--accent-color);
+    color: var(--accent-text);
   }
 
   .editor-line-content img {
@@ -204,7 +182,7 @@ body.page--teacher {
     border-radius: 999px;
     text-decoration: none;
     color: var(--text-primary);
-    background: rgba(59, 130, 246, 0.14);
+    background: var(--accent-tint);
     cursor: pointer;
   }
 
@@ -214,7 +192,7 @@ body.page--teacher {
 
   .editor-line-content .editor-media-tile:hover,
   .editor-line-content .editor-media-tile.mark-active {
-    background: rgba(59, 130, 246, 0.24);
+    background: var(--accent-tint-strong);
   }
 
   .editor-content-display ul.editor-line-content,
@@ -292,14 +270,14 @@ body.page--teacher {
   }
 
   .editor-line-row.stopped-here {
-    background: rgba(240, 180, 41, 0.08);
+    background: color-mix(in srgb, var(--accent-amber) 8%, transparent);
   }
 
   .editor-line-row.stopped-here .editor-line-marker,
   .editor-line-marker.active {
-    color: #0f172a;
+    color: var(--on-accent);
     background: var(--accent-color);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--glass-border);
   }
 
   .verse-bar {
@@ -329,7 +307,7 @@ body.page--teacher {
   .controls-divider {
     width: 1px;
     height: 24px;
-    background: rgba(55, 65, 81, 0.8);
+    background: var(--glass-border-strong);
   }
 
   .media-drawer,
@@ -417,14 +395,14 @@ body.page--teacher {
 
   .quick-verse-select,
   .quick-verse-input {
-    background: rgba(2, 6, 23, 0.82);
-    border-color: rgba(148, 163, 184, 0.45);
+    background: var(--input-bg);
+    border-color: var(--input-border);
     color: var(--text-primary);
   }
 
   .quick-verse-select option {
-    background: #0b1220;
-    color: #e5e7eb;
+    background: var(--bg-surface-elevated);
+    color: var(--text-primary);
   }
 
   .quick-verse-btn-nav {
@@ -443,9 +421,9 @@ body.page--teacher {
     margin: 10px 0;
     padding: 12px 14px;
     border-radius: 12px;
-    border: 1px solid rgba(240, 180, 41, 0.55);
-    border-left: 4px solid var(--accent-color);
-    background: rgba(240, 180, 41, 0.14);
+    border: 1px solid color-mix(in srgb, var(--accent-amber) 55%, transparent);
+    border-left: 4px solid var(--accent-text);
+    background: color-mix(in srgb, var(--accent-amber) 14%, transparent);
   }
 
   .editor-content-display .qa-pause-marker {
@@ -454,7 +432,7 @@ body.page--teacher {
 
   .editor-content-display .qa-pause-marker:hover,
   .editor-content-display .qa-break-marker:hover {
-    background: rgba(240, 180, 41, 0.2);
+    background: color-mix(in srgb, var(--accent-amber) 20%, transparent);
   }
 
   .editor-content-display .qa-pause-title,
@@ -484,8 +462,8 @@ body.page--teacher {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(240, 180, 41, 0.28);
-    color: #fef3c7;
+    background: color-mix(in srgb, var(--accent-amber) 28%, transparent);
+    color: var(--text-primary);
     flex: 0 0 auto;
   }
 
@@ -497,7 +475,7 @@ body.page--teacher {
     margin-top: 8px;
   }
 
-  html[data-theme='light'] & {
+  html:is([data-theme='light'], [data-theme='sepia']) & {
     .editor-line-content,
     .editor-line-content p,
     .editor-line-content li,
@@ -511,7 +489,7 @@ body.page--teacher {
     .editor-line-content h6,
     .editor-content-display .qa-pause-title,
     .editor-content-display .qa-break-content strong {
-      color: #0f172a;
+      color: var(--text-primary);
     }
 
     .editor-line-content [style*='color: rgb(248, 249, 250)'],
@@ -527,23 +505,23 @@ body.page--teacher {
     .editor-line-content [style*='color:#fff'],
     .editor-line-content [style*='color: white'],
     .editor-line-content [style*='color:white'] {
-      color: #0f172a !important;
+      color: var(--text-primary) !important;
     }
 
     .editor-line-content {
-      border-left-color: rgba(148, 163, 184, 0.8);
+      border-left-color: var(--glass-border-strong);
     }
 
     .quick-verse-select,
     .quick-verse-input {
-      background: rgba(255, 255, 255, 0.95);
-      border-color: rgba(148, 163, 184, 0.72);
-      color: #0f172a;
+      background: var(--input-bg);
+      border-color: var(--input-border);
+      color: var(--text-primary);
     }
 
     .quick-verse-select option {
-      background: #ffffff;
-      color: #0f172a;
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
     }
   }
 

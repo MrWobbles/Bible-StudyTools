@@ -2,12 +2,6 @@
   const ENABLED_KEY = 'bst.background.enabled';
   const CACHE_KEY = 'bst.background.cache';
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-  const ACCENT_VARS = [
-    '--bst-bg-image', '--accent-purple', '--accent-purple-soft', '--accent-purple-neon', '--accent-pink',
-    '--accent-pink-soft', '--accent-blue', '--accent-blue-soft', '--border-accent-purple',
-    '--border-accent-blue', '--border-accent-pink', '--shadow-glow-purple', '--shadow-glow-blue',
-    '--shadow-glow-pink'
-  ];
 
   function isEnabled() {
     try {
@@ -89,40 +83,12 @@
     return second ? [first, second.hue] : [first];
   }
 
-  function hsl(h, s, l, a) {
-    const base = `${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-    return a === undefined ? `hsl(${base})` : `hsl(${base} / ${a})`;
-  }
-
-  // Lightness is clamped per theme so accents stay readable on the surfaces.
   function applyPalette(hues) {
-    const root = document.documentElement;
-    if (!hues.length) return;
-    const isLight = root.getAttribute('data-theme') === 'light';
-    const primaryHue = hues[0];
-    const secondaryHue = hues[1] === undefined ? (primaryHue + 150) % 360 : hues[1];
-    const l = isLight ? 0.38 : 0.64;
-    const s = isLight ? 0.7 : 0.8;
-    const set = (name, value) => root.style.setProperty(name, value);
-
-    set('--accent-purple', hsl(primaryHue, s, l));
-    set('--accent-purple-soft', hsl(primaryHue, s - 0.1, isLight ? l + 0.08 : l - 0.08));
-    set('--accent-purple-neon', hsl(primaryHue, s, isLight ? l - 0.06 : l + 0.08));
-    set('--accent-pink', hsl(primaryHue, s, isLight ? l - 0.06 : l + 0.08));
-    set('--accent-pink-soft', hsl(primaryHue, s - 0.1, isLight ? l + 0.1 : l + 0.14));
-    set('--accent-blue', hsl(secondaryHue, s, l));
-    set('--accent-blue-soft', hsl(secondaryHue, s - 0.1, isLight ? l + 0.08 : l + 0.1));
-    set('--border-accent-purple', hsl(primaryHue, s, l));
-    set('--border-accent-pink', hsl(primaryHue, s, l));
-    set('--border-accent-blue', hsl(secondaryHue, s, l));
-    set('--shadow-glow-purple', `0 0 0 1px ${hsl(primaryHue, s, l, 0.35)}`);
-    set('--shadow-glow-pink', `0 0 0 1px ${hsl(primaryHue, s, l, 0.35)}`);
-    set('--shadow-glow-blue', `0 0 0 1px ${hsl(secondaryHue, s, l, 0.35)}`);
+    if (window.BSTPalette) window.BSTPalette.apply(hues);
   }
 
   function clearBackground() {
-    const root = document.documentElement;
-    ACCENT_VARS.forEach((name) => root.style.removeProperty(name));
+    if (window.BSTPalette) window.BSTPalette.clear();
     document.getElementById('bst-bg-credit')?.remove();
   }
 
@@ -131,7 +97,7 @@
     if (!photo.photographer || !photo.photographerUrl) return;
     const credit = document.createElement('div');
     credit.id = 'bst-bg-credit';
-    credit.style.cssText = 'position:fixed;left:10px;bottom:6px;z-index:5;font-size:11px;opacity:.75;color:var(--text-primary);text-shadow:0 1px 2px rgba(0,0,0,.6);';
+    credit.style.cssText = 'position:fixed;left:10px;bottom:8px;z-index:5;font-size:12px;padding:3px 8px;border-radius:6px;background:var(--glass-surface);color:var(--text-primary);border:1px solid var(--glass-border);';
     const photoLink = document.createElement('a');
     photoLink.href = photo.photoUrl || photo.photographerUrl;
     photoLink.textContent = 'Photo';
@@ -257,12 +223,6 @@
     lastChange = cached.at || Date.now();
     startRotation();
   }
-
-  // Re-tint when the theme changes so lightness matches light/dark.
-  new MutationObserver(() => {
-    const cached = readCache();
-    if (cached && isEnabled()) applyPalette(cached.palette);
-  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   window.BSTBackground = {
     refresh() {

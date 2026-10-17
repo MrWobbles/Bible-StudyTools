@@ -8,14 +8,14 @@
     (function () {
       try {
         var theme = localStorage.getItem('bst-theme') || 'dark';
-        var allowedThemes = ['dark', 'light', 'monokai-dark', 'dracula-dark', 'nord-dark'];
-        var normalizedTheme = allowedThemes.includes(theme) ? theme : 'dark';
+        var normalizedTheme = ['light', 'sepia', 'night', 'vivid'].indexOf(theme) >= 0 ? theme : 'dark';
         document.documentElement.setAttribute('data-theme', normalizedTheme);
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
     })();
   </script>
+  <script src="assets/js/palette.js"></script>
   <title>Bible Study Editor - Rich Text Editor</title>
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -67,9 +67,9 @@
           <select id="theme-select-editor" data-theme-select aria-label="Theme selection">
             <option value="dark">Dark</option>
             <option value="light">Light</option>
-            <option value="monokai-dark">Monokai Dark</option>
-            <option value="dracula-dark">Dracula Dark</option>
-            <option value="nord-dark">Nord Dark</option>
+          <option value="sepia">Sepia</option>
+          <option value="night">Night</option>
+          <option value="vivid">Vivid</option>
           </select>
         </label>
         <button id="btn-save" class="btn btn-primary"><span class="material-symbols-outlined">save</span>Save</button>

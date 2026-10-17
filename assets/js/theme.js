@@ -2,13 +2,15 @@
   const THEME_KEY = 'bst-theme';
   const DARK = 'dark';
   const LIGHT = 'light';
+  const SEPIA = 'sepia';
   const THEMES = [
     { id: 'dark', label: 'Dark' },
     { id: 'light', label: 'Light' },
-    { id: 'monokai-dark', label: 'Monokai Dark' },
-    { id: 'dracula-dark', label: 'Dracula Dark' },
-    { id: 'nord-dark', label: 'Nord Dark' }
+    { id: 'sepia', label: 'Sepia' },
+    { id: 'night', label: 'Night' },
+    { id: 'vivid', label: 'Vivid' }
   ];
+  const NEXT_ICONS = { dark: 'dark_mode', light: 'light_mode', sepia: 'auto_stories', night: 'bedtime', vivid: 'palette' };
   const VALID_THEME_IDS = new Set(THEMES.map((theme) => theme.id));
 
   function normalizeTheme(theme) {
@@ -44,8 +46,9 @@
     toggleButtons.forEach((button) => {
       const icon = button.querySelector('.theme-toggle__icon');
       const label = button.querySelector('.theme-toggle__label');
-      const nextLabel = nextTheme === LIGHT ? 'Dark mode' : 'Light mode';
-      const nextIcon = nextTheme === LIGHT ? 'dark_mode' : 'light_mode';
+      const next = THEMES[(THEMES.findIndex((item) => item.id === nextTheme) + 1) % THEMES.length];
+      const nextLabel = `${next.label} mode`;
+      const nextIcon = NEXT_ICONS[next.id] || 'palette';
 
       if (icon) icon.textContent = nextIcon;
       if (label) label.textContent = nextLabel;
@@ -65,8 +68,8 @@
       const darkDefault = '#f8f9fa';
       const lightDefault = '#0f172a';
       const currentValue = String(textColorInput.value || '').toLowerCase();
-      const previousWasLight = previousTheme === LIGHT;
-      const nextIsLight = nextTheme === LIGHT;
+      const previousWasLight = previousTheme === LIGHT || previousTheme === SEPIA;
+      const nextIsLight = nextTheme === LIGHT || nextTheme === SEPIA;
 
       if (nextIsLight && (currentValue === darkDefault || !previousWasLight)) {
         textColorInput.value = lightDefault;
@@ -80,7 +83,8 @@
 
   function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || DARK;
-    applyTheme(current === LIGHT ? DARK : LIGHT);
+    const index = THEMES.findIndex((theme) => theme.id === current);
+    applyTheme(THEMES[(index + 1) % THEMES.length].id);
   }
 
   function initThemeToggle() {

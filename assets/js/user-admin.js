@@ -369,9 +369,9 @@
     const themes = [
       { id: 'dark', label: 'Dark' },
       { id: 'light', label: 'Light' },
-      { id: 'monokai-dark', label: 'Monokai Dark' },
-      { id: 'dracula-dark', label: 'Dracula Dark' },
-      { id: 'nord-dark', label: 'Nord Dark' }
+    { id: 'sepia', label: 'Sepia' },
+    { id: 'night', label: 'Night' },
+    { id: 'vivid', label: 'Vivid' }
     ];
     
     themes.forEach(t => {

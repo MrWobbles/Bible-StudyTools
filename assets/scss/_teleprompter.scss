@@ -76,7 +76,7 @@
 
 .btn-primary:hover,
 .btn-primary.active {
-  box-shadow: 0 0 20px rgba(168, 85, 255, 0.4);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-purple) 40%, transparent);
   transform: translateY(-2px);
 }
 
@@ -117,7 +117,7 @@
 }
 
 .status-indicator.listening-active {
-  background: rgba(34, 197, 94, 0.1);
+  background: color-mix(in srgb, var(--accent-green) 10%, transparent);
   border-color: var(--accent-green);
   color: var(--accent-green);
   animation: pulse-green 1.5s ease-in-out infinite;
@@ -126,10 +126,10 @@
 @keyframes pulse-green {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-green) 40%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-green) 0%, transparent);
   }
 }
 
@@ -209,7 +209,7 @@
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: var(--space-lg);
-  border-bottom: 2px solid rgba(168, 85, 255, 0.3);
+  border-bottom: 2px solid color-mix(in srgb, var(--accent-purple) 30%, transparent);
   padding-bottom: var(--space-md);
 }
 
@@ -233,9 +233,9 @@
 }
 
 .teleprompter__point.current {
-  background: linear-gradient(135deg, rgba(168, 85, 255, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-purple) 15%, transparent) 0%, color-mix(in srgb, var(--accent-blue) 15%, transparent) 100%);
   border: 2px solid var(--accent-purple);
-  box-shadow: 0 0 30px rgba(168, 85, 255, 0.25);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent-purple) 25%, transparent);
   padding: var(--space-xxl);
   min-height: 200px;
   display: flex;
@@ -255,7 +255,7 @@
 .point-type-badge {
   display: inline-block;
   padding: var(--space-xs) var(--space-md);
-  background: rgba(168, 85, 255, 0.2);
+  background: color-mix(in srgb, var(--accent-purple) 20%, transparent);
   border: 1px solid var(--accent-purple);
   border-radius: var(--radius-pill);
   font-size: 12px;
@@ -343,9 +343,9 @@
   font-weight: 700;
   transform: scale(1.25);
   opacity: 1;
-  background: linear-gradient(135deg, rgba(168, 85, 255, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-purple) 15%, transparent) 0%, color-mix(in srgb, var(--accent-blue) 15%, transparent) 100%);
   border: 2px solid var(--accent-purple);
-  box-shadow: 0 0 30px rgba(168, 85, 255, 0.3);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent-purple) 30%, transparent);
   padding: var(--space-xl);
 }
 
@@ -547,7 +547,7 @@
 .debug-output > div {
   margin-bottom: var(--space-xs);
   padding: var(--space-xs);
-  border-bottom: 1px solid rgba(168, 85, 255, 0.2);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-purple) 20%, transparent);
 }
 
 /* Keyboard Shortcuts Info */
@@ -645,22 +645,22 @@
 }
 
 /* Light theme adjustments */
-html[data-theme='light'] .teleprompter__point.current {
-  background: linear-gradient(135deg, rgba(168, 85, 255, 0.08) 0%, rgba(56, 189, 248, 0.08) 100%);
+html:is([data-theme='light'], [data-theme='sepia']) .teleprompter__point.current {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-purple) 8%, transparent) 0%, color-mix(in srgb, var(--accent-blue) 8%, transparent) 100%);
   border-color: var(--accent-purple);
 }
 
-html[data-theme='light'] .teleprompter__point {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(148, 163, 184, 0.5);
-  color: var(--text-inverse);
+html:is([data-theme='light'], [data-theme='sepia']) .teleprompter__point {
+  background: var(--bg-surface-elevated);
+  border-color: var(--glass-border);
+  color: var(--text-primary);
 }
 
-html[data-theme='light'] .teleprompter__point .point-text {
-  color: var(--text-inverse);
+html:is([data-theme='light'], [data-theme='sepia']) .teleprompter__point .point-text {
+  color: var(--text-primary);
 }
 
-html[data-theme='light'] .point-type-badge {
-  background: rgba(168, 85, 255, 0.1);
+html:is([data-theme='light'], [data-theme='sepia']) .point-type-badge {
+  background: color-mix(in srgb, var(--accent-purple) 10%, transparent);
 }
 }

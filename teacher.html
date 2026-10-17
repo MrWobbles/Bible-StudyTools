@@ -8,14 +8,14 @@
     (function () {
       try {
         var theme = localStorage.getItem('bst-theme') || 'dark';
-        var allowedThemes = ['dark', 'light', 'monokai-dark', 'dracula-dark', 'nord-dark'];
-        var normalizedTheme = allowedThemes.includes(theme) ? theme : 'dark';
+        var normalizedTheme = ['light', 'sepia', 'night', 'vivid'].indexOf(theme) >= 0 ? theme : 'dark';
         document.documentElement.setAttribute('data-theme', normalizedTheme);
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
     })();
   </script>
+  <script src="assets/js/palette.js"></script>
   <title>Presenter View — Bible Study</title>
   <link rel="icon" href="assets/images/icon.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />

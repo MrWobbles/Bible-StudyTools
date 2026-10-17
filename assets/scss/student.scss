@@ -2,28 +2,6 @@
 @use 'base';
 
 body.page--student {
-  --page-bg: #0f1419;
-  --panel-bg: #1a1f28;
-  --text-primary: #f8f9fa;
-  --text-secondary: #9ca3af;
-  --accent-color: #3b82f6;
-  --accent-color-hover: #2563eb;
-  --focus-ring: rgba(59, 130, 246, 0.16);
-  --surface-border: rgba(255, 255, 255, 0.1);
-  --header-border: rgba(255, 255, 255, 0.1);
-
-  html[data-theme='light'] & {
-    --page-bg: #f5f7fb;
-    --panel-bg: #ffffff;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --accent-color: #2563eb;
-    --accent-color-hover: #1d4ed8;
-    --focus-ring: rgba(37, 99, 235, 0.2);
-    --surface-border: rgba(148, 163, 184, 0.5);
-    --header-border: rgba(148, 163, 184, 0.5);
-  }
-
   padding: 12px;
 
   .app {
