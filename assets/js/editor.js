@@ -332,6 +332,74 @@ async function applyMergedEditorVersion() {
   }
 }
 
+// Speech time estimate
+const SPEECH_WPM_KEY = 'bst.editor.speechWpm';
+const DEFAULT_SPEECH_WPM = 140;
+let speechSelectionMode = false;
+
+function getSpeechWpm() {
+  const stored = Number(localStorage.getItem(SPEECH_WPM_KEY));
+  return stored >= 20 && stored <= 400 ? stored : DEFAULT_SPEECH_WPM;
+}
+
+function formatSpeechTime(words, wpm) {
+  const totalSeconds = Math.round((words / wpm) * 60);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function countWords(text) {
+  const matches = String(text || '').trim().match(/\S+/g);
+  return matches ? matches.length : 0;
+}
+
+function updateSpeechTime() {
+  const box = document.getElementById('speech-time-box');
+  if (!box || !editor) return;
+  const { from, to, empty } = editor.state.selection;
+  if (empty) speechSelectionMode = false;
+  const text = speechSelectionMode
+    ? editor.state.doc.textBetween(from, to, ' ')
+    : editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ');
+  const words = countWords(text);
+  box.querySelector('.speech-time-label').textContent = speechSelectionMode ? 'Selection' : 'Whole text';
+  box.querySelector('.speech-time-value').textContent = formatSpeechTime(words, getSpeechWpm());
+  box.querySelector('.speech-time-words').textContent = `${words} words`;
+}
+
+function initSpeechTimeBox() {
+  if (document.getElementById('speech-time-box')) return;
+  const box = document.createElement('div');
+  box.id = 'speech-time-box';
+  box.title = 'Click to show time for the highlighted selection (click again for whole text)';
+  box.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:1000;padding:8px 12px;border-radius:8px;background:rgba(20,20,20,.9);color:#fff;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:right;user-select:none;';
+  box.innerHTML = '<div class="speech-time-label" style="opacity:.7;font-size:11px"></div>' +
+    '<div class="speech-time-value" style="font-size:20px;font-weight:600"></div>' +
+    '<div style="font-size:11px"><span class="speech-time-words"></span> @ ' +
+    '<input type="number" class="speech-time-wpm" min="20" max="400" style="width:52px;font-size:11px"> wpm</div>';
+  document.body.appendChild(box);
+
+  const wpmInput = box.querySelector('.speech-time-wpm');
+  wpmInput.value = getSpeechWpm();
+  wpmInput.addEventListener('click', (e) => e.stopPropagation());
+  wpmInput.addEventListener('change', () => {
+    const v = Number(wpmInput.value);
+    if (v >= 20 && v <= 400) localStorage.setItem(SPEECH_WPM_KEY, String(v));
+    else wpmInput.value = getSpeechWpm();
+    updateSpeechTime();
+  });
+  // Keep the editor selection when clicking the box.
+  box.addEventListener('mousedown', (e) => {
+    if (e.target !== wpmInput) e.preventDefault();
+  });
+  box.addEventListener('click', () => {
+    speechSelectionMode = !speechSelectionMode && !editor.state.selection.empty;
+    updateSpeechTime();
+  });
+  updateSpeechTime();
+}
+
 // Initialize TipTap Editor
 function initializeEditor() {
   editor = new Editor({
@@ -391,11 +459,15 @@ function initializeEditor() {
         markEditorDirty();
       }
       updateOutlineNavigator();
+      updateSpeechTime();
     },
     onSelectionUpdate: ({ editor }) => {
       updateToolbarActiveStates(editor);
+      updateSpeechTime();
     },
   });
+
+  initSpeechTimeBox();
 
   console.log('Editor initialized:', editor);
 
