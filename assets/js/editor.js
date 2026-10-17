@@ -363,7 +363,6 @@ function updateSpeechTime() {
     ? editor.state.doc.textBetween(from, to, ' ')
     : editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ');
   const words = countWords(text);
-  box.querySelector('.speech-time-label').textContent = speechSelectionMode ? 'Selection' : 'Whole text';
   box.querySelector('.speech-time-value').textContent = formatSpeechTime(words, getSpeechWpm());
   box.querySelector('.speech-time-words').textContent = `${words} words`;
 }
@@ -374,25 +373,19 @@ function initSpeechTimeBox() {
   box.id = 'speech-time-box';
   box.title = 'Click to show time for the highlighted selection (click again for whole text)';
   box.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:1000;padding:8px 12px;border-radius:8px;background:rgba(20,20,20,.9);color:#fff;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:right;user-select:none;';
-  box.innerHTML = '<div class="speech-time-label" style="opacity:.7;font-size:11px"></div>' +
-    '<div class="speech-time-value" style="font-size:20px;font-weight:600"></div>' +
-    '<div style="font-size:11px"><span class="speech-time-words"></span> @ ' +
-    '<input type="number" class="speech-time-wpm" min="20" max="400" style="width:52px;font-size:11px"> wpm</div>';
+  box.innerHTML = '<div style="display:flex;align-items:center;gap:10px;justify-content:flex-end">' +
+    '<div><div class="speech-time-value" style="font-size:20px;font-weight:600"></div>' +
+    '<div class="speech-time-words" style="font-size:11px;opacity:.8"></div></div>' +
+    '<a class="speech-time-gear" href="settings.html" target="_blank" rel="noopener" title="Settings" aria-label="Settings" style="color:inherit;text-decoration:none;font-size:20px">&#9881;</a></div>';
   document.body.appendChild(box);
 
-  const wpmInput = box.querySelector('.speech-time-wpm');
-  wpmInput.value = getSpeechWpm();
-  wpmInput.addEventListener('click', (e) => e.stopPropagation());
-  wpmInput.addEventListener('change', () => {
-    const v = Number(wpmInput.value);
-    if (v >= 20 && v <= 400) localStorage.setItem(SPEECH_WPM_KEY, String(v));
-    else wpmInput.value = getSpeechWpm();
-    updateSpeechTime();
-  });
+  box.querySelector('.speech-time-gear').addEventListener('click', (e) => e.stopPropagation());
   // Keep the editor selection when clicking the box.
   box.addEventListener('mousedown', (e) => {
-    if (e.target !== wpmInput) e.preventDefault();
+    if (!e.target.closest('.speech-time-gear')) e.preventDefault();
   });
+  // Pick up a changed speed after returning from the settings tab.
+  window.addEventListener('focus', updateSpeechTime);
   box.addEventListener('click', () => {
     speechSelectionMode = !speechSelectionMode && !editor.state.selection.empty;
     updateSpeechTime();

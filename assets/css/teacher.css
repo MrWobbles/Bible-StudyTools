@@ -205,7 +205,7 @@ body::after {
 
 body::before {
   z-index: -2;
-  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(3, 6, 14, 0.65), rgba(10, 20, 36, 0.55)), url("../images/nature-background.jpg");
+  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(3, 6, 14, 0.65), rgba(10, 20, 36, 0.55)), var(--bst-bg-image, var(--bst-bg-image, url("../images/nature-background.jpg")));
   background-size: auto, auto, cover;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
@@ -219,7 +219,7 @@ body::after {
 }
 
 html[data-theme=light] body::before {
-  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)), url("../images/nature-background.jpg");
+  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)), var(--bst-bg-image, var(--bst-bg-image, url("../images/nature-background.jpg")));
   background-size: auto, auto, cover;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
@@ -228,6 +228,27 @@ html[data-theme=light] body::before {
 
 html[data-theme=light] body::after {
   opacity: 0.35;
+}
+
+.bst-bg-fade {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
+  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(3, 6, 14, 0.65), rgba(10, 20, 36, 0.55)), var(--bst-bg-image);
+  background-size: auto, auto, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+
+html[data-theme=light] .bst-bg-fade {
+  background-image: linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)), linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)), var(--bst-bg-image);
+}
+
+.bst-bg-fade.is-visible {
+  opacity: 1;
 }
 
 .app {

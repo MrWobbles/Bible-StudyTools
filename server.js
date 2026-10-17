@@ -64,6 +64,9 @@ const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
 const SMTP_FROM = String(process.env.SMTP_FROM || SMTP_USER || `Bible Study Tools <${SIGNUP_NOTIFICATION_EMAIL}>`).trim();
 const API_BIBLE_KEY = String(process.env.API_BIBLE_KEY || '').trim();
 const API_BIBLE_BASE_URL = 'https://rest.api.bible/v1';
+const UNSPLASH_ACCESS_KEY = String(process.env.UNSPLASH_ACCESS_KEY || '').trim();
+const UNSPLASH_CACHE_TTL_MS = 10 * 60 * 1000;
+const unsplashCache = new Map();
 const AUTH_COOKIE_NAME = 'bst_access_token';
 
 app.disable('x-powered-by');
@@ -1504,6 +1507,51 @@ app.get('/api/status', (req, res) => {
     message: 'API is running',
     supabase: isConnected() ? 'connected' : 'disconnected'
   });
+});
+
+app.get('/api/background/random', async (req, res) => {
+  if (!UNSPLASH_ACCESS_KEY) {
+    return res.status(503).json({ error: 'UNSPLASH_ACCESS_KEY is not configured on the server.' });
+  }
+
+  const query = String(req.query.query || 'landscape scenery nature').trim().slice(0, 100);
+  const cacheKey = query.toLowerCase();
+  const cached = unsplashCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < UNSPLASH_CACHE_TTL_MS && req.query.refresh !== '1') {
+    return res.json(cached.photo);
+  }
+
+  try {
+    const url = `https://api.unsplash.com/photos/random?orientation=landscape&content_filter=high&query=${encodeURIComponent(query)}`;
+    const response = await fetch(url, {
+      headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`, 'Accept-Version': 'v1' }
+    });
+    if (!response.ok) {
+      return res.status(response.status === 403 ? 429 : 502).json({ error: 'Unsplash request failed' });
+    }
+    const data = await response.json();
+    const photo = {
+      id: data.id,
+      url: data.urls?.regular || '',
+      thumbUrl: data.urls?.small || '',
+      color: data.color || null,
+      description: data.alt_description || data.description || '',
+      photographer: data.user?.name || '',
+      photographerUrl: data.user?.links?.html ? `${data.user.links.html}?utm_source=bible_study_tools&utm_medium=referral` : '',
+      photoUrl: data.links?.html ? `${data.links.html}?utm_source=bible_study_tools&utm_medium=referral` : '',
+      downloadLocation: data.links?.download_location || ''
+    };
+    unsplashCache.set(cacheKey, { at: Date.now(), photo });
+
+    // Unsplash API guidelines require reporting a download when a photo is used.
+    if (photo.downloadLocation) {
+      fetch(photo.downloadLocation, { headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` } }).catch(() => {});
+    }
+    res.json(photo);
+  } catch (err) {
+    console.error('Error fetching Unsplash photo:', err);
+    res.status(502).json({ error: 'Failed to fetch background image' });
+  }
 });
 
 app.get('/api/bible/bibles', async (req, res) => {

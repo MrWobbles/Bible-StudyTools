@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      try {
+        var theme = localStorage.getItem('bst-theme') || 'dark';
+        var allowedThemes = ['dark', 'light', 'monokai-dark', 'dracula-dark', 'nord-dark'];
+        document.documentElement.setAttribute('data-theme', allowedThemes.includes(theme) ? theme : 'dark');
+      } catch (err) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <title>Settings — Bible Study Tools</title>
+  <link rel="icon" href="assets/images/icon.png" type="image/png" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/admin.css" />
+</head>
+
+<body class="page page--settings">
+  <div class="app">
+    <header class="app__header">
+      <div class="title-group app__title-group">
+        <h1>Settings</h1>
+        <p class="subtitle app__subtitle">Preferences saved in this browser.</p>
+      </div>
+    </header>
+    <main class="app__layout">
+      <section class="panel" style="padding:24px;max-width:480px;">
+        <h2>Editor</h2>
+        <label for="speech-wpm" style="display:block;margin:12px 0 6px;">Speaking speed (words per minute)</label>
+        <input id="speech-wpm" type="number" min="20" max="400" step="1" />
+        <button id="speech-wpm-save" class="pill-link" type="button">Save</button>
+        <span id="speech-wpm-status" role="status" style="margin-left:8px;"></span>
+      </section>
+      <section class="panel" style="padding:24px;max-width:480px;margin-top:16px;">
+        <h2>Appearance</h2>
+        <label style="display:flex;gap:8px;align-items:center;margin:12px 0;">
+          <input id="bg-enabled" type="checkbox" />
+          Random scenery background and matching colors
+        </label>
+        <button id="bg-refresh" class="pill-link" type="button">New image</button>
+      </section>
+    </main>
+  </div>
+  <script>
+    (function () {
+      var KEY = 'bst.editor.speechWpm';
+      var input = document.getElementById('speech-wpm');
+      var status = document.getElementById('speech-wpm-status');
+      var stored = Number(localStorage.getItem(KEY));
+      input.value = stored >= 20 && stored <= 400 ? stored : 140;
+      document.getElementById('speech-wpm-save').addEventListener('click', function () {
+        var v = Math.round(Number(input.value));
+        if (!(v >= 20 && v <= 400)) {
+          status.textContent = 'Enter a value between 20 and 400.';
+          return;
+        }
+        localStorage.setItem(KEY, String(v));
+        input.value = v;
+        status.textContent = 'Saved.';
+      });
+    })();
+    (function () {
+      var box = document.getElementById('bg-enabled');
+      box.checked = localStorage.getItem('bst.background.enabled') !== '0';
+      box.addEventListener('change', function () {
+        localStorage.setItem('bst.background.enabled', box.checked ? '1' : '0');
+        window.BSTBackground.refresh();
+      });
+      document.getElementById('bg-refresh').addEventListener('click', function () {
+        localStorage.setItem('bst.background.enabled', '1');
+        box.checked = true;
+        window.BSTBackground.refresh();
+      });
+    })();
+  </script>
+  <script src="assets/js/background.js"></script>
+</body>
+
+</html>
