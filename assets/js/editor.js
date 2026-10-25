@@ -164,7 +164,9 @@ function getEditorDraftKey() {
 function getCodeViewHtml() {
   if (!isCodeView) return null;
   const codeTextarea = document.getElementById('editor-code-view');
-  if (codeMirrorInstance) return codeMirrorInstance.getValue();
+  if (codeMirrorInstance && typeof codeMirrorInstance.getValue === 'function') {
+    return codeMirrorInstance.getValue();
+  }
   return codeTextarea?.value ?? editor.getHTML();
 }
 
@@ -1527,9 +1529,32 @@ async function insertVerseReference() {
 }
 
 // Insert Image
-function insertImage() {
+async function insertImage() {
   let imageUrl = document.getElementById('image-url').value.trim();
   const imageAlt = document.getElementById('image-alt').value.trim();
+  const fileInput = document.getElementById('image-upload');
+  const file = fileInput?.files?.[0];
+
+  if (!imageUrl && file) {
+    const insertBtn = document.getElementById('btn-insert-image');
+    const originalHtml = insertBtn.innerHTML;
+    insertBtn.disabled = true;
+    insertBtn.textContent = 'Uploading to Google Drive...';
+    try {
+      const notebookName = getCurrentClassForDisplayRouting()?.title
+        || document.getElementById('document-title')?.textContent?.trim()
+        || 'Bible Study Images';
+      const result = await window.BSTApi.uploadImageToDrive(notebookName, file);
+      imageUrl = result.url;
+    } catch (err) {
+      console.error('Drive upload failed:', err);
+      alert(`Image upload failed: ${err.message}`);
+      return;
+    } finally {
+      insertBtn.innerHTML = originalHtml;
+      insertBtn.disabled = false;
+    }
+  }
 
   if (!imageUrl) {
     alert('Please enter an image URL or upload an image');
@@ -1551,6 +1576,7 @@ function insertImage() {
   closeModal('image-modal');
   document.getElementById('image-url').value = '';
   document.getElementById('image-alt').value = '';
+  if (fileInput) fileInput.value = '';
 }
 
 // Insert Link

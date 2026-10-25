@@ -351,6 +351,25 @@
     return result;
   }
 
+  async function uploadImageToDrive(folderName, file) {
+    const dataBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = () => reject(new Error('Could not read image file'));
+      reader.readAsDataURL(file);
+    });
+    const response = await fetchWithSecurity('/api/drive/upload-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderName, fileName: file.name, mimeType: file.type, dataBase64 })
+    }, { requireAdmin: true });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result?.error || `Upload failed: ${response.status}`);
+    }
+    return result;
+  }
+
   async function upsertSupabaseClass(classId, classPayload) {
     return fetchJson(`/api/supabase/classes/${encodeURIComponent(classId)}`, {
       method: 'PUT',
@@ -484,6 +503,7 @@
     getNotes,
     getEditorDocument,
     saveEditorDocument,
+    uploadImageToDrive,
     listEditorVersions,
     getEditorVersion,
     deleteSupabaseClass,
