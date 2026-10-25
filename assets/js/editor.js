@@ -2067,7 +2067,6 @@ function extractText(node) {
   }
   return '';
 }
-
 // Code View Toggle Function
 let codeMirrorInstance = null;
 
@@ -2130,6 +2129,8 @@ function toggleCodeView() {
     
     if (codeMirrorInstance) {
       codeMirrorInstance.getWrapperElement().style.display = 'none';
+      codeMirrorInstance.toTextArea(); // Destroy CodeMirror instance
+      codeMirrorInstance = null;
     } else {
       codeTextarea.style.display = 'none';
     }
