@@ -6,8 +6,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "build:styles": "sass assets/scss/admin.scss:assets/css/admin.css assets/scss/teacher.scss:assets/css/teacher.css assets/scss/student.scss:assets/css/student.css assets/scss/editor.scss:assets/css/editor.css --no-source-map",
-    "watch:styles": "sass --watch assets/scss:assets/css --no-source-map",
+    "build": "npm run build:ts && vite build",
+    "build:ts": "tsc -p tsconfig.scripts.json && tsc -p tsconfig.editor.json --noEmit",
+    "typecheck": "tsc -p tsconfig.scripts.json --noEmit && tsc -p tsconfig.editor.json --noEmit",
+    "build:styles": "vite build",
+    "watch:styles": "sass --watch src/scss:assets/css --no-source-map",
+    "dev:vite": "vite",
     "check:syntax": "node scripts/ci/run-syntax-checks.js",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
@@ -54,8 +58,11 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
     "@playwright/test": "^1.58.2",
+    "@types/node": "^26.6.6",
     "sass": "^1.93.2",
     "supertest": "^7.2.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
     "vitest": "^4.1.0"
   }
 }

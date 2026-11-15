@@ -1,136 +1,124 @@
+"use strict";
 (function () {
-  const statusEl = document.getElementById('requests-status');
-  const pendingListEl = document.getElementById('pending-requests-list');
-  const resolvedListEl = document.getElementById('resolved-requests-list');
-  const activeAccountsListEl = document.getElementById('active-accounts-list');
-  const accountPasswordModalEl = document.getElementById('account-password-modal');
-  const accountDeleteModalEl = document.getElementById('account-delete-modal');
-  const accountPasswordFormEl = document.getElementById('account-password-form');
-  const accountDeleteFormEl = document.getElementById('account-delete-form');
-  const accountPasswordIdentifierEl = document.getElementById('account-password-identifier');
-  const accountDeleteIdentifierEl = document.getElementById('account-delete-identifier');
-  const accountPasswordValueEl = document.getElementById('account-password-value');
-  const accountPasswordTargetEl = document.getElementById('account-password-target');
-  const accountDeleteTargetEl = document.getElementById('account-delete-target');
-  const accountPasswordSubmitEl = document.getElementById('account-password-submit');
-  const accountDeleteSubmitEl = document.getElementById('account-delete-submit');
-
-  function setStatus(message, tone) {
-    if (!statusEl) return;
-    statusEl.textContent = message || '';
-    statusEl.dataset.tone = tone || '';
-  }
-
-  function formatDate(value) {
-    if (!value) {
-      return 'Unknown';
+    const statusEl = document.getElementById('requests-status');
+    const pendingListEl = document.getElementById('pending-requests-list');
+    const resolvedListEl = document.getElementById('resolved-requests-list');
+    const activeAccountsListEl = document.getElementById('active-accounts-list');
+    const accountPasswordModalEl = document.getElementById('account-password-modal');
+    const accountDeleteModalEl = document.getElementById('account-delete-modal');
+    const accountPasswordFormEl = document.getElementById('account-password-form');
+    const accountDeleteFormEl = document.getElementById('account-delete-form');
+    const accountPasswordIdentifierEl = document.getElementById('account-password-identifier');
+    const accountDeleteIdentifierEl = document.getElementById('account-delete-identifier');
+    const accountPasswordValueEl = document.getElementById('account-password-value');
+    const accountPasswordTargetEl = document.getElementById('account-password-target');
+    const accountDeleteTargetEl = document.getElementById('account-delete-target');
+    const accountPasswordSubmitEl = document.getElementById('account-password-submit');
+    const accountDeleteSubmitEl = document.getElementById('account-delete-submit');
+    function getErrorMessage(err, fallback) {
+        return err instanceof Error && err.message ? err.message : fallback;
     }
-
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return value;
+    function setStatus(message, tone) {
+        if (!statusEl)
+            return;
+        statusEl.textContent = message || '';
+        statusEl.dataset.tone = tone || '';
     }
-
-    return parsed.toLocaleString();
-  }
-
-  function escapeHtml(value) {
-    return String(value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function getAccountIdentifier(account) {
-    const email = String(account?.email || '').trim();
-    if (email) {
-      return email;
+    function formatDate(value) {
+        if (!value) {
+            return 'Unknown';
+        }
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+            return value;
+        }
+        return parsed.toLocaleString();
     }
-
-    const username = String(account?.username || '').trim();
-    if (username) {
-      return username;
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
-
-    return '';
-  }
-
-  function getAccountLabel(account) {
-    const username = String(account?.username || '').trim();
-    const email = String(account?.email || '').trim();
-    if (username && email) {
-      return `${username} (${email})`;
+    function getAccountIdentifier(account) {
+        const email = String(account?.email || '').trim();
+        if (email) {
+            return email;
+        }
+        const username = String(account?.username || '').trim();
+        if (username) {
+            return username;
+        }
+        return '';
     }
-    return username || email || 'Unknown Account';
-  }
-
-  function openModal(modalEl) {
-    if (!modalEl) return;
-    modalEl.classList.add('is-open');
-    modalEl.setAttribute('aria-hidden', 'false');
-  }
-
-  function closeModal(modalEl) {
-    if (!modalEl) return;
-    modalEl.classList.remove('is-open');
-    modalEl.setAttribute('aria-hidden', 'true');
-  }
-
-  function closeAllModals() {
-    closeModal(accountPasswordModalEl);
-    closeModal(accountDeleteModalEl);
-  }
-
-  function openAccountPasswordModal(account) {
-    const identifier = getAccountIdentifier(account);
-    if (!identifier) {
-      setStatus(`Cannot reset password: ${getAccountLabel(account)} does not have an email or username.`, 'error');
-      return;
+    function getAccountLabel(account) {
+        const username = String(account?.username || '').trim();
+        const email = String(account?.email || '').trim();
+        if (username && email) {
+            return `${username} (${email})`;
+        }
+        return username || email || 'Unknown Account';
     }
-
-    if (accountPasswordIdentifierEl) {
-      accountPasswordIdentifierEl.value = identifier;
+    function openModal(modalEl) {
+        if (!modalEl)
+            return;
+        modalEl.classList.add('is-open');
+        modalEl.setAttribute('aria-hidden', 'false');
     }
-    if (accountPasswordTargetEl) {
-      accountPasswordTargetEl.textContent = getAccountLabel(account);
+    function closeModal(modalEl) {
+        if (!modalEl)
+            return;
+        modalEl.classList.remove('is-open');
+        modalEl.setAttribute('aria-hidden', 'true');
     }
-    if (accountPasswordValueEl) {
-      accountPasswordValueEl.value = '';
+    function closeAllModals() {
+        closeModal(accountPasswordModalEl);
+        closeModal(accountDeleteModalEl);
     }
-
-    openModal(accountPasswordModalEl);
-    accountPasswordValueEl?.focus();
-  }
-
-  function openAccountDeleteModal(account) {
-    const identifier = getAccountIdentifier(account);
-    if (!identifier) {
-      setStatus(`Cannot delete account: ${getAccountLabel(account)} does not have an email or username.`, 'error');
-      return;
+    function openAccountPasswordModal(account) {
+        const identifier = getAccountIdentifier(account);
+        if (!identifier) {
+            setStatus(`Cannot reset password: ${getAccountLabel(account)} does not have an email or username.`, 'error');
+            return;
+        }
+        if (accountPasswordIdentifierEl instanceof HTMLInputElement) {
+            accountPasswordIdentifierEl.value = identifier;
+        }
+        if (accountPasswordTargetEl) {
+            accountPasswordTargetEl.textContent = getAccountLabel(account);
+        }
+        if (accountPasswordValueEl instanceof HTMLInputElement) {
+            accountPasswordValueEl.value = '';
+        }
+        openModal(accountPasswordModalEl);
+        accountPasswordValueEl?.focus();
     }
-
-    if (accountDeleteIdentifierEl) {
-      accountDeleteIdentifierEl.value = identifier;
+    function openAccountDeleteModal(account) {
+        const identifier = getAccountIdentifier(account);
+        if (!identifier) {
+            setStatus(`Cannot delete account: ${getAccountLabel(account)} does not have an email or username.`, 'error');
+            return;
+        }
+        if (accountDeleteIdentifierEl instanceof HTMLInputElement) {
+            accountDeleteIdentifierEl.value = identifier;
+        }
+        if (accountDeleteTargetEl) {
+            accountDeleteTargetEl.textContent = getAccountLabel(account);
+        }
+        openModal(accountDeleteModalEl);
+        accountDeleteSubmitEl?.focus();
     }
-    if (accountDeleteTargetEl) {
-      accountDeleteTargetEl.textContent = getAccountLabel(account);
-    }
-
-    openModal(accountDeleteModalEl);
-    accountDeleteSubmitEl?.focus();
-  }
-
-  function buildRequestCard(request, resolved) {
-    const article = document.createElement('article');
-    article.className = 'admin-request-card';
-    article.dataset.requestId = String(request.id || '');
-
-    const message = request.message ? `<p class="admin-request-card__message">${escapeHtml(request.message)}</p>` : '<p class="admin-request-card__message admin-request-card__message--muted">No request message provided.</p>';
-    const inviteCode = request.invite_code ? `<code class="admin-request-card__code">${escapeHtml(request.invite_code)}</code>` : '';
-
-    article.innerHTML = `
+    function buildRequestCard(request, resolved) {
+        const article = document.createElement('article');
+        article.className = 'admin-request-card';
+        article.dataset.requestId = String(request.id || '');
+        const message = request.message
+            ? `<p class="admin-request-card__message">${escapeHtml(request.message)}</p>`
+            : '<p class="admin-request-card__message admin-request-card__message--muted">No request message provided.</p>';
+        const inviteCode = request.invite_code ? `<code class="admin-request-card__code">${escapeHtml(request.invite_code)}</code>` : '';
+        article.innerHTML = `
       <div class="admin-request-card__header">
         <div>
           <h3>${escapeHtml(request.display_name || request.username || request.email)}</h3>
@@ -170,76 +158,80 @@
         </form>
       `}
     `;
-
-    if (!resolved) {
-      article.querySelector('form')?.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const submitButton = form.querySelector('button[type="submit"]');
-        const formData = new FormData(form);
-        submitButton.disabled = true;
-        setStatus(`Approving ${request.email}...`, 'info');
-
-        try {
-          const payload = await window.BSTApi.approveSignupRequest(request.id, {
-            inviteCode: String(formData.get('inviteCode') || '').trim(),
-            expiresInDays: Number.parseInt(String(formData.get('expiresInDays') || '7'), 10)
-          });
-
-          const code = String(payload?.inviteCode || '').trim();
-          setStatus(`Approved ${request.email}. Invite code: ${code}`, 'success');
-          if (code && navigator.clipboard?.writeText) {
-            navigator.clipboard.writeText(code).catch(() => undefined);
-          }
-          await loadRequests();
-        } catch (err) {
-          setStatus(err?.message || 'Approval failed.', 'error');
-        } finally {
-          submitButton.disabled = false;
+        if (!resolved) {
+            article.querySelector('form')?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (!(event.currentTarget instanceof HTMLFormElement) || !window.BSTApi)
+                    return;
+                const form = event.currentTarget;
+                const submitButton = form.querySelector('button[type="submit"]');
+                const formData = new FormData(form);
+                if (submitButton)
+                    submitButton.disabled = true;
+                setStatus(`Approving ${request.email || ''}...`, 'info');
+                try {
+                    const payload = await window.BSTApi.approveSignupRequest(request.id, {
+                        inviteCode: String(formData.get('inviteCode') || '').trim(),
+                        expiresInDays: Number.parseInt(String(formData.get('expiresInDays') || '7'), 10)
+                    });
+                    const code = String(payload?.inviteCode || '').trim();
+                    setStatus(`Approved ${request.email || ''}. Invite code: ${code}`, 'success');
+                    if (code && navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText(code).catch(() => undefined);
+                    }
+                    await loadRequests();
+                }
+                catch (err) {
+                    setStatus(getErrorMessage(err, 'Approval failed.'), 'error');
+                }
+                finally {
+                    if (submitButton)
+                        submitButton.disabled = false;
+                }
+            });
+            article.querySelector('.admin-request-card__reject-btn')?.addEventListener('click', async () => {
+                if (!window.BSTApi)
+                    return;
+                const form = article.querySelector('form');
+                const submitButton = form?.querySelector('button[type="submit"]');
+                const rejectButton = article.querySelector('.admin-request-card__reject-btn');
+                const reasonInput = form?.querySelector('input[name="rejectReason"]');
+                const reason = String(reasonInput?.value || '').trim();
+                const confirmed = window.confirm(`Reject signup request from ${request.email || ''}?`);
+                if (!confirmed) {
+                    return;
+                }
+                if (submitButton)
+                    submitButton.disabled = true;
+                if (rejectButton)
+                    rejectButton.disabled = true;
+                setStatus(`Rejecting ${request.email || ''}...`, 'info');
+                try {
+                    await window.BSTApi.rejectSignupRequest(request.id, {
+                        reason
+                    });
+                    setStatus(`Rejected ${request.email || ''}.`, 'success');
+                    await loadRequests();
+                }
+                catch (err) {
+                    setStatus(getErrorMessage(err, 'Reject failed.'), 'error');
+                }
+                finally {
+                    if (submitButton)
+                        submitButton.disabled = false;
+                    if (rejectButton)
+                        rejectButton.disabled = false;
+                }
+            });
         }
-      });
-
-      article.querySelector('.admin-request-card__reject-btn')?.addEventListener('click', async () => {
-        const form = article.querySelector('form');
-        const submitButton = form?.querySelector('button[type="submit"]');
-        const rejectButton = article.querySelector('.admin-request-card__reject-btn');
-        const reasonInput = form?.querySelector('input[name="rejectReason"]');
-        const reason = String(reasonInput?.value || '').trim();
-
-        const confirmed = window.confirm(`Reject signup request from ${request.email}?`);
-        if (!confirmed) {
-          return;
-        }
-
-        if (submitButton) submitButton.disabled = true;
-        if (rejectButton) rejectButton.disabled = true;
-
-        setStatus(`Rejecting ${request.email}...`, 'info');
-        try {
-          await window.BSTApi.rejectSignupRequest(request.id, {
-            reason
-          });
-          setStatus(`Rejected ${request.email}.`, 'success');
-          await loadRequests();
-        } catch (err) {
-          setStatus(err?.message || 'Reject failed.', 'error');
-        } finally {
-          if (submitButton) submitButton.disabled = false;
-          if (rejectButton) rejectButton.disabled = false;
-        }
-      });
+        return article;
     }
-
-    return article;
-  }
-
-  function buildAccountCard(account) {
-    const article = document.createElement('article');
-    article.className = 'admin-request-card';
-    const identifier = getAccountIdentifier(account);
-    const hasIdentifier = Boolean(identifier);
-
-    article.innerHTML = `
+    function buildAccountCard(account) {
+        const article = document.createElement('article');
+        article.className = 'admin-request-card';
+        const identifier = getAccountIdentifier(account);
+        const hasIdentifier = Boolean(identifier);
+        article.innerHTML = `
       <div class="admin-request-card__header">
         <div>
           <h3>${escapeHtml(account.username || '(no username)')}</h3>
@@ -262,293 +254,280 @@
         <button type="button" class="btn-danger account-delete-action" ${hasIdentifier ? '' : 'disabled aria-disabled="true"'}>Delete Account</button>
       </div>
     `;
-
-    article.querySelector('.account-reset-action')?.addEventListener('click', () => {
-      openAccountPasswordModal(account);
-    });
-
-    article.querySelector('.account-delete-action')?.addEventListener('click', () => {
-      openAccountDeleteModal(account);
-    });
-
-    return article;
-  }
-
-  function renderRequests(requests) {
-    const pending = requests.filter((request) => String(request.status || '').trim().toLowerCase() === 'pending');
-    const resolved = requests.filter((request) => String(request.status || '').trim().toLowerCase() !== 'pending');
-
-    pendingListEl.innerHTML = '';
-    resolvedListEl.innerHTML = '';
-
-    if (pending.length === 0) {
-      pendingListEl.innerHTML = '<p class="admin-request-card__empty">No pending signup requests.</p>';
-    } else {
-      pending.forEach((request) => pendingListEl.appendChild(buildRequestCard(request, false)));
+        article.querySelector('.account-reset-action')?.addEventListener('click', () => {
+            openAccountPasswordModal(account);
+        });
+        article.querySelector('.account-delete-action')?.addEventListener('click', () => {
+            openAccountDeleteModal(account);
+        });
+        return article;
     }
-
-    if (resolved.length === 0) {
-      resolvedListEl.innerHTML = '<p class="admin-request-card__empty">No approved or processed requests yet.</p>';
-    } else {
-      resolved.forEach((request) => resolvedListEl.appendChild(buildRequestCard(request, true)));
-    }
-  }
-
-  function renderAccounts(accounts) {
-    if (!activeAccountsListEl) {
-      return;
-    }
-
-    activeAccountsListEl.innerHTML = '';
-    if (!Array.isArray(accounts) || accounts.length === 0) {
-      activeAccountsListEl.innerHTML = '<p class="admin-request-card__empty">No active accounts found.</p>';
-      return;
-    }
-
-    accounts.forEach((account) => {
-      activeAccountsListEl.appendChild(buildAccountCard(account));
-    });
-  }
-
-  async function loadRequests() {
-    setStatus('Loading signup requests...', 'info');
-    try {
-      const payload = await window.BSTApi.listSignupRequests();
-      const requests = Array.isArray(payload?.requests) ? payload.requests : [];
-      renderRequests(requests);
-      setStatus(`Loaded ${requests.length} signup request${requests.length === 1 ? '' : 's'}.`, 'success');
-    } catch (err) {
-      pendingListEl.innerHTML = '<p class="admin-request-card__empty">Could not load signup requests.</p>';
-      resolvedListEl.innerHTML = '';
-      setStatus(err?.message || 'Could not load signup requests.', 'error');
-    }
-  }
-
-  async function loadAccounts() {
-    try {
-      const payload = await window.BSTApi.listUserAccounts();
-      const accounts = Array.isArray(payload?.accounts) ? payload.accounts : [];
-      renderAccounts(accounts);
-    } catch (err) {
-      if (activeAccountsListEl) {
-        activeAccountsListEl.innerHTML = '<p class="admin-request-card__empty">Could not load active accounts.</p>';
-      }
-      setStatus(err?.message || 'Could not load active accounts.', 'error');
-    }
-  }
-
-  // ===== GLOBAL NAV =====
-  async function setupGlobalNav() {
-    const nav = document.createElement('div');
-    nav.id = 'floating-global-nav';
-    Object.assign(nav.style, {
-      position: 'fixed',
-      top: '16px',
-      right: '24px',
-      display: 'flex',
-      gap: '20px',
-      alignItems: 'center',
-      zIndex: '10000',
-      fontFamily: 'inherit'
-    });
-
-    // Theme Selector
-    const themeSelect = document.createElement('select');
-    themeSelect.setAttribute('data-theme-select', '');
-    Object.assign(themeSelect.style, {
-      background: 'transparent',
-      border: 'none',
-      color: 'var(--accent, inherit)',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: '500',
-      outline: 'none',
-      padding: '0'
-    });
-    
-    const themes = [
-      { id: 'dark', label: 'Dark' },
-      { id: 'light', label: 'Light' },
-    { id: 'sepia', label: 'Sepia' },
-    { id: 'night', label: 'Night' },
-    { id: 'vivid', label: 'Vivid' }
-    ];
-    
-    themes.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id;
-      opt.textContent = t.label;
-      themeSelect.appendChild(opt);
-    });
-
-    themeSelect.value = document.documentElement.getAttribute('data-theme') || 'dark';
-    themeSelect.addEventListener('change', () => {
-      if (window.BSTTheme) window.BSTTheme.applyTheme(themeSelect.value);
-    });
-
-    // User Admin Link
-    const adminLink = document.createElement('a');
-    adminLink.href = 'user-admin.html';
-    Object.assign(adminLink.style, {
-      color: 'var(--accent, inherit)',
-      textDecoration: 'none',
-      fontWeight: '500',
-      fontSize: '14px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px'
-    });
-    adminLink.innerHTML = `Admin <span id="pending-requests-badge" style="display: none; background: #e74c3c; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; line-height: 1;">0</span>`;
-    
-    adminLink.addEventListener('mouseenter', () => adminLink.style.textDecoration = 'underline');
-    adminLink.addEventListener('mouseleave', () => adminLink.style.textDecoration = 'none');
-
-    // Sign Out Button
-    const signOutBtn = document.createElement('button');
-    Object.assign(signOutBtn.style, {
-      background: 'transparent',
-      border: 'none',
-      color: 'var(--accent, inherit)',
-      cursor: 'pointer',
-      fontWeight: '500',
-      fontSize: '14px',
-      padding: '0',
-      outline: 'none'
-    });
-    signOutBtn.textContent = 'Sign Out';
-    signOutBtn.addEventListener('click', async () => {
-      if (window.BSTApi) {
-        await window.BSTApi.logout();
-        window.location.replace('/auth.html');
-      }
-    });
-    
-    signOutBtn.addEventListener('mouseenter', () => signOutBtn.style.textDecoration = 'underline');
-    signOutBtn.addEventListener('mouseleave', () => signOutBtn.style.textDecoration = 'none');
-
-    nav.appendChild(themeSelect);
-    nav.appendChild(adminLink);
-    nav.appendChild(signOutBtn);
-    document.body.appendChild(nav);
-
-    // Fetch pending requests for the badge
-    try {
-      if (window.BSTApi && typeof window.BSTApi.listSignupRequests === 'function') {
-        const res = await window.BSTApi.listSignupRequests('pending');
-        if (res && res.requests && res.requests.length > 0) {
-          const badge = document.getElementById('pending-requests-badge');
-          badge.textContent = res.requests.length;
-          badge.style.display = 'inline-block';
+    function renderRequests(requests) {
+        const pending = requests.filter((request) => String(request.status || '').trim().toLowerCase() === 'pending');
+        const resolved = requests.filter((request) => String(request.status || '').trim().toLowerCase() !== 'pending');
+        if (pendingListEl) {
+            pendingListEl.innerHTML = '';
+            if (pending.length === 0) {
+                pendingListEl.innerHTML = '<p class="admin-request-card__empty">No pending signup requests.</p>';
+            }
+            else {
+                pending.forEach((request) => pendingListEl.appendChild(buildRequestCard(request, false)));
+            }
         }
-      }
-    } catch (err) {
-      console.warn('Could not fetch pending requests for badge:', err);
+        if (resolvedListEl) {
+            resolvedListEl.innerHTML = '';
+            if (resolved.length === 0) {
+                resolvedListEl.innerHTML = '<p class="admin-request-card__empty">No approved or processed requests yet.</p>';
+            }
+            else {
+                resolved.forEach((request) => resolvedListEl.appendChild(buildRequestCard(request, true)));
+            }
+        }
     }
-  }
-
-  async function init() {
-    if (!window.BSTApi) {
-      window.location.replace('/auth.html');
-      return;
+    function renderAccounts(accounts) {
+        if (!activeAccountsListEl) {
+            return;
+        }
+        activeAccountsListEl.innerHTML = '';
+        if (!Array.isArray(accounts) || accounts.length === 0) {
+            activeAccountsListEl.innerHTML = '<p class="admin-request-card__empty">No active accounts found.</p>';
+            return;
+        }
+        accounts.forEach((account) => {
+            activeAccountsListEl.appendChild(buildAccountCard(account));
+        });
     }
-
-    setupGlobalNav();
-
-    const adminUser = await window.BSTApi.ensureAdminAccess({ redirectTo: '/auth.html' });
-    if (!adminUser) {
-      return;
+    async function loadRequests() {
+        if (!window.BSTApi)
+            return;
+        setStatus('Loading signup requests...', 'info');
+        try {
+            const payload = await window.BSTApi.listSignupRequests();
+            const requests = Array.isArray(payload?.requests) ? payload.requests : [];
+            renderRequests(requests);
+            setStatus(`Loaded ${requests.length} signup request${requests.length === 1 ? '' : 's'}.`, 'success');
+        }
+        catch (err) {
+            if (pendingListEl)
+                pendingListEl.innerHTML = '<p class="admin-request-card__empty">Could not load signup requests.</p>';
+            if (resolvedListEl)
+                resolvedListEl.innerHTML = '';
+            setStatus(getErrorMessage(err, 'Could not load signup requests.'), 'error');
+        }
     }
-
-    document.getElementById('refresh-requests-btn')?.addEventListener('click', () => {
-      void loadRequests();
-      void loadAccounts();
-    });
-
-    document.getElementById('logout-btn')?.addEventListener('click', async () => {
-      await window.BSTApi.logout();
-      window.location.replace('/auth.html');
-    });
-
-    document.querySelectorAll('[data-close-modal]').forEach((buttonEl) => {
-      buttonEl.addEventListener('click', () => {
-        const modalId = buttonEl.getAttribute('data-close-modal');
-        if (!modalId) {
-          return;
+    async function loadAccounts() {
+        if (!window.BSTApi)
+            return;
+        try {
+            const payload = await window.BSTApi.listUserAccounts();
+            const accounts = Array.isArray(payload?.accounts) ? payload.accounts : [];
+            renderAccounts(accounts);
         }
-        closeModal(document.getElementById(modalId));
-      });
-    });
-
-    [accountPasswordModalEl, accountDeleteModalEl].forEach((modalEl) => {
-      modalEl?.addEventListener('click', (event) => {
-        if (event.target === modalEl) {
-          closeModal(modalEl);
+        catch (err) {
+            if (activeAccountsListEl) {
+                activeAccountsListEl.innerHTML = '<p class="admin-request-card__empty">Could not load active accounts.</p>';
+            }
+            setStatus(getErrorMessage(err, 'Could not load active accounts.'), 'error');
         }
-      });
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        closeAllModals();
-      }
-    });
-
-    accountPasswordFormEl?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      const formData = new FormData(event.currentTarget);
-      const identifier = String(formData.get('identifier') || '').trim();
-      const newPassword = String(formData.get('newPassword') || '');
-      if (!identifier) {
-        setStatus('Password reset failed: missing account identifier.', 'error');
-        return;
-      }
-
-      if (accountPasswordSubmitEl) accountPasswordSubmitEl.disabled = true;
-      setStatus(`Resetting password for ${identifier}...`, 'info');
-      try {
-        await window.BSTApi.resetAccountPassword(identifier, newPassword);
-        closeModal(accountPasswordModalEl);
-        if (accountPasswordFormEl) {
-          accountPasswordFormEl.reset();
+    }
+    // ===== GLOBAL NAV =====
+    async function setupGlobalNav() {
+        const nav = document.createElement('div');
+        nav.id = 'floating-global-nav';
+        Object.assign(nav.style, {
+            position: 'fixed',
+            top: '16px',
+            right: '24px',
+            display: 'flex',
+            gap: '20px',
+            alignItems: 'center',
+            zIndex: '10000',
+            fontFamily: 'inherit'
+        });
+        const themeSelect = document.createElement('select');
+        themeSelect.setAttribute('data-theme-select', '');
+        Object.assign(themeSelect.style, {
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--accent, inherit)',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            outline: 'none',
+            padding: '0'
+        });
+        const themes = [
+            { id: 'dark', label: 'Dark' },
+            { id: 'light', label: 'Light' },
+            { id: 'sepia', label: 'Sepia' },
+            { id: 'night', label: 'Night' },
+            { id: 'vivid', label: 'Vivid' }
+        ];
+        themes.forEach((t) => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = t.label;
+            themeSelect.appendChild(opt);
+        });
+        themeSelect.value = document.documentElement.getAttribute('data-theme') || 'dark';
+        themeSelect.addEventListener('change', () => {
+            if (window.BSTTheme)
+                window.BSTTheme.applyTheme(themeSelect.value);
+        });
+        const adminLink = document.createElement('a');
+        adminLink.href = 'user-admin.html';
+        Object.assign(adminLink.style, {
+            color: 'var(--accent, inherit)',
+            textDecoration: 'none',
+            fontWeight: '500',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+        });
+        adminLink.innerHTML = 'Admin <span id="pending-requests-badge" style="display: none; background: #e74c3c; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; line-height: 1;">0</span>';
+        adminLink.addEventListener('mouseenter', () => { adminLink.style.textDecoration = 'underline'; });
+        adminLink.addEventListener('mouseleave', () => { adminLink.style.textDecoration = 'none'; });
+        const signOutBtn = document.createElement('button');
+        Object.assign(signOutBtn.style, {
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--accent, inherit)',
+            cursor: 'pointer',
+            fontWeight: '500',
+            fontSize: '14px',
+            padding: '0',
+            outline: 'none'
+        });
+        signOutBtn.textContent = 'Sign Out';
+        signOutBtn.addEventListener('click', async () => {
+            if (window.BSTApi) {
+                await window.BSTApi.logout();
+                window.location.replace('/auth.html');
+            }
+        });
+        signOutBtn.addEventListener('mouseenter', () => { signOutBtn.style.textDecoration = 'underline'; });
+        signOutBtn.addEventListener('mouseleave', () => { signOutBtn.style.textDecoration = 'none'; });
+        nav.appendChild(themeSelect);
+        nav.appendChild(adminLink);
+        nav.appendChild(signOutBtn);
+        document.body.appendChild(nav);
+        try {
+            if (window.BSTApi && typeof window.BSTApi.listSignupRequests === 'function') {
+                const res = await window.BSTApi.listSignupRequests('pending');
+                if (res && res.requests && res.requests.length > 0) {
+                    const badge = document.getElementById('pending-requests-badge');
+                    if (badge) {
+                        badge.textContent = String(res.requests.length);
+                        badge.style.display = 'inline-block';
+                    }
+                }
+            }
         }
-        setStatus(`Password reset for ${identifier}.`, 'success');
-      } catch (err) {
-        setStatus(err?.message || 'Password reset failed.', 'error');
-      } finally {
-        if (accountPasswordSubmitEl) accountPasswordSubmitEl.disabled = false;
-      }
-    });
-
-    accountDeleteFormEl?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      const formData = new FormData(event.currentTarget);
-      const identifier = String(formData.get('identifier') || '').trim();
-      if (!identifier) {
-        setStatus('Account removal failed: missing account identifier.', 'error');
-        return;
-      }
-
-      if (accountDeleteSubmitEl) accountDeleteSubmitEl.disabled = true;
-      setStatus(`Removing account ${identifier}...`, 'info');
-      try {
-        await window.BSTApi.removeAccount(identifier);
-        closeModal(accountDeleteModalEl);
-        if (accountDeleteFormEl) {
-          accountDeleteFormEl.reset();
+        catch (err) {
+            console.warn('Could not fetch pending requests for badge:', err);
         }
-        setStatus(`Removed account ${identifier}.`, 'success');
-        await loadAccounts();
-      } catch (err) {
-        setStatus(err?.message || 'Account removal failed.', 'error');
-      } finally {
-        if (accountDeleteSubmitEl) accountDeleteSubmitEl.disabled = false;
-      }
-    });
-
-    await Promise.all([loadRequests(), loadAccounts()]);
-  }
-
-  void init();
+    }
+    async function init() {
+        if (!window.BSTApi) {
+            window.location.replace('/auth.html');
+            return;
+        }
+        void setupGlobalNav();
+        const adminUser = await window.BSTApi.ensureAdminAccess({ redirectTo: '/auth.html' });
+        if (!adminUser) {
+            return;
+        }
+        document.getElementById('refresh-requests-btn')?.addEventListener('click', () => {
+            void loadRequests();
+            void loadAccounts();
+        });
+        document.getElementById('logout-btn')?.addEventListener('click', async () => {
+            await window.BSTApi?.logout();
+            window.location.replace('/auth.html');
+        });
+        document.querySelectorAll('[data-close-modal]').forEach((buttonEl) => {
+            buttonEl.addEventListener('click', () => {
+                const modalId = buttonEl.getAttribute('data-close-modal');
+                if (!modalId) {
+                    return;
+                }
+                closeModal(document.getElementById(modalId));
+            });
+        });
+        [accountPasswordModalEl, accountDeleteModalEl].forEach((modalEl) => {
+            modalEl?.addEventListener('click', (event) => {
+                if (event.target === modalEl) {
+                    closeModal(modalEl);
+                }
+            });
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeAllModals();
+            }
+        });
+        accountPasswordFormEl?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!(event.currentTarget instanceof HTMLFormElement) || !window.BSTApi)
+                return;
+            const formData = new FormData(event.currentTarget);
+            const identifier = String(formData.get('identifier') || '').trim();
+            const newPassword = String(formData.get('newPassword') || '');
+            if (!identifier) {
+                setStatus('Password reset failed: missing account identifier.', 'error');
+                return;
+            }
+            if (accountPasswordSubmitEl instanceof HTMLButtonElement)
+                accountPasswordSubmitEl.disabled = true;
+            setStatus(`Resetting password for ${identifier}...`, 'info');
+            try {
+                await window.BSTApi.resetAccountPassword(identifier, newPassword);
+                closeModal(accountPasswordModalEl);
+                if (accountPasswordFormEl instanceof HTMLFormElement) {
+                    accountPasswordFormEl.reset();
+                }
+                setStatus(`Password reset for ${identifier}.`, 'success');
+            }
+            catch (err) {
+                setStatus(getErrorMessage(err, 'Password reset failed.'), 'error');
+            }
+            finally {
+                if (accountPasswordSubmitEl instanceof HTMLButtonElement)
+                    accountPasswordSubmitEl.disabled = false;
+            }
+        });
+        accountDeleteFormEl?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!(event.currentTarget instanceof HTMLFormElement) || !window.BSTApi)
+                return;
+            const formData = new FormData(event.currentTarget);
+            const identifier = String(formData.get('identifier') || '').trim();
+            if (!identifier) {
+                setStatus('Account removal failed: missing account identifier.', 'error');
+                return;
+            }
+            if (accountDeleteSubmitEl instanceof HTMLButtonElement)
+                accountDeleteSubmitEl.disabled = true;
+            setStatus(`Removing account ${identifier}...`, 'info');
+            try {
+                await window.BSTApi.removeAccount(identifier);
+                closeModal(accountDeleteModalEl);
+                if (accountDeleteFormEl instanceof HTMLFormElement) {
+                    accountDeleteFormEl.reset();
+                }
+                setStatus(`Removed account ${identifier}.`, 'success');
+                await loadAccounts();
+            }
+            catch (err) {
+                setStatus(getErrorMessage(err, 'Account removal failed.'), 'error');
+            }
+            finally {
+                if (accountDeleteSubmitEl instanceof HTMLButtonElement)
+                    accountDeleteSubmitEl.disabled = false;
+            }
+        });
+        await Promise.all([loadRequests(), loadAccounts()]);
+    }
+    void init();
 })();

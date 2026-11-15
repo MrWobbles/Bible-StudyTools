@@ -1,0 +1,582 @@
+(function () {
+  interface HttpError extends Error {
+    response?: Response;
+    status?: number;
+    payload?: unknown;
+  }
+
+  const STORAGE_KEY_ADMIN = 'bst-admin-token';
+  const STORAGE_KEY_ACCESS = 'bst-supabase-access-token';
+  const STORAGE_KEY_REFRESH = 'bst-supabase-refresh-token';
+  const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+  let refreshInProgress: Promise<boolean> | null = null;
+
+  function isLoopbackHost(hostname: string): boolean {
+    return LOOPBACK_HOSTS.has(hostname) || hostname.endsWith('.localhost');
+  }
+
+  function isAdminUser(user: unknown): user is AuthUser {
+    if (!user || typeof user !== 'object') {
+      return false;
+    }
+
+    const candidate = user as AuthUser;
+    return Boolean(candidate.isAdmin || String(candidate.role || '').trim().toLowerCase() === 'admin');
+  }
+
+  function getAdminToken(): string {
+    return localStorage.getItem(STORAGE_KEY_ADMIN)?.trim() || '';
+  }
+
+  function setAdminToken(token: string): void {
+    const normalized = typeof token === 'string' ? token.trim() : '';
+    if (normalized) {
+      localStorage.setItem(STORAGE_KEY_ADMIN, normalized);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_ADMIN);
+    }
+  }
+
+  function getAccessToken(): string {
+    return localStorage.getItem(STORAGE_KEY_ACCESS)?.trim() || '';
+  }
+
+  function getRefreshToken(): string {
+    return localStorage.getItem(STORAGE_KEY_REFRESH)?.trim() || '';
+  }
+
+  function setAuthSession(session: AuthSession | null | undefined): void {
+    const accessToken = typeof session?.accessToken === 'string' ? session.accessToken.trim() : '';
+    const refreshToken = typeof session?.refreshToken === 'string' ? session.refreshToken.trim() : '';
+
+    if (accessToken) {
+      localStorage.setItem(STORAGE_KEY_ACCESS, accessToken);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_ACCESS);
+    }
+
+    if (refreshToken) {
+      localStorage.setItem(STORAGE_KEY_REFRESH, refreshToken);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_REFRESH);
+    }
+  }
+
+  function clearAuthSession(): void {
+    localStorage.removeItem(STORAGE_KEY_ACCESS);
+    localStorage.removeItem(STORAGE_KEY_REFRESH);
+  }
+
+  async function loginWithPassword(identifier: string, password: string): Promise<Record<string, unknown>> {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ identifier, password })
+    });
+
+    if (!response.ok) {
+      const message = await getErrorMessage(response);
+      throw new Error(message || 'Login failed');
+    }
+
+    const payload = (await response.json()) as Record<string, unknown> & { session?: AuthSession };
+    setAuthSession(payload.session);
+    return payload;
+  }
+
+  async function refreshAuthSession(): Promise<boolean> {
+    if (refreshInProgress) {
+      return refreshInProgress;
+    }
+
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+      return false;
+    }
+
+    refreshInProgress = (async (): Promise<boolean> => {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refreshToken })
+      });
+
+      if (!response.ok) {
+        const currentRefreshToken = getRefreshToken();
+        if (currentRefreshToken && currentRefreshToken !== refreshToken) {
+          return true;
+        }
+        clearAuthSession();
+        return false;
+      }
+
+      const payload = (await response.json()) as { session?: AuthSession };
+      setAuthSession(payload.session);
+      return true;
+    })();
+
+    try {
+      return await refreshInProgress;
+    } finally {
+      refreshInProgress = null;
+    }
+  }
+
+  async function promptAndLogin(): Promise<boolean> {
+    const promptPrefix = isLoopbackHost(window.location.hostname)
+      ? 'Sign in with Supabase credentials for admin actions on this server.'
+      : 'Sign in with Supabase credentials for this server.';
+
+    const identifier = window.prompt(`${promptPrefix}\nUsername or email:`);
+    if (!identifier || !identifier.trim()) {
+      return false;
+    }
+
+    const password = window.prompt('Password:');
+    if (!password) {
+      return false;
+    }
+
+    await loginWithPassword(identifier.trim(), password);
+    return true;
+  }
+
+  async function logout(): Promise<void> {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore network failures while still clearing local state.
+    }
+
+    clearAuthSession();
+    setAdminToken('');
+  }
+
+  async function ensureAuthenticated(options: { redirectTo?: string } = {}): Promise<AuthUser | null> {
+    const { redirectTo = '/auth.html' } = options;
+
+    try {
+      const payload = await getCurrentUser();
+      return payload?.user || null;
+    } catch {
+      clearAuthSession();
+      if (redirectTo) {
+        const target = `${redirectTo}?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        window.location.replace(target);
+      }
+      return null;
+    }
+  }
+
+  async function ensureAdminAccess(options: { redirectTo?: string } = {}): Promise<AuthUser | null> {
+    const { redirectTo = '/auth.html' } = options;
+
+    try {
+      const payload = await getCurrentUser();
+      if (isAdminUser(payload?.user)) {
+        return payload.user;
+      }
+
+      if (redirectTo) {
+        const target = `${redirectTo}?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        window.location.replace(target);
+      }
+      return null;
+    } catch {
+      clearAuthSession();
+      if (redirectTo) {
+        const target = `${redirectTo}?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        window.location.replace(target);
+      }
+      return null;
+    }
+  }
+
+  function buildHeaders(existingHeaders: HeadersInit | undefined, requireAdmin: boolean): Headers {
+    const headers = new Headers(existingHeaders || {});
+
+    if (requireAdmin) {
+      const accessToken = getAccessToken();
+      if (accessToken) {
+        headers.set('Authorization', `Bearer ${accessToken}`);
+      } else {
+        const token = getAdminToken();
+        if (token) {
+          headers.set('x-bst-admin-token', token);
+        }
+      }
+    }
+
+    return headers;
+  }
+
+  async function fetchWithSecurity(
+    url: string,
+    options: RequestInit = {},
+    config: ApiSecurityConfig = {}
+  ): Promise<Response> {
+    const {
+      requireAdmin = false,
+      retryOnUnauthorized = true,
+      tryRefreshOnUnauthorized = true,
+      tryInteractiveLoginOnUnauthorized = true,
+      promptForAdminTokenOnUnauthorized = true
+    } = config;
+
+    const runRequest = (): Promise<Response> =>
+      fetch(url, {
+        ...options,
+        headers: buildHeaders(options.headers, requireAdmin)
+      });
+
+    let response = await runRequest();
+
+    if (requireAdmin && retryOnUnauthorized && response.status === 401) {
+      if (tryRefreshOnUnauthorized) {
+        const refreshed = await refreshAuthSession();
+        if (refreshed) {
+          response = await fetchWithSecurity(url, options, {
+            ...config,
+            retryOnUnauthorized: false,
+            tryRefreshOnUnauthorized: false,
+            tryInteractiveLoginOnUnauthorized
+          });
+          return response;
+        }
+      }
+
+      if (tryInteractiveLoginOnUnauthorized) {
+        try {
+          const loggedIn = await promptAndLogin();
+          if (loggedIn) {
+            response = await fetchWithSecurity(url, options, {
+              ...config,
+              retryOnUnauthorized: false,
+              tryRefreshOnUnauthorized: false,
+              tryInteractiveLoginOnUnauthorized: false
+            });
+            return response;
+          }
+        } catch {
+          // Keep original response on failed interactive login.
+        }
+      }
+
+      if (promptForAdminTokenOnUnauthorized) {
+        const enteredToken = window.prompt('Enter the admin token for this server (optional fallback):', getAdminToken());
+        if (enteredToken && enteredToken.trim()) {
+          setAdminToken(enteredToken);
+          response = await fetchWithSecurity(url, options, {
+            ...config,
+            retryOnUnauthorized: false,
+            tryRefreshOnUnauthorized: false,
+            tryInteractiveLoginOnUnauthorized: false,
+            promptForAdminTokenOnUnauthorized: false
+          });
+        }
+      }
+    }
+
+    return response;
+  }
+
+  async function getErrorMessage(response: Response): Promise<string> {
+    try {
+      const json = (await response.clone().json()) as { error?: string };
+      if (json?.error) {
+        return json.error;
+      }
+    } catch {
+      // Ignore JSON parse failures and fall back to text.
+    }
+
+    try {
+      const text = await response.text();
+      if (text) {
+        return text;
+      }
+    } catch {
+      // Ignore text read failures.
+    }
+
+    return `Request failed: ${response.status}`;
+  }
+
+  async function fetchJson<T = unknown>(
+    url: string,
+    options: RequestInit = {},
+    config: ApiSecurityConfig = {}
+  ): Promise<T> {
+    const response = await fetchWithSecurity(url, options, config);
+    if (!response.ok) {
+      const error: HttpError = new Error(await getErrorMessage(response));
+      error.response = response;
+      throw error;
+    }
+    return response.json() as Promise<T>;
+  }
+
+  async function getClasses(): Promise<ClassConfig[] | { classes: ClassConfig[] } | ClassConfig> {
+    return fetchJson<ClassConfig[] | { classes: ClassConfig[] } | ClassConfig>('/api/data/classes', {}, { requireAdmin: true });
+  }
+
+  async function getLessonPlans(): Promise<unknown> {
+    return fetchJson('/api/data/lessonPlans', {}, { requireAdmin: true });
+  }
+
+  async function getNotes(): Promise<unknown> {
+    return fetchJson('/api/data/notes', {}, { requireAdmin: true });
+  }
+
+  async function getEditorDocument(docType: string, recordId: string): Promise<Record<string, unknown>> {
+    return fetchJson<Record<string, unknown>>(
+      `/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}`,
+      {},
+      { requireAdmin: true }
+    );
+  }
+
+  async function listEditorVersions(docType: string, recordId: string): Promise<unknown> {
+    return fetchJson(
+      `/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}/versions`,
+      {},
+      { requireAdmin: true }
+    );
+  }
+
+  async function getEditorVersion(docType: string, recordId: string, seq: string | number): Promise<unknown> {
+    return fetchJson(
+      `/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}/versions/${encodeURIComponent(seq)}`,
+      {},
+      { requireAdmin: true }
+    );
+  }
+
+  async function saveEditorDocument(
+    docType: string,
+    recordId: string,
+    payload: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const response = await fetchWithSecurity(
+      `/api/editor/${encodeURIComponent(docType)}/${encodeURIComponent(recordId)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      },
+      { requireAdmin: true }
+    );
+
+    const result = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+    if (!response.ok) {
+      const error: HttpError = new Error(result?.error || `Request failed: ${response.status}`);
+      error.status = response.status;
+      error.payload = result;
+      throw error;
+    }
+    return result;
+  }
+
+  async function uploadImageToDrive(folderName: string, file: File): Promise<Record<string, unknown>> {
+    const dataBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = () => reject(new Error('Could not read image file'));
+      reader.readAsDataURL(file);
+    });
+    const response = await fetchWithSecurity(
+      '/api/drive/upload-image',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderName, fileName: file.name, mimeType: file.type, dataBase64 })
+      },
+      { requireAdmin: true }
+    );
+    const result = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+    if (!response.ok) {
+      throw new Error(result?.error || `Upload failed: ${response.status}`);
+    }
+    return result;
+  }
+
+  async function deleteSupabaseClass(classId: string): Promise<unknown> {
+    return fetchJson(
+      `/api/supabase/classes/${encodeURIComponent(classId)}`,
+      { method: 'DELETE' },
+      { requireAdmin: true }
+    );
+  }
+
+  async function upsertSupabaseLessonPlan(
+    planId: string,
+    lessonPlanPayload: Record<string, unknown>
+  ): Promise<unknown> {
+    return fetchJson(
+      `/api/supabase/lessonPlans/${encodeURIComponent(planId)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(lessonPlanPayload)
+      },
+      { requireAdmin: true }
+    );
+  }
+
+  async function deleteSupabaseLessonPlan(planId: string): Promise<unknown> {
+    return fetchJson(
+      `/api/supabase/lessonPlans/${encodeURIComponent(planId)}`,
+      { method: 'DELETE' },
+      { requireAdmin: true }
+    );
+  }
+
+  async function upsertSupabaseNote(noteId: string, notePayload: Record<string, unknown>): Promise<unknown> {
+    return fetchJson(
+      `/api/supabase/notes/${encodeURIComponent(noteId)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(notePayload)
+      },
+      { requireAdmin: true }
+    );
+  }
+
+  async function deleteSupabaseNote(noteId: string): Promise<unknown> {
+    return fetchJson(
+      `/api/supabase/notes/${encodeURIComponent(noteId)}`,
+      { method: 'DELETE' },
+      { requireAdmin: true }
+    );
+  }
+
+  async function getCurrentUser(): Promise<{ user?: AuthUser }> {
+    return fetchJson<{ user?: AuthUser }>(
+      '/api/auth/me',
+      {},
+      {
+        requireAdmin: true,
+        tryInteractiveLoginOnUnauthorized: false,
+        promptForAdminTokenOnUnauthorized: false
+      }
+    );
+  }
+
+  async function listSignupRequests(status?: string): Promise<{ requests?: SignupRequest[] }> {
+    const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
+    return fetchJson<{ requests?: SignupRequest[] }>(
+      `/api/admin/signup-requests${suffix}`,
+      {},
+      { requireAdmin: true }
+    );
+  }
+
+  async function listUserAccounts(): Promise<{ accounts?: UserAccount[] }> {
+    return fetchJson<{ accounts?: UserAccount[] }>(
+      '/api/admin/accounts',
+      {},
+      { requireAdmin: true }
+    );
+  }
+
+  async function approveSignupRequest(
+    requestId: string,
+    payload: Record<string, unknown> = {}
+  ): Promise<{ inviteCode?: string }> {
+    return fetchJson<{ inviteCode?: string }>(
+      `/api/admin/signup-requests/${encodeURIComponent(requestId)}/approve`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      },
+      { requireAdmin: true }
+    );
+  }
+
+  async function rejectSignupRequest(requestId: string, payload: Record<string, unknown> = {}): Promise<unknown> {
+    return fetchJson(
+      `/api/admin/signup-requests/${encodeURIComponent(requestId)}/reject`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      },
+      { requireAdmin: true }
+    );
+  }
+
+  async function resetAccountPassword(identifier: string, newPassword: string): Promise<unknown> {
+    return fetchJson(
+      '/api/admin/accounts/reset-password',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ identifier, newPassword })
+      },
+      { requireAdmin: true }
+    );
+  }
+
+  async function removeAccount(identifier: string): Promise<unknown> {
+    return fetchJson(
+      `/api/admin/accounts/${encodeURIComponent(identifier)}`,
+      { method: 'DELETE' },
+      { requireAdmin: true }
+    );
+  }
+
+  window.BSTApi = {
+    fetch: fetchWithSecurity,
+    fetchJson,
+    getClasses,
+    getLessonPlans,
+    getNotes,
+    getEditorDocument,
+    saveEditorDocument,
+    uploadImageToDrive,
+    listEditorVersions,
+    getEditorVersion,
+    deleteSupabaseClass,
+    upsertSupabaseLessonPlan,
+    deleteSupabaseLessonPlan,
+    upsertSupabaseNote,
+    deleteSupabaseNote,
+    getCurrentUser,
+    listSignupRequests,
+    listUserAccounts,
+    approveSignupRequest,
+    rejectSignupRequest,
+    resetAccountPassword,
+    removeAccount,
+    loginWithPassword,
+    refreshAuthSession,
+    ensureAuthenticated,
+    ensureAdminAccess,
+    logout,
+    getAdminToken,
+    setAdminToken,
+    getAccessToken,
+    getRefreshToken,
+    setAuthSession,
+    clearAuthSession,
+    clearAdminToken: () => setAdminToken(''),
+    isLoopbackHost: () => isLoopbackHost(window.location.hostname),
+    isAdminUser
+  };
+})();

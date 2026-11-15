@@ -1,1 +1,21 @@
-editor.js
+# Compiled outputs (edit src/ instead)
+assets/js/
+assets/css/
+*.tsbuildinfo
+
+# Desktop build & duplicated resources
+desktop/dist/
+desktop/build/
+desktop/node_modules/
+
+# Large data & lockfiles
+data/bibles.json
+package-lock.json
+desktop/package-lock.json
+
+# Generated / runtime artifacts
+backups/
+exports/
+logs/
+test-results/
+playwright-report/

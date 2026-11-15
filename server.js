@@ -2772,7 +2772,7 @@ app.get('/api/vbs/media', requireAuthenticatedAccess, async (req, res) => {
 });
 
 // ===== DJ SONG REQUEST API =====
-const QUEUE_FILE = path.join(__dirname, 'queue.json');
+const QUEUE_FILE = path.join(__dirname, 'data', 'queue.json');
 
 async function getQueueData() {
   try {

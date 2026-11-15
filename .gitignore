@@ -43,3 +43,6 @@ assets/audio/*
 desktop/dist/
 desktop/build/
 assets/data/Can-I-Trust-the-Bible-Episode-1.mp4
+
+# TypeScript incremental build cache
+*.tsbuildinfo

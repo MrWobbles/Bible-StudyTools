@@ -1,114 +1,103 @@
+"use strict";
 // LLM Service for Bible Study Application
 // Integrates with local Ollama instance for AI-powered features
-
-/**
- * Configuration for LLM service
- */
-const LLM_CONFIG = {
-    baseUrl: 'http://localhost:11434',
-    defaultModel: 'llama3.1',
-    timeout: 180000, // 180 seconds (3 minutes)
-    availableModels: [
-        { id: 'llama3.1', name: 'Llama 3.1', size: '4.7GB' },
-        { id: 'mistral', name: 'Mistral', size: '4.1GB' },
-        { id: 'phi3', name: 'Phi-3', size: '2.3GB' },
-        { id: 'gemma2', name: 'Gemma 2', size: '5.4GB' }
-    ]
-};
-
-/**
- * Check if Ollama is running and accessible
- * @returns {Promise<boolean>} - True if Ollama is available
- */
-async function checkOllamaAvailability() {
-    try {
-        const response = await fetch(`${LLM_CONFIG.baseUrl}/api/tags`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(5000)
-        });
-        return response.ok;
-    } catch (error) {
-        console.warn('Ollama not available:', error.message);
-        return false;
+(function () {
+    const LLM_CONFIG = {
+        baseUrl: 'http://localhost:11434',
+        defaultModel: 'llama3.1',
+        timeout: 180000, // 180 seconds (3 minutes)
+        availableModels: [
+            { id: 'llama3.1', name: 'Llama 3.1', size: '4.7GB' },
+            { id: 'mistral', name: 'Mistral', size: '4.1GB' },
+            { id: 'phi3', name: 'Phi-3', size: '2.3GB' },
+            { id: 'gemma2', name: 'Gemma 2', size: '5.4GB' }
+        ]
+    };
+    function getErrorMessage(err) {
+        return err instanceof Error ? err.message : String(err);
     }
-}
-
-/**
- * Get list of installed models from Ollama
- * @returns {Promise<Array>} - Array of model objects
- */
-async function getInstalledModels() {
-    try {
-        const response = await fetch(`${LLM_CONFIG.baseUrl}/api/tags`);
-        if (!response.ok) return [];
-        
-        const data = await response.json();
-        return data.models || [];
-    } catch (error) {
-        console.error('Failed to get installed models:', error);
-        return [];
-    }
-}
-
-/**
- * Generate text completion using Ollama
- * @param {string} prompt - The prompt to send to the LLM
- * @param {object} options - Generation options
- * @returns {Promise<string>} - Generated text response
- */
-async function generateCompletion(prompt, options = {}) {
-    const {
-        model = LLM_CONFIG.defaultModel,
-        temperature = 0.7,
-        stream = false,
-        system = null
-    } = options;
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), LLM_CONFIG.timeout);
-
-        const response = await fetch(`${LLM_CONFIG.baseUrl}/api/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model,
-                prompt,
-                system,
-                stream,
-                options: {
-                    temperature
-                }
-            }),
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`LLM request failed: ${response.statusText}`);
+    function stripMarkdownCodeFence(text) {
+        let trimmed = text.trim();
+        if (trimmed.startsWith('```')) {
+            trimmed = trimmed.replace(/```json?\n?/g, '').replace(/```\s*$/g, '');
         }
-
-        const data = await response.json();
-        return data.response || '';
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            throw new Error('LLM request timed out');
-        }
-        throw error;
+        return trimmed;
     }
-}
-
-/**
- * Generate structured Bible study outline using LLM
- * @param {string} content - The lesson content to analyze
- * @param {object} options - Generation options
- * @returns {Promise<Array>} - Array of outline sections
- */
-async function generateOutlineStructure(content, options = {}) {
-    const systemPrompt = `You are a Bible study curriculum expert. Analyze the provided content and generate a structured outline suitable for a Bible study class. 
+    /**
+     * Check if Ollama is running and accessible.
+     */
+    async function checkOllamaAvailability() {
+        try {
+            const response = await fetch(`${LLM_CONFIG.baseUrl}/api/tags`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000)
+            });
+            return response.ok;
+        }
+        catch (error) {
+            console.warn('Ollama not available:', getErrorMessage(error));
+            return false;
+        }
+    }
+    /**
+     * Get list of installed models from Ollama.
+     */
+    async function getInstalledModels() {
+        try {
+            const response = await fetch(`${LLM_CONFIG.baseUrl}/api/tags`);
+            if (!response.ok)
+                return [];
+            const data = (await response.json());
+            return data.models || [];
+        }
+        catch (error) {
+            console.error('Failed to get installed models:', error);
+            return [];
+        }
+    }
+    /**
+     * Generate text completion using Ollama.
+     */
+    async function generateCompletion(prompt, options = {}) {
+        const { model = LLM_CONFIG.defaultModel, temperature = 0.7, stream = false, system = null } = options;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), LLM_CONFIG.timeout);
+            const response = await fetch(`${LLM_CONFIG.baseUrl}/api/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model,
+                    prompt,
+                    system,
+                    stream,
+                    options: {
+                        temperature
+                    }
+                }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`LLM request failed: ${response.statusText}`);
+            }
+            const data = (await response.json());
+            return data.response || '';
+        }
+        catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                throw new Error('LLM request timed out');
+            }
+            throw error;
+        }
+    }
+    /**
+     * Generate structured Bible study outline using LLM.
+     */
+    async function generateOutlineStructure(content, options = {}) {
+        const systemPrompt = `You are a Bible study curriculum expert. Analyze the provided content and generate a structured outline suitable for a Bible study class. 
 
 The content may be unstructured text, paragraphs, notes, or bullet points. Your job is to organize it into logical sections.
 
@@ -150,108 +139,79 @@ Guidelines:
 - Mark the first section as defaultOpen: true
 - If content is sparse, create fewer but complete sections
 - Return ONLY the JSON array, no additional text or markdown`;
-
-    const userPrompt = `Analyze this Bible study content and generate a structured outline:\n\n${content}`;
-
-    try {
-        const response = await generateCompletion(userPrompt, {
-            ...options,
-            system: systemPrompt,
-            temperature: 0.5 // Lower temperature for more consistent JSON
-        });
-
-        // Try to parse the JSON response
-        let outline;
+        const userPrompt = `Analyze this Bible study content and generate a structured outline:\n\n${content}`;
         try {
-            // Remove markdown code blocks if present
-            let jsonText = response.trim();
-            
-            // Remove markdown code blocks
-            if (jsonText.startsWith('```')) {
-                jsonText = jsonText.replace(/```json?\n?/g, '').replace(/```\s*$/g, '');
+            const response = await generateCompletion(userPrompt, {
+                ...options,
+                system: systemPrompt,
+                temperature: 0.5
+            });
+            let parsed;
+            try {
+                let jsonText = stripMarkdownCodeFence(response);
+                const firstBracket = jsonText.indexOf('[');
+                const lastBracket = jsonText.lastIndexOf(']');
+                if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+                    jsonText = jsonText.substring(firstBracket, lastBracket + 1);
+                }
+                parsed = JSON.parse(jsonText);
             }
-            
-            // Find JSON array - look for first [ and last ]
-            const firstBracket = jsonText.indexOf('[');
-            const lastBracket = jsonText.lastIndexOf(']');
-            
-            if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-                jsonText = jsonText.substring(firstBracket, lastBracket + 1);
+            catch (parseError) {
+                console.error('Failed to parse LLM response as JSON:', parseError);
+                console.error('Response was:', response);
+                throw new Error('LLM returned invalid JSON. Try again or use standard outline generation.');
             }
-            
-            outline = JSON.parse(jsonText);
-        } catch (parseError) {
-            console.error('Failed to parse LLM response as JSON:', parseError);
-            console.error('Response was:', response);
-            throw new Error('LLM returned invalid JSON. Try again or use standard outline generation.');
+            if (!Array.isArray(parsed)) {
+                throw new Error('LLM response is not an array');
+            }
+            return parsed.map((rawSection) => {
+                const section = (rawSection && typeof rawSection === 'object' ? rawSection : {});
+                return {
+                    id: section.id || 'untitled-section',
+                    summary: section.summary || 'Untitled Section',
+                    defaultOpen: Boolean(section.defaultOpen),
+                    points: Array.isArray(section.points) ? section.points : [],
+                    verses: Array.isArray(section.verses) ? section.verses : [],
+                    questions: Array.isArray(section.questions) ? section.questions : []
+                };
+            });
         }
-
-        // Validate the structure
-        if (!Array.isArray(outline)) {
-            throw new Error('LLM response is not an array');
+        catch (error) {
+            console.error('LLM outline generation failed:', error);
+            throw error;
         }
-
-        // Ensure each section has required fields
-        outline = outline.map(section => ({
-            id: section.id || 'untitled-section',
-            summary: section.summary || 'Untitled Section',
-            defaultOpen: section.defaultOpen || false,
-            points: Array.isArray(section.points) ? section.points : [],
-            verses: Array.isArray(section.verses) ? section.verses : [],
-            questions: Array.isArray(section.questions) ? section.questions : []
-        }));
-
-        return outline;
-    } catch (error) {
-        console.error('LLM outline generation failed:', error);
-        throw error;
     }
-}
-
-/**
- * Enhance existing outline with LLM suggestions
- * @param {Array} existingOutline - Current outline structure
- * @param {string} content - Original content
- * @returns {Promise<Array>} - Enhanced outline
- */
-async function enhanceOutline(existingOutline, content) {
-    const systemPrompt = `You are a Bible study curriculum expert. Enhance the provided outline by:
+    /**
+     * Enhance existing outline with LLM suggestions.
+     */
+    async function enhanceOutline(existingOutline, content) {
+        const systemPrompt = `You are a Bible study curriculum expert. Enhance the provided outline by:
 - Adding insightful discussion questions
 - Identifying additional Bible verse references
 - Suggesting key theological points
 - Improving section summaries
 
 Return the enhanced outline in the same JSON format as provided.`;
-
-    const userPrompt = `Content:\n${content}\n\nCurrent Outline:\n${JSON.stringify(existingOutline, null, 2)}\n\nEnhance this outline:`;
-
-    try {
-        const response = await generateCompletion(userPrompt, {
-            system: systemPrompt,
-            temperature: 0.6
-        });
-
-        let enhanced = response.trim();
-        if (enhanced.startsWith('```')) {
-            enhanced = enhanced.replace(/```json?\n?/g, '').replace(/```\s*$/g, '');
+        const userPrompt = `Content:\n${content}\n\nCurrent Outline:\n${JSON.stringify(existingOutline, null, 2)}\n\nEnhance this outline:`;
+        try {
+            const response = await generateCompletion(userPrompt, {
+                system: systemPrompt,
+                temperature: 0.6
+            });
+            const enhanced = stripMarkdownCodeFence(response);
+            const parsed = JSON.parse(enhanced);
+            return Array.isArray(parsed) ? parsed : existingOutline;
         }
-
-        return JSON.parse(enhanced);
-    } catch (error) {
-        console.error('Outline enhancement failed:', error);
-        // Return original outline if enhancement fails
-        return existingOutline;
+        catch (error) {
+            console.error('Outline enhancement failed:', error);
+            return existingOutline;
+        }
     }
-}
-
-/**
- * Generate discussion questions for a specific topic
- * @param {string} topic - Topic or passage to generate questions for
- * @param {number} count - Number of questions to generate
- * @returns {Promise<Array>} - Array of question objects
- */
-async function generateQuestions(topic, count = 3) {
-    const prompt = `Generate ${count} thoughtful discussion questions for a Bible study on: ${topic}
+    /**
+     * Generate discussion questions for a specific topic.
+     */
+    async function generateQuestions(topic, count = 3) {
+        const prompt = `Generate ${count} thoughtful discussion questions for a Bible study on: ${topic}
 
 Return as JSON array in this format:
 [
@@ -261,42 +221,37 @@ Return as JSON array in this format:
     "answer": ""
   }
 ]`;
-
-    try {
-        const response = await generateCompletion(prompt, {
-            temperature: 0.8
-        });
-
-        let questions = response.trim();
-        if (questions.startsWith('```')) {
-            questions = questions.replace(/```json?\n?/g, '').replace(/```\s*$/g, '');
+        try {
+            const response = await generateCompletion(prompt, {
+                temperature: 0.8
+            });
+            const questions = stripMarkdownCodeFence(response);
+            const parsed = JSON.parse(questions);
+            return Array.isArray(parsed) ? parsed : [];
         }
-
-        return JSON.parse(questions);
-    } catch (error) {
-        console.error('Question generation failed:', error);
-        return [];
+        catch (error) {
+            console.error('Question generation failed:', error);
+            return [];
+        }
     }
-}
-
-// Export functions
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        checkOllamaAvailability,
-        getInstalledModels,
-        generateCompletion,
-        generateOutlineStructure,
-        enhanceOutline,
-        generateQuestions,
-        LLM_CONFIG
-    };
-} else {
-    // Browser environment - expose to window
-    window.checkOllamaAvailability = checkOllamaAvailability;
-    window.getInstalledModels = getInstalledModels;
-    window.generateCompletion = generateCompletion;
-    window.generateOutlineStructure = generateOutlineStructure;
-    window.enhanceOutline = enhanceOutline;
-    window.generateQuestions = generateQuestions;
-    window.LLM_CONFIG = LLM_CONFIG;
-}
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            checkOllamaAvailability,
+            getInstalledModels,
+            generateCompletion,
+            generateOutlineStructure,
+            enhanceOutline,
+            generateQuestions,
+            LLM_CONFIG
+        };
+    }
+    else {
+        window.checkOllamaAvailability = checkOllamaAvailability;
+        window.getInstalledModels = getInstalledModels;
+        window.generateCompletion = generateCompletion;
+        window.generateOutlineStructure = generateOutlineStructure;
+        window.enhanceOutline = enhanceOutline;
+        window.generateQuestions = generateQuestions;
+        window.LLM_CONFIG = LLM_CONFIG;
+    }
+})();

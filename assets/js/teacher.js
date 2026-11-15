@@ -1,558 +1,544 @@
-// Teacher view script - classConfig and classId are declared in loader.js
-// Initialize teacher-specific variables
-let VIDEO_ID = '';
-let pausePoints = [];
-let CHANNEL_KEY = 'class-control';
-let STORAGE_FALLBACK_KEY = 'class-control-storage';
-let NOTES_KEY = 'class-teacher-notes';
-let QUESTION_PREFIX = 'class-question-';
-let currentMediaType = null;
-let allClassesData = null; // Store full classes data for saving
-
-let channel = null;
-let statusEl = null;
-let pauseListEl = null;
-let notesEl = null;
-let downloadBtn = null;
-let uploadBtn = null;
-let fileInput = null;
-let questionFields = [];
-let displayWindow = null;
-let displayWindowCheckInterval = null;
-const PREVIEW_THUMB_WIDTH = 400;
-const PREVIEW_THUMB_HEIGHT = 225;
-const DEFAULT_DISPLAY_WIDTH = 1280;
-const DEFAULT_DISPLAY_HEIGHT = 720;
-
-async function loadClassConfig() {
-  try {
-    const raw = await window.BSTApi.getClasses();
-
-    // Store full data for saving
-    allClassesData = raw;
-
-    // Normalize to array: supports {classes:[...]}, [ ... ], or single object
-    const classesArr = Array.isArray(raw)
-      ? raw
-      : Array.isArray(raw?.classes)
-        ? raw.classes
-        : [raw];
-
-    // Find class by either id (GUID) or classNumber for backward compatibility
-    classConfig = classesArr.find(c =>
-      c.classNumber?.toString() === classId || c.id === classId
-    ) || classesArr[0] || {};
-
-    if (!classConfig || !classConfig.classNumber) {
-      console.error(`Class ${classId} not found in configuration`);
-    }
-
-    const primaryMedia = classConfig.media?.find(m => m.primary && m.type === 'video');
-    VIDEO_ID = primaryMedia?.sources?.[0]?.videoId || '';
-    pausePoints = primaryMedia?.pausePoints || [];
-
-    // Normalize pausePoints to objects: { time: seconds, label: 'M:SS' }
-    pausePoints = (pausePoints || []).map(p => {
-      if (p == null) return null;
-      if (typeof p === 'number') return { time: p, label: formatTime(p) };
-      if (typeof p === 'string') {
-        const parts = p.split(':').map(n => Number(n));
-        let secs = 0;
-        if (parts.length === 3) secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
-        else if (parts.length === 2) secs = parts[0] * 60 + parts[1];
-        else secs = Number(p) || 0;
-        return { time: secs, label: formatTime(secs) };
-      }
-      if (typeof p === 'object') {
-        const t = Number(p.time);
-        const timeVal = Number.isFinite(t) ? t : (typeof p.time === 'string' ? (p.time.split(':').reduce((acc, cur) => acc * 60 + Number(cur), 0)) : 0);
-        return { time: timeVal, label: p.label || formatTime(timeVal) };
-      }
-      return null;
-    }).filter(Boolean);
-
-    CHANNEL_KEY = classConfig.channelName || `class${classId}-control`;
-    STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
-    NOTES_KEY = `class${classId}-teacher-notes`;
-    QUESTION_PREFIX = `class${classId}-question-`;
-
-    window.BIBLE_STUDY_CONFIG = {
-      videoId: VIDEO_ID,
-      channelName: CHANNEL_KEY,
-      pausePoints: pausePoints
-    };
-
-    initializePage();
-  } catch (err) {
-    console.error('Failed to load class configuration:', err);
-  }
-}
-
-function initializePage() {
-  document.title = `Presenter View — ${classConfig.title}`;
-
-  statusEl = document.getElementById('status');
-  pauseListEl = document.getElementById('pause-list');
-  notesEl = document.getElementById('notes');
-  downloadBtn = document.getElementById('download-notes');
-  uploadBtn = document.getElementById('upload-notes');
-  fileInput = document.getElementById('notes-file');
-
-  const h1 = document.querySelector('h1');
-  if (h1) h1.textContent = `Presenter View · ${classConfig.title}`;
-
-  const subtitle = document.querySelector('.subtitle');
-  if (subtitle) subtitle.textContent = `${classConfig.subtitle || ''} · Keep this on your laptop while casting the main screen.`;
-
-  const previewIframe = document.getElementById('student-preview');
-  if (previewIframe) previewIframe.src = `${window.location.origin}/student.html?class=${classId}`;
-
-  const guideTitle = document.querySelector('h3');
-  if (guideTitle) guideTitle.textContent = `${classConfig.title} guide with notes`;
-
-  renderOutlineWithQuestions();
-
-  // Render media gallery
-  renderMediaGallery();
-
-  // Set up tab switching
-  setupOutlineTabs();
-
-  // Render generated outline
-  renderGeneratedOutline();
-
-  // Use Electron IPC-based channel if available, otherwise native BroadcastChannel
-  if (window.bst?.createBroadcastChannel) {
-    channel = window.bst.createBroadcastChannel(CHANNEL_KEY);
-  } else if ('BroadcastChannel' in window) {
-    channel = new BroadcastChannel(CHANNEL_KEY);
-  } else {
-    channel = null;
-  }
-
-  bindControls();
-  hydrateNotes();
-
-  // Set up open display button
-  const openDisplayBtn = document.getElementById('open-display-btn');
-  if (openDisplayBtn) {
-    openDisplayBtn.addEventListener('click', openDisplayWindow);
-  }
-
-  // Set up teleprompter button
-  const openTeleprompterBtn = document.getElementById('open-teleprompter-btn');
-  if (openTeleprompterBtn) {
-    openTeleprompterBtn.addEventListener('click', openTeleprompter);
-  }
-
-  if (statusEl) statusEl.textContent = 'Ready. Open the display page on the TV (student.html).';
-}
-
-function formatStoppedMarkerTimestamp(timestamp) {
-  if (!timestamp) return '';
-
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return '';
-
-  return date.toLocaleString([], {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
-}
-
-function getStoppedMarkerHoverLabel() {
-  const formattedTimestamp = formatStoppedMarkerTimestamp(classConfig.stoppedMarkerUpdatedAt);
-  if (!formattedTimestamp) return '';
-
-  if (classConfig.stoppedMarkerAction === 'added') {
-    return `Added ${formattedTimestamp}`;
-  }
-
-  if (classConfig.stoppedMarkerAction === 'modified') {
-    return `Modified ${formattedTimestamp}`;
-  }
-
-  return `Marked ${formattedTimestamp}`;
-}
-
-function getStoppedMarkerButtonTitle(isStoppedHere) {
-  if (!isStoppedHere) {
-    return 'Mark where you stopped';
-  }
-
-  const markerHoverLabel = getStoppedMarkerHoverLabel();
-  return markerHoverLabel
-    ? `Click to remove marker\n${markerHoverLabel}`
-    : 'Click to remove marker';
-}
-
-function updateStoppedMarkerState({ sectionId = null, headingId = null, lineId = null }) {
-  const hadExistingMarker = Boolean(
-    classConfig.stoppedAtSection ||
-    classConfig.stoppedAtEditorHeading ||
-    classConfig.stoppedAtEditorLine
-  );
-  const hasNextMarker = Boolean(sectionId || headingId || lineId);
-  const stoppedMarkerUpdatedAt = hasNextMarker ? new Date().toISOString() : null;
-  const stoppedMarkerAction = hasNextMarker
-    ? (hadExistingMarker ? 'modified' : 'added')
-    : null;
-
-  classConfig.stoppedAtSection = sectionId;
-  classConfig.stoppedAtEditorHeading = headingId;
-  classConfig.stoppedAtEditorLine = lineId;
-  classConfig.stoppedMarkerUpdatedAt = stoppedMarkerUpdatedAt;
-  classConfig.stoppedMarkerAction = stoppedMarkerAction;
-
-  if (allClassesData && allClassesData.classes) {
-    const classIndex = allClassesData.classes.findIndex(c =>
-      c.id === classConfig.id || c.classNumber === classConfig.classNumber
-    );
-
-    if (classIndex !== -1) {
-      allClassesData.classes[classIndex].stoppedAtSection = sectionId;
-      allClassesData.classes[classIndex].stoppedAtEditorHeading = headingId;
-      allClassesData.classes[classIndex].stoppedAtEditorLine = lineId;
-      allClassesData.classes[classIndex].stoppedMarkerUpdatedAt = stoppedMarkerUpdatedAt;
-      allClassesData.classes[classIndex].stoppedMarkerAction = stoppedMarkerAction;
-    } else {
-      console.warn('Could not find class in allClassesData to update marker', {
-        classConfigId: classConfig.id,
-        classConfigNumber: classConfig.classNumber
-      });
-    }
-  } else {
-    console.warn('allClassesData or allClassesData.classes not available for marker update');
-  }
-}
-
-function renderOutlineWithQuestions() {
-  if (!classConfig.outline) return;
-
-  const questionBank = document.getElementById('question-bank');
-  if (!questionBank) return;
-
-  const outlineContainer = questionBank.querySelector('div.list') || questionBank;
-
-  const existingAccordions = outlineContainer.querySelectorAll('details.accordion');
-  existingAccordions.forEach(acc => acc.remove());
-
-  const titleH3 = outlineContainer.querySelector('h3');
-  const insertPoint = titleH3 ? titleH3.nextSibling : outlineContainer.firstChild;
-
-  classConfig.outline.forEach((section) => {
-    const isOpen = section.defaultOpen ? ' open' : '';
-    const isStoppedHere = classConfig.stoppedAtSection === section.id;
-    const detailsEl = document.createElement('details');
-    detailsEl.className = `accordion${isOpen}${isStoppedHere ? ' stopped-here' : ''}`;
-    detailsEl.setAttribute('data-section-id', section.id || '');
-
-    const summaryEl = document.createElement('summary');
-
-    // Create summary content wrapper
-    const summaryContent = document.createElement('span');
-    summaryContent.className = 'summary-text';
-    summaryContent.textContent = section.summary;
-    summaryEl.appendChild(summaryContent);
-
-    // Add stopped-here indicator
-    if (isStoppedHere) {
-      const stoppedIndicator = document.createElement('span');
-      stoppedIndicator.className = 'stopped-indicator';
-      stoppedIndicator.innerHTML = '<span class="material-icons">location_on</span> Stopped here';
-      summaryEl.appendChild(stoppedIndicator);
-    }
-
-    // Add "Mark stopped here" button
-    const stopMarkerBtn = document.createElement('button');
-    stopMarkerBtn.className = 'stop-marker-btn' + (isStoppedHere ? ' active' : '');
-    stopMarkerBtn.innerHTML = isStoppedHere ? '<span class="material-icons">check</span> Marked' : '<span class="material-icons">location_on</span>';
-    stopMarkerBtn.title = getStoppedMarkerButtonTitle(isStoppedHere);
-    stopMarkerBtn.onclick = (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      if (isStoppedHere) {
-        setStoppedMarker(null);
-      } else {
-        setStoppedMarker(section.id);
-      }
-    };
-    summaryEl.appendChild(stopMarkerBtn);
-
-    detailsEl.appendChild(summaryEl);
-
-    // Actions row (e.g., Jump button)
-    const actionsRow = document.createElement('div');
-    actionsRow.style.display = 'flex';
-    actionsRow.style.gap = '10px';
-    actionsRow.style.alignItems = 'center';
-    actionsRow.style.margin = '8px 0 6px';
-
-    const pauseIdx = findPauseIndexForSection(section);
-    if (pauseIdx != null && pauseIdx >= 0) {
-      const info = document.createElement('div');
-      info.style.fontSize = '13px';
-      info.style.color = 'var(--muted)';
-      info.style.marginRight = '8px';
-      const timeText = (pausePoints[pauseIdx] && typeof pausePoints[pauseIdx].time === 'number') ? formatTime(pausePoints[pauseIdx].time) : '';
-      // Show section title first, then the time
-      info.textContent = `${section.summary}${timeText ? ' · ' + timeText : ''}`;
-      actionsRow.appendChild(info);
-
-      const jumpBtn = document.createElement('button');
-      jumpBtn.innerHTML = '<span class="material-symbols-outlined">skip_next</span>Jump here';
-      jumpBtn.onclick = () => sendCommand('jumpToPause', { index: pauseIdx });
-      actionsRow.appendChild(jumpBtn);
-    }
-    if (actionsRow.children.length > 0) {
-      detailsEl.appendChild(actionsRow);
-    }
-
-    // Points list with type support
-    if (Array.isArray(section.points) && section.points.length > 0) {
-      const pointsContainer = document.createElement('div');
-      pointsContainer.className = 'points-container';
-
-      section.points.forEach(pt => {
-        // Support both string format (backward compatible) and object format with type
-        const pointType = typeof pt === 'object' ? (pt.type || 'point') : 'point';
-        const pointText = typeof pt === 'object' ? pt.text : pt;
-
-        const pointDiv = document.createElement('div');
-        pointDiv.className = `point point-${pointType}`;
-
-        // Add icons for different types
-        const icons = {
-          verse: 'menu_book',
-          question: 'help',
-          example: 'lightbulb',
-          note: 'edit_note',
-          heading: '',
-          point: 'radio_button_unchecked'
-        };
-
-        const icon = icons[pointType] || 'radio_button_unchecked';
-        if (pointType === 'heading') {
-          pointDiv.innerHTML = `<strong>${pointText}</strong>`;
-        } else {
-          pointDiv.innerHTML = `<span class="point-icon material-symbols-outlined">${icon}</span><span class="point-text">${pointText}</span>`;
+"use strict";
+// Teacher view script
+(function () {
+    let classConfig = {};
+    const classId = new URLSearchParams(window.location.search).get('class') || '1';
+    // Initialize teacher-specific variables
+    let VIDEO_ID = '';
+    let pausePoints = [];
+    let CHANNEL_KEY = 'class-control';
+    let STORAGE_FALLBACK_KEY = 'class-control-storage';
+    let NOTES_KEY = 'class-teacher-notes';
+    let QUESTION_PREFIX = 'class-question-';
+    let currentMediaType = null;
+    let allClassesData = null; // Store full classes data for saving
+    let channel = null;
+    let statusEl = null;
+    let pauseListEl = null;
+    let notesEl = null;
+    let downloadBtn = null;
+    let uploadBtn = null;
+    let fileInput = null;
+    let questionFields = [];
+    let displayWindow = null;
+    let displayWindowCheckInterval = null;
+    const PREVIEW_THUMB_WIDTH = 400;
+    const PREVIEW_THUMB_HEIGHT = 225;
+    const DEFAULT_DISPLAY_WIDTH = 1280;
+    const DEFAULT_DISPLAY_HEIGHT = 720;
+    let customContextMenu = null;
+    async function loadClassConfig() {
+        try {
+            if (!window.BSTApi) {
+                console.error('BSTApi is not available');
+                return;
+            }
+            const raw = await window.BSTApi.getClasses();
+            // Store full data for saving
+            allClassesData = raw;
+            // Normalize to array: supports {classes:[...]}, [ ... ], or single object
+            let classesArr;
+            if (Array.isArray(raw)) {
+                classesArr = raw;
+            }
+            else if (raw && typeof raw === 'object' && 'classes' in raw && Array.isArray(raw.classes)) {
+                classesArr = raw.classes;
+            }
+            else if (raw && typeof raw === 'object') {
+                classesArr = [raw];
+            }
+            else {
+                classesArr = [];
+            }
+            // Find class by either id (GUID) or classNumber for backward compatibility
+            classConfig =
+                classesArr.find((c) => c.classNumber?.toString() === classId || c.id === classId) ||
+                    classesArr[0] ||
+                    {};
+            if (!classConfig || !classConfig.classNumber) {
+                console.error(`Class ${classId} not found in configuration`);
+            }
+            const primaryMedia = classConfig.media?.find((m) => m.primary && m.type === 'video');
+            VIDEO_ID = primaryMedia?.sources?.[0]?.videoId || '';
+            const rawPausePoints = primaryMedia?.pausePoints || [];
+            // Normalize pausePoints to objects: { time: seconds, label: 'M:SS' }
+            pausePoints = rawPausePoints
+                .map((p) => {
+                if (p == null)
+                    return null;
+                if (typeof p === 'number')
+                    return { time: p, label: formatTime(p) };
+                if (typeof p === 'string') {
+                    const parts = p.split(':').map((n) => Number(n));
+                    let secs = 0;
+                    if (parts.length === 3)
+                        secs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                    else if (parts.length === 2)
+                        secs = parts[0] * 60 + parts[1];
+                    else
+                        secs = Number(p) || 0;
+                    return { time: secs, label: formatTime(secs) };
+                }
+                if (typeof p === 'object') {
+                    const pt = p;
+                    const t = Number(pt.time);
+                    const timeVal = Number.isFinite(t)
+                        ? t
+                        : typeof pt.time === 'string'
+                            ? pt.time.split(':').reduce((acc, cur) => acc * 60 + Number(cur), 0)
+                            : 0;
+                    const label = typeof pt.label === 'string' && pt.label ? pt.label : formatTime(timeVal);
+                    return { time: timeVal, label };
+                }
+                return null;
+            })
+                .filter((p) => p !== null);
+            CHANNEL_KEY = classConfig.channelName || `class${classId}-control`;
+            STORAGE_FALLBACK_KEY = `${CHANNEL_KEY}-storage`;
+            NOTES_KEY = `class${classId}-teacher-notes`;
+            QUESTION_PREFIX = `class${classId}-question-`;
+            window.BIBLE_STUDY_CONFIG = {
+                videoId: VIDEO_ID,
+                channelName: CHANNEL_KEY,
+                bibleTranslation: classConfig.bibleTranslation || 'nkjv',
+                pausePoints: pausePoints
+            };
+            initializePage();
         }
-
-        // Check if the point text looks like a Bible verse reference and make it clickable
-        const versePattern = /^([1-3]?\s?[A-Za-z]+)\s+(\d+(?::\d+(?:[–-]\d+(?::\d+)?)?)?)$/;
-        const verseMatch = pointText.match(versePattern);
-        if (verseMatch || pointType === 'verse') {
-          pointDiv.classList.add('clickable-mark');
-          pointDiv.title = 'Click to display on student screen';
-          pointDiv.onclick = () => {
-            sendVerseToStudent(pointText, 'nkjv');
-            pointDiv.classList.add('mark-active');
-            setTimeout(() => pointDiv.classList.remove('mark-active'), 500);
-          };
+        catch (err) {
+            console.error('Failed to load class configuration:', err);
         }
-
-        pointsContainer.appendChild(pointDiv);
-      });
-
-      detailsEl.appendChild(pointsContainer);
     }
-
-    // Section media marks - clickable items to display on student screen
-    if (Array.isArray(section.media) && section.media.length > 0) {
-      const mediaMarksContainer = document.createElement('div');
-      mediaMarksContainer.className = 'media-marks-container';
-
-      const mediaMarksLabel = document.createElement('div');
-      mediaMarksLabel.className = 'media-marks-label';
-      mediaMarksLabel.innerHTML = '<small><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: text-bottom;">push_pin</span> Media marks (click to display)</small>';
-      mediaMarksContainer.appendChild(mediaMarksLabel);
-
-      const mediaMarksList = document.createElement('div');
-      mediaMarksList.className = 'media-marks-list';
-
-      section.media.forEach((media, mediaIdx) => {
-        const markItem = document.createElement('button');
-        markItem.className = `media-mark media-mark-${media.type}`;
-        markItem.title = `Display ${media.title || media.type} on student screen`;
-
-        const markIcon = getMediaMarkIcon(media.type);
-        markItem.innerHTML = `<span class="mark-icon">${markIcon}</span><span class="mark-title">${media.title || media.reference || media.type}</span>`;
-
-        markItem.onclick = () => {
-          sendSectionMediaToStudent(media);
-          markItem.classList.add('mark-active');
-          setTimeout(() => markItem.classList.remove('mark-active'), 500);
-        };
-
-        mediaMarksList.appendChild(markItem);
-      });
-
-      mediaMarksContainer.appendChild(mediaMarksList);
-      detailsEl.appendChild(mediaMarksContainer);
-    }
-
-    // Questions with answer fields + notes
-    if (section.questions && section.questions.length > 0) {
-      section.questions.forEach(q => {
-        const questionDiv = document.createElement('div');
-        questionDiv.className = 'question';
-
-        // Question header with prompt and display button
-        const questionHeader = document.createElement('div');
-        questionHeader.className = 'question-header';
-
-        const promptP = document.createElement('p');
-        promptP.textContent = q.prompt;
-        questionHeader.appendChild(promptP);
-
-        // Add "Display on screen" button
-        const displayBtn = document.createElement('button');
-        displayBtn.className = 'question-display-btn';
-        displayBtn.innerHTML = '<span class="material-symbols-outlined">live_tv</span> Show';
-        displayBtn.title = 'Display this question on the student screen';
-        displayBtn.onclick = (e) => {
-          e.stopPropagation();
-          sendSectionMediaToStudent({
-            type: 'question',
-            prompt: q.prompt,
-            title: q.prompt
-          });
-          displayBtn.classList.add('mark-active');
-          setTimeout(() => displayBtn.classList.remove('mark-active'), 500);
-        };
-        questionHeader.appendChild(displayBtn);
-
-        questionDiv.appendChild(questionHeader);
-
-        // Teacher notes / suggested answer
-        if (q.answer) {
-          const answerP = document.createElement('div');
-          answerP.className = 'question-notes';
-          answerP.textContent = q.answer;
-          questionDiv.appendChild(answerP);
+    function initializePage() {
+        document.title = `Presenter View — ${classConfig.title || ''}`;
+        statusEl = document.getElementById('status');
+        pauseListEl = document.getElementById('pause-list');
+        notesEl = document.getElementById('notes');
+        downloadBtn = document.getElementById('download-notes');
+        uploadBtn = document.getElementById('upload-notes');
+        const fileInputEl = document.getElementById('notes-file');
+        fileInput = fileInputEl instanceof HTMLInputElement ? fileInputEl : null;
+        const h1 = document.querySelector('h1');
+        if (h1)
+            h1.textContent = `Presenter View · ${classConfig.title || ''}`;
+        const subtitle = document.querySelector('.subtitle');
+        if (subtitle) {
+            subtitle.textContent = `${classConfig.subtitle || ''} · Keep this on your laptop while casting the main screen.`;
         }
-
-        const textarea = document.createElement('textarea');
-        textarea.setAttribute('data-question-key', q.key);
-        questionDiv.appendChild(textarea);
-
-        detailsEl.appendChild(questionDiv);
-      });
+        const previewIframe = document.getElementById('student-preview');
+        if (previewIframe instanceof HTMLIFrameElement) {
+            previewIframe.src = `${window.location.origin}/student.html?class=${classId}`;
+        }
+        const guideTitle = document.querySelector('h3');
+        if (guideTitle)
+            guideTitle.textContent = `${classConfig.title || ''} guide with notes`;
+        renderOutlineWithQuestions();
+        // Render media gallery
+        renderMediaGallery();
+        // Set up tab switching
+        setupOutlineTabs();
+        // Render generated outline
+        renderGeneratedOutline();
+        // Use Electron IPC-based channel if available, otherwise native BroadcastChannel
+        if (window.bst?.createBroadcastChannel) {
+            channel = window.bst.createBroadcastChannel(CHANNEL_KEY);
+        }
+        else if ('BroadcastChannel' in window) {
+            channel = new BroadcastChannel(CHANNEL_KEY);
+        }
+        else {
+            channel = null;
+        }
+        bindControls();
+        hydrateNotes();
+        // Set up open display button
+        const openDisplayBtn = document.getElementById('open-display-btn');
+        if (openDisplayBtn) {
+            openDisplayBtn.addEventListener('click', openDisplayWindow);
+        }
+        // Set up teleprompter button
+        const openTeleprompterBtn = document.getElementById('open-teleprompter-btn');
+        if (openTeleprompterBtn) {
+            openTeleprompterBtn.addEventListener('click', openTeleprompter);
+        }
+        if (statusEl) {
+            statusEl.textContent = 'Ready. Open the display page on the TV (student.html).';
+        }
     }
-
-    if (titleH3 && titleH3.parentNode === outlineContainer) {
-      titleH3.parentNode.insertBefore(detailsEl, titleH3.nextSibling);
-    } else {
-      outlineContainer.insertBefore(detailsEl, insertPoint);
+    function formatStoppedMarkerTimestamp(timestamp) {
+        if (!timestamp)
+            return '';
+        const date = new Date(timestamp);
+        if (Number.isNaN(date.getTime()))
+            return '';
+        return date.toLocaleString([], {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        });
     }
-  });
-
-  questionFields = Array.from(document.querySelectorAll('textarea[data-question-key]'));
-}
-
-// Helpers to map sections to pause points
-function findPauseIndexForSection(section) {
-  try {
-    const primaryVideo = classConfig.media?.find(m => m.primary && m.type === 'video');
-    const points = primaryVideo?.pausePoints || [];
-    if (!points.length) return null;
-
-    // 1) Try by label similarity
-    const sum = normalizeString(section.summary || '');
-    let bestIdx = null;
-    let bestScore = 0;
-    points.forEach((p, idx) => {
-      const lbl = normalizeString(p.label || '');
-      if (!lbl) return;
-      // Exact or substring match gets priority
-      if (sum.includes(lbl) || lbl.includes(sum)) {
-        bestIdx = idx; bestScore = 2; return;
-      }
-      // Token overlap as fallback
-      const score = tokenOverlap(sum, lbl);
-      if (score > bestScore) { bestScore = score; bestIdx = idx; }
-    });
-    if (bestIdx != null && bestScore > 0) return bestIdx;
-
-    // 2) Try by timestamp in summary (e.g., 00:07:05 · ... or 7:05)
-    const ts = parseTimeFromSummary(section.summary || '');
-    if (ts != null) {
-      let nearest = 0;
-      let delta = Infinity;
-      points.forEach((p, idx) => {
-        const d = Math.abs((p.time || 0) - ts);
-        if (d < delta) { delta = d; nearest = idx; }
-      });
-      // Require reasonable proximity (e.g., within 45s) to avoid bad jumps
-      if (delta <= 45) return nearest;
+    function getStoppedMarkerHoverLabel() {
+        const formattedTimestamp = formatStoppedMarkerTimestamp(classConfig.stoppedMarkerUpdatedAt);
+        if (!formattedTimestamp)
+            return '';
+        if (classConfig.stoppedMarkerAction === 'added') {
+            return `Added ${formattedTimestamp}`;
+        }
+        if (classConfig.stoppedMarkerAction === 'modified') {
+            return `Modified ${formattedTimestamp}`;
+        }
+        return `Marked ${formattedTimestamp}`;
     }
-  } catch (e) {
-    // ignore
-  }
-  return null;
-}
-
-function normalizeString(s) {
-  return String(s)
-    .toLowerCase()
-    .replace(/\u00b7/g, ' ')
-    .replace(/"|\(|\)|\[|\]|\{|\}|:|,|\.|&/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function tokenOverlap(a, b) {
-  if (!a || !b) return 0;
-  const ta = new Set(a.split(' '));
-  const tb = new Set(b.split(' '));
-  let count = 0;
-  ta.forEach(t => { if (tb.has(t)) count += 1; });
-  return count;
-}
-
-function parseTimeFromSummary(summary) {
-  // Supports HH:MM:SS ·, HH:MM ·, or M:SS at start
-  const m = String(summary).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (!m) return null;
-  const h = m[3] ? parseInt(m[1], 10) : 0;
-  const mm = m[3] ? parseInt(m[2], 10) : parseInt(m[1], 10);
-  const ss = m[3] ? parseInt(m[3], 10) : parseInt(m[2], 10);
-  return h * 3600 + mm * 60 + ss;
-}
-
-function renderMediaGallery() {
-  const hasMedia = classConfig.media && classConfig.media.length > 0;
-
-  const orderedMedia = [];
-
-  if (hasMedia) {
-    const primaryMedia = classConfig.media.filter(m => m.primary);
-    const otherClassMedia = classConfig.media.filter(m => !m.primary);
-
-    orderedMedia.push(...primaryMedia);
-
-    if (classConfig.outline) {
-      classConfig.outline.forEach(section => {
-        if (section.media && section.media.length > 0) {
-          section.media.forEach(media => {
-            orderedMedia.push({
-              ...media,
-              sectionTitle: section.summary
+    function getStoppedMarkerButtonTitle(isStoppedHere) {
+        if (!isStoppedHere) {
+            return 'Mark where you stopped';
+        }
+        const markerHoverLabel = getStoppedMarkerHoverLabel();
+        return markerHoverLabel
+            ? `Click to remove marker\n${markerHoverLabel}`
+            : 'Click to remove marker';
+    }
+    function updateStoppedMarkerState({ sectionId = null, headingId = null, lineId = null }) {
+        const hadExistingMarker = Boolean(classConfig.stoppedAtSection ||
+            classConfig.stoppedAtEditorHeading ||
+            classConfig.stoppedAtEditorLine);
+        const hasNextMarker = Boolean(sectionId || headingId || lineId);
+        const stoppedMarkerUpdatedAt = hasNextMarker ? new Date().toISOString() : null;
+        const stoppedMarkerAction = hasNextMarker
+            ? hadExistingMarker
+                ? 'modified'
+                : 'added'
+            : null;
+        classConfig.stoppedAtSection = sectionId;
+        classConfig.stoppedAtEditorHeading = headingId;
+        classConfig.stoppedAtEditorLine = lineId;
+        classConfig.stoppedMarkerUpdatedAt = stoppedMarkerUpdatedAt;
+        classConfig.stoppedMarkerAction = stoppedMarkerAction;
+        if (allClassesData &&
+            !Array.isArray(allClassesData) &&
+            'classes' in allClassesData &&
+            Array.isArray(allClassesData.classes)) {
+            const classIndex = allClassesData.classes.findIndex((c) => c.id === classConfig.id || c.classNumber === classConfig.classNumber);
+            if (classIndex !== -1) {
+                allClassesData.classes[classIndex].stoppedAtSection = sectionId;
+                allClassesData.classes[classIndex].stoppedAtEditorHeading = headingId;
+                allClassesData.classes[classIndex].stoppedAtEditorLine = lineId;
+                allClassesData.classes[classIndex].stoppedMarkerUpdatedAt = stoppedMarkerUpdatedAt;
+                allClassesData.classes[classIndex].stoppedMarkerAction = stoppedMarkerAction;
+            }
+            else {
+                console.warn('Could not find class in allClassesData to update marker', {
+                    classConfigId: classConfig.id,
+                    classConfigNumber: classConfig.classNumber
+                });
+            }
+        }
+        else {
+            console.warn('allClassesData or allClassesData.classes not available for marker update');
+        }
+    }
+    function renderOutlineWithQuestions() {
+        if (!classConfig.outline)
+            return;
+        const questionBank = document.getElementById('question-bank');
+        if (!questionBank)
+            return;
+        const outlineContainer = questionBank.querySelector('div.list') || questionBank;
+        const existingAccordions = outlineContainer.querySelectorAll('details.accordion');
+        existingAccordions.forEach((acc) => acc.remove());
+        const titleH3 = outlineContainer.querySelector('h3');
+        const insertPoint = titleH3 ? titleH3.nextSibling : outlineContainer.firstChild;
+        classConfig.outline.forEach((section) => {
+            const isOpen = section.defaultOpen ? ' open' : '';
+            const isStoppedHere = classConfig.stoppedAtSection === section.id;
+            const detailsEl = document.createElement('details');
+            detailsEl.className = `accordion${isOpen}${isStoppedHere ? ' stopped-here' : ''}`;
+            detailsEl.setAttribute('data-section-id', section.id || '');
+            const summaryEl = document.createElement('summary');
+            // Create summary content wrapper
+            const summaryContent = document.createElement('span');
+            summaryContent.className = 'summary-text';
+            summaryContent.textContent = section.summary;
+            summaryEl.appendChild(summaryContent);
+            // Add stopped-here indicator
+            if (isStoppedHere) {
+                const stoppedIndicator = document.createElement('span');
+                stoppedIndicator.className = 'stopped-indicator';
+                stoppedIndicator.innerHTML = '<span class="material-icons">location_on</span> Stopped here';
+                summaryEl.appendChild(stoppedIndicator);
+            }
+            // Add "Mark stopped here" button
+            const stopMarkerBtn = document.createElement('button');
+            stopMarkerBtn.className = 'stop-marker-btn' + (isStoppedHere ? ' active' : '');
+            stopMarkerBtn.innerHTML = isStoppedHere
+                ? '<span class="material-icons">check</span> Marked'
+                : '<span class="material-icons">location_on</span>';
+            stopMarkerBtn.title = getStoppedMarkerButtonTitle(isStoppedHere);
+            stopMarkerBtn.onclick = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (isStoppedHere) {
+                    void setStoppedMarker(null);
+                }
+                else {
+                    void setStoppedMarker(section.id);
+                }
+            };
+            summaryEl.appendChild(stopMarkerBtn);
+            detailsEl.appendChild(summaryEl);
+            // Actions row (e.g., Jump button)
+            const actionsRow = document.createElement('div');
+            actionsRow.style.display = 'flex';
+            actionsRow.style.gap = '10px';
+            actionsRow.style.alignItems = 'center';
+            actionsRow.style.margin = '8px 0 6px';
+            const pauseIdx = findPauseIndexForSection(section);
+            if (pauseIdx != null && pauseIdx >= 0) {
+                const info = document.createElement('div');
+                info.style.fontSize = '13px';
+                info.style.color = 'var(--muted)';
+                info.style.marginRight = '8px';
+                const timeText = pausePoints[pauseIdx] && typeof pausePoints[pauseIdx].time === 'number'
+                    ? formatTime(pausePoints[pauseIdx].time)
+                    : '';
+                // Show section title first, then the time
+                info.textContent = `${section.summary}${timeText ? ' · ' + timeText : ''}`;
+                actionsRow.appendChild(info);
+                const jumpBtn = document.createElement('button');
+                jumpBtn.innerHTML = '<span class="material-symbols-outlined">skip_next</span>Jump here';
+                jumpBtn.onclick = () => sendCommand('jumpToPause', { index: pauseIdx });
+                actionsRow.appendChild(jumpBtn);
+            }
+            if (actionsRow.children.length > 0) {
+                detailsEl.appendChild(actionsRow);
+            }
+            // Points list with type support
+            if (Array.isArray(section.points) && section.points.length > 0) {
+                const pointsContainer = document.createElement('div');
+                pointsContainer.className = 'points-container';
+                const icons = {
+                    verse: 'menu_book',
+                    question: 'help',
+                    example: 'lightbulb',
+                    note: 'edit_note',
+                    heading: '',
+                    point: 'radio_button_unchecked'
+                };
+                section.points.forEach((pt) => {
+                    // Support both string format (backward compatible) and object format with type
+                    const pointType = typeof pt === 'object' ? pt.type || 'point' : 'point';
+                    const pointText = typeof pt === 'object' ? pt.text : pt;
+                    const pointDiv = document.createElement('div');
+                    pointDiv.className = `point point-${pointType}`;
+                    const icon = icons[pointType] || 'radio_button_unchecked';
+                    if (pointType === 'heading') {
+                        pointDiv.innerHTML = `<strong>${pointText}</strong>`;
+                    }
+                    else {
+                        pointDiv.innerHTML = `<span class="point-icon material-symbols-outlined">${icon}</span><span class="point-text">${pointText}</span>`;
+                    }
+                    // Check if the point text looks like a Bible verse reference and make it clickable
+                    const versePattern = /^([1-3]?\s?[A-Za-z]+)\s+(\d+(?::\d+(?:[–-]\d+(?::\d+)?)?)?)$/;
+                    const verseMatch = pointText.match(versePattern);
+                    if (verseMatch || pointType === 'verse') {
+                        pointDiv.classList.add('clickable-mark');
+                        pointDiv.title = 'Click to display on student screen';
+                        pointDiv.onclick = () => {
+                            sendVerseToStudent(pointText, 'nkjv');
+                            pointDiv.classList.add('mark-active');
+                            setTimeout(() => pointDiv.classList.remove('mark-active'), 500);
+                        };
+                    }
+                    pointsContainer.appendChild(pointDiv);
+                });
+                detailsEl.appendChild(pointsContainer);
+            }
+            // Section media marks - clickable items to display on student screen
+            if (Array.isArray(section.media) && section.media.length > 0) {
+                const mediaMarksContainer = document.createElement('div');
+                mediaMarksContainer.className = 'media-marks-container';
+                const mediaMarksLabel = document.createElement('div');
+                mediaMarksLabel.className = 'media-marks-label';
+                mediaMarksLabel.innerHTML =
+                    '<small><span class="material-symbols-outlined" style="font-size: 14px; vertical-align: text-bottom;">push_pin</span> Media marks (click to display)</small>';
+                mediaMarksContainer.appendChild(mediaMarksLabel);
+                const mediaMarksList = document.createElement('div');
+                mediaMarksList.className = 'media-marks-list';
+                section.media.forEach((media) => {
+                    const markItem = document.createElement('button');
+                    markItem.className = `media-mark media-mark-${media.type}`;
+                    markItem.title = `Display ${media.title || media.type} on student screen`;
+                    const markIcon = getMediaMarkIcon(media.type);
+                    markItem.innerHTML = `<span class="mark-icon">${markIcon}</span><span class="mark-title">${media.title || media.reference || media.type}</span>`;
+                    markItem.onclick = () => {
+                        sendSectionMediaToStudent(media);
+                        markItem.classList.add('mark-active');
+                        setTimeout(() => markItem.classList.remove('mark-active'), 500);
+                    };
+                    mediaMarksList.appendChild(markItem);
+                });
+                mediaMarksContainer.appendChild(mediaMarksList);
+                detailsEl.appendChild(mediaMarksContainer);
+            }
+            // Questions with answer fields + notes
+            if (section.questions && section.questions.length > 0) {
+                section.questions.forEach((q) => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'question';
+                    // Question header with prompt and display button
+                    const questionHeader = document.createElement('div');
+                    questionHeader.className = 'question-header';
+                    const promptP = document.createElement('p');
+                    promptP.textContent = q.prompt;
+                    questionHeader.appendChild(promptP);
+                    // Add "Display on screen" button
+                    const displayBtn = document.createElement('button');
+                    displayBtn.className = 'question-display-btn';
+                    displayBtn.innerHTML = '<span class="material-symbols-outlined">live_tv</span> Show';
+                    displayBtn.title = 'Display this question on the student screen';
+                    displayBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        sendSectionMediaToStudent({
+                            type: 'question',
+                            prompt: q.prompt,
+                            title: q.prompt
+                        });
+                        displayBtn.classList.add('mark-active');
+                        setTimeout(() => displayBtn.classList.remove('mark-active'), 500);
+                    };
+                    questionHeader.appendChild(displayBtn);
+                    questionDiv.appendChild(questionHeader);
+                    // Teacher notes / suggested answer
+                    if (q.answer) {
+                        const answerP = document.createElement('div');
+                        answerP.className = 'question-notes';
+                        answerP.textContent = q.answer;
+                        questionDiv.appendChild(answerP);
+                    }
+                    const textarea = document.createElement('textarea');
+                    textarea.setAttribute('data-question-key', q.key);
+                    questionDiv.appendChild(textarea);
+                    detailsEl.appendChild(questionDiv);
+                });
+            }
+            if (titleH3 && titleH3.parentNode === outlineContainer) {
+                titleH3.parentNode.insertBefore(detailsEl, titleH3.nextSibling);
+            }
+            else {
+                outlineContainer.insertBefore(detailsEl, insertPoint);
+            }
+        });
+        questionFields = Array.from(document.querySelectorAll('textarea[data-question-key]')).filter((el) => el instanceof HTMLTextAreaElement);
+    }
+    // Helpers to map sections to pause points
+    function findPauseIndexForSection(section) {
+        try {
+            const primaryVideo = classConfig.media?.find((m) => m.primary && m.type === 'video');
+            const points = primaryVideo?.pausePoints || [];
+            if (!points.length)
+                return null;
+            // 1) Try by label similarity
+            const sum = normalizeString(section.summary || '');
+            let bestIdx = null;
+            let bestScore = 0;
+            points.forEach((p, idx) => {
+                const lbl = normalizeString(p.label || '');
+                if (!lbl)
+                    return;
+                // Exact or substring match gets priority
+                if (sum.includes(lbl) || lbl.includes(sum)) {
+                    bestIdx = idx;
+                    bestScore = 2;
+                    return;
+                }
+                // Token overlap as fallback
+                const score = tokenOverlap(sum, lbl);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIdx = idx;
+                }
             });
-          });
+            if (bestIdx != null && bestScore > 0)
+                return bestIdx;
+            // 2) Try by timestamp in summary (e.g., 00:07:05 · ... or 7:05)
+            const ts = parseTimeFromSummary(section.summary || '');
+            if (ts != null) {
+                let nearest = 0;
+                let delta = Infinity;
+                points.forEach((p, idx) => {
+                    const pTime = typeof p.time === 'number' ? p.time : Number(p.time) || 0;
+                    const d = Math.abs(pTime - ts);
+                    if (d < delta) {
+                        delta = d;
+                        nearest = idx;
+                    }
+                });
+                // Require reasonable proximity (e.g., within 45s) to avoid bad jumps
+                if (delta <= 45)
+                    return nearest;
+            }
         }
-      });
+        catch {
+            // ignore
+        }
+        return null;
     }
-
-    orderedMedia.push(...otherClassMedia);
-  }
-
-  let mediaDrawer = document.getElementById('media-drawer');
-  if (!mediaDrawer) {
-    mediaDrawer = document.createElement('aside');
-    mediaDrawer.id = 'media-drawer';
-    mediaDrawer.className = 'media-drawer';
-    mediaDrawer.innerHTML = `
+    function normalizeString(s) {
+        return String(s)
+            .toLowerCase()
+            .replace(/\u00b7/g, ' ')
+            .replace(/"|\(|\)|\[|\]|\{|\}|:|,|\.|&/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+    function tokenOverlap(a, b) {
+        if (!a || !b)
+            return 0;
+        const ta = new Set(a.split(' '));
+        const tb = new Set(b.split(' '));
+        let count = 0;
+        ta.forEach((t) => {
+            if (tb.has(t))
+                count += 1;
+        });
+        return count;
+    }
+    function parseTimeFromSummary(summary) {
+        // Supports HH:MM:SS ·, HH:MM ·, or M:SS at start
+        const m = String(summary).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (!m)
+            return null;
+        const h = m[3] ? parseInt(m[1], 10) : 0;
+        const mm = m[3] ? parseInt(m[2], 10) : parseInt(m[1], 10);
+        const ss = m[3] ? parseInt(m[3], 10) : parseInt(m[2], 10);
+        return h * 3600 + mm * 60 + ss;
+    }
+    function renderMediaGallery() {
+        const mediaList = classConfig.media;
+        const orderedMedia = [];
+        if (mediaList && mediaList.length > 0) {
+            const primaryMedia = mediaList.filter((m) => m.primary);
+            const otherClassMedia = mediaList.filter((m) => !m.primary);
+            orderedMedia.push(...primaryMedia);
+            if (classConfig.outline) {
+                classConfig.outline.forEach((section) => {
+                    if (section.media && section.media.length > 0) {
+                        section.media.forEach((media) => {
+                            orderedMedia.push({
+                                ...media,
+                                sectionTitle: section.summary
+                            });
+                        });
+                    }
+                });
+            }
+            orderedMedia.push(...otherClassMedia);
+        }
+        let mediaDrawer = document.getElementById('media-drawer');
+        if (!mediaDrawer) {
+            mediaDrawer = document.createElement('aside');
+            mediaDrawer.id = 'media-drawer';
+            mediaDrawer.className = 'media-drawer';
+            mediaDrawer.innerHTML = `
       <div class="media-drawer-header">
         <div>
           <div class="tag">Media resources</div>
@@ -564,15 +550,14 @@ function renderMediaGallery() {
       </div>
       <div class="media-drawer-body" id="media-panel"></div>
     `;
-    document.body.appendChild(mediaDrawer);
-  }
-
-  let verseDrawer = document.getElementById('verse-drawer');
-  if (!verseDrawer) {
-    verseDrawer = document.createElement('aside');
-    verseDrawer.id = 'verse-drawer';
-    verseDrawer.className = 'verse-drawer';
-    verseDrawer.innerHTML = `
+            document.body.appendChild(mediaDrawer);
+        }
+        let verseDrawer = document.getElementById('verse-drawer');
+        if (!verseDrawer) {
+            verseDrawer = document.createElement('aside');
+            verseDrawer.id = 'verse-drawer';
+            verseDrawer.className = 'verse-drawer';
+            verseDrawer.innerHTML = `
       <div class="media-drawer-header">
         <div>
           <div class="tag">Bible verse</div>
@@ -584,15 +569,14 @@ function renderMediaGallery() {
       </div>
       <div class="media-drawer-body" id="verse-panel"></div>
     `;
-    document.body.appendChild(verseDrawer);
-  }
-
-  let textDrawer = document.getElementById('text-drawer');
-  if (!textDrawer) {
-    textDrawer = document.createElement('aside');
-    textDrawer.id = 'text-drawer';
-    textDrawer.className = 'verse-drawer'; // Reusing verse-drawer styles
-    textDrawer.innerHTML = `
+            document.body.appendChild(verseDrawer);
+        }
+        let textDrawer = document.getElementById('text-drawer');
+        if (!textDrawer) {
+            textDrawer = document.createElement('aside');
+            textDrawer.id = 'text-drawer';
+            textDrawer.className = 'verse-drawer'; // Reusing verse-drawer styles
+            textDrawer.innerHTML = `
       <div class="media-drawer-header">
         <div>
           <div class="tag">Custom Display</div>
@@ -604,20 +588,23 @@ function renderMediaGallery() {
       </div>
       <div class="media-drawer-body" id="text-panel"></div>
     `;
-    document.body.appendChild(textDrawer);
-  }
-
-  const mediaPanel = document.getElementById('media-panel');
-  if (mediaPanel) {
-    // Render a compact vertical list of class materials
-    if (orderedMedia.length > 0) {
-      const mediaHTML = `
+            document.body.appendChild(textDrawer);
+        }
+        const mediaPanel = document.getElementById('media-panel');
+        if (mediaPanel) {
+            // Render a compact vertical list of class materials
+            if (orderedMedia.length > 0) {
+                const mediaHTML = `
         <div class="media-list">
-          ${orderedMedia.map((media, idx) => {
-        const sectionLabel = media.sectionTitle ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>` : '';
-        const url = media.url || (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) || '#';
-
-        return `
+          ${orderedMedia
+                    .map((media, idx) => {
+                    const sectionLabel = media.sectionTitle
+                        ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${media.sectionTitle}</div>`
+                        : '';
+                    const url = media.url ||
+                        (media.sources && media.sources[0] && (media.sources[0].url || media.sources[0].path)) ||
+                        '#';
+                    return `
             <div class="media-item" data-media-index="${idx}" data-media-type="${media.type}" data-media-url="${url}" title="${media.title || media.type}">
               <div style="display:flex; gap:10px; align-items:center; min-width:0;">
                 <span class="material-symbols-outlined" style="font-size:20px;">${getMediaIcon(media.type)}</span>
@@ -629,34 +616,36 @@ function renderMediaGallery() {
               </div>
             </div>
             `;
-      }).join('')}
+                })
+                    .join('')}
         </div>
       `;
-      mediaPanel.innerHTML = mediaHTML;
-
-      mediaPanel.querySelectorAll('.media-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const idx = Number(item.dataset.mediaIndex);
-          if (Number.isInteger(idx)) {
-            sendMediaToStudent(idx);
-          }
-        });
-      });
-    } else {
-      mediaPanel.innerHTML = `
+                mediaPanel.innerHTML = mediaHTML;
+                mediaPanel.querySelectorAll('.media-item').forEach((item) => {
+                    if (!(item instanceof HTMLElement))
+                        return;
+                    item.addEventListener('click', () => {
+                        const idx = Number(item.dataset.mediaIndex);
+                        if (Number.isInteger(idx)) {
+                            sendMediaToStudent(idx);
+                        }
+                    });
+                });
+            }
+            else {
+                mediaPanel.innerHTML = `
         <div style="color: var(--muted); font-size: 14px; padding: 20px; text-align: center;">
           <span class="material-icons" style="font-size: 32px; opacity: 0.5; display: block; margin-bottom: 8px;">folder_off</span>
           No media resources for this class.<br>
           Add media in the Admin panel.
         </div>
       `;
-    }
-  }
-
-  const versePanel = document.getElementById('verse-panel');
-  if (!versePanel) return;
-
-  versePanel.innerHTML = `
+            }
+        }
+        const versePanel = document.getElementById('verse-panel');
+        if (!versePanel)
+            return;
+        versePanel.innerHTML = `
     <div class="quick-verse-form-row quick-verse-main-row">
       <input id="verse-ref-input" class="quick-verse-input" type="text" placeholder="e.g., John 3:16–18" />
       <input id="verse-translation-input" class="quick-verse-input" list="bible-versions" placeholder="e.g. NKJV" aria-label="Bible version" style="width: 120px;" value="NKJV" />
@@ -675,44 +664,44 @@ function renderMediaGallery() {
       Defaults to NKJV. Uses API.Bible for exact premium matches. Falls back to WEB, KJV, or NET (labs.bible.org) if the exact translation is unavailable.
     </div>
   `;
-
-  const verseRefInput = document.getElementById('verse-ref-input');
-  const verseTranslationInput = document.getElementById('verse-translation-input');
-  const verseSendBtn = document.getElementById('verse-send-btn');
-  const datalist = document.getElementById('bible-versions');
-
-  // Fetch full list of bibles for typeahead via the server proxy
-  const bibleListUrl = '/api/bible/bibles';
-  console.debug('[Teacher] fetching Bible list from proxy:', bibleListUrl);
-  fetch(bibleListUrl).then(res => res.json()).then(data => {
-    if (data && data.data) {
-      datalist.innerHTML = ''; // clear defaults
-      data.data.forEach(b => {
-        const option = document.createElement('option');
-        // Prefer abbreviation if available, otherwise name
-        option.value = b.abbreviation || b.name;
-        // The text content helps users filter when typing
-        option.textContent = `${b.name} (${b.language.name})`;
-        datalist.appendChild(option);
-      });
-      // Add bible-api.com fallbacks just in case
-      const fallbacks = ['WEB', 'ESV', 'NIV', 'NASB', 'NLT', 'AMP'];
-      fallbacks.forEach(f => {
-        const option = document.createElement('option');
-        option.value = f;
-        datalist.appendChild(option);
-      });
-    }
-  }).catch(err => console.error('Failed to fetch API.Bible list for typeahead:', err));
-
-  if (verseSendBtn && verseRefInput) {
-    verseSendBtn.onclick = () =>
-      sendVerseToStudent(verseRefInput.value, verseTranslationInput?.value || 'NKJV');
-  }
-
-  const textPanel = document.getElementById('text-panel');
-  if (textPanel) {
-    textPanel.innerHTML = `
+        const verseRefInput = document.getElementById('verse-ref-input');
+        const verseTranslationInput = document.getElementById('verse-translation-input');
+        const verseSendBtn = document.getElementById('verse-send-btn');
+        const datalist = document.getElementById('bible-versions');
+        // Fetch full list of bibles for typeahead via the server proxy
+        const bibleListUrl = '/api/bible/bibles';
+        console.debug('[Teacher] fetching Bible list from proxy:', bibleListUrl);
+        fetch(bibleListUrl)
+            .then((res) => res.json())
+            .then((raw) => {
+            const data = raw;
+            if (data && Array.isArray(data.data) && datalist instanceof HTMLDataListElement) {
+                datalist.innerHTML = ''; // clear defaults
+                data.data.forEach((b) => {
+                    const option = document.createElement('option');
+                    // Prefer abbreviation if available, otherwise name
+                    option.value = b.abbreviation || b.name || '';
+                    // The text content helps users filter when typing
+                    option.textContent = `${b.name || ''} (${b.language?.name || ''})`;
+                    datalist.appendChild(option);
+                });
+                // Add bible-api.com fallbacks just in case
+                const fallbacks = ['WEB', 'ESV', 'NIV', 'NASB', 'NLT', 'AMP'];
+                fallbacks.forEach((f) => {
+                    const option = document.createElement('option');
+                    option.value = f;
+                    datalist.appendChild(option);
+                });
+            }
+        })
+            .catch((err) => console.error('Failed to fetch API.Bible list for typeahead:', err));
+        if (verseSendBtn instanceof HTMLButtonElement && verseRefInput instanceof HTMLInputElement) {
+            const translationEl = verseTranslationInput instanceof HTMLInputElement ? verseTranslationInput : null;
+            verseSendBtn.onclick = () => sendVerseToStudent(verseRefInput.value, translationEl?.value || 'NKJV');
+        }
+        const textPanel = document.getElementById('text-panel');
+        if (textPanel) {
+            textPanel.innerHTML = `
       <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
         <div>
           <label for="text-title-input" style="display: block; margin-bottom: 8px; font-weight: 500;">Title (optional)</label>
@@ -725,359 +714,328 @@ function renderMediaGallery() {
         <button id="text-send-btn" class="btn-primary" style="width: 100%; padding: 12px;">Display on Screen</button>
       </div>
     `;
-
-    const textTitleInput = document.getElementById('text-title-input');
-    const textContentInput = document.getElementById('text-content-input');
-    const textSendBtn = document.getElementById('text-send-btn');
-
-    if (textSendBtn && textContentInput) {
-      textSendBtn.onclick = () => {
-        const title = textTitleInput ? textTitleInput.value.trim() : '';
-        const content = textContentInput.value.trim();
-        if (content) {
-          sendTextToStudent(title, content);
+            const textTitleInput = document.getElementById('text-title-input');
+            const textContentInput = document.getElementById('text-content-input');
+            const textSendBtn = document.getElementById('text-send-btn');
+            if (textSendBtn instanceof HTMLButtonElement && textContentInput instanceof HTMLTextAreaElement) {
+                const titleInputEl = textTitleInput instanceof HTMLInputElement ? textTitleInput : null;
+                textSendBtn.onclick = () => {
+                    const title = titleInputEl ? titleInputEl.value.trim() : '';
+                    const content = textContentInput.value.trim();
+                    if (content) {
+                        sendTextToStudent(title, content);
+                    }
+                };
+            }
         }
-      };
+        const toggleBtn = document.getElementById('toggle-media-btn');
+        const closeBtn = document.getElementById('media-close-btn');
+        const page = document.querySelector('.page');
+        if (toggleBtn instanceof HTMLElement) {
+            toggleBtn.onclick = () => {
+                mediaDrawer?.classList.toggle('open');
+                page?.classList.toggle('media-drawer-open');
+            };
+        }
+        if (closeBtn instanceof HTMLElement) {
+            closeBtn.onclick = () => {
+                mediaDrawer?.classList.remove('open');
+                page?.classList.remove('media-drawer-open');
+            };
+        }
+        const verseToggleBtn = document.getElementById('toggle-verse-btn');
+        const verseCloseBtn = document.getElementById('verse-close-btn');
+        if (verseToggleBtn instanceof HTMLElement) {
+            verseToggleBtn.onclick = () => {
+                verseDrawer?.classList.toggle('open');
+                page?.classList.toggle('verse-drawer-open');
+            };
+        }
+        if (verseCloseBtn instanceof HTMLElement) {
+            verseCloseBtn.onclick = () => {
+                verseDrawer?.classList.remove('open');
+                page?.classList.remove('verse-drawer-open');
+            };
+        }
+        const textToggleBtn = document.getElementById('toggle-text-btn');
+        const textCloseBtn = document.getElementById('text-close-btn');
+        if (textToggleBtn instanceof HTMLElement) {
+            textToggleBtn.onclick = () => {
+                textDrawer?.classList.toggle('open');
+                page?.classList.toggle('verse-drawer-open');
+            };
+        }
+        if (textCloseBtn instanceof HTMLElement) {
+            textCloseBtn.onclick = () => {
+                textDrawer?.classList.remove('open');
+                page?.classList.remove('verse-drawer-open');
+            };
+        }
+        // Store media list for sendMediaToStudent function
+        window.teacherMediaList = orderedMedia;
     }
-  }
-
-  const toggleBtn = document.getElementById('toggle-media-btn');
-  const closeBtn = document.getElementById('media-close-btn');
-  const page = document.querySelector('.page');
-  if (toggleBtn) {
-    toggleBtn.onclick = () => {
-      mediaDrawer.classList.toggle('open');
-      page.classList.toggle('media-drawer-open');
-    };
-  }
-  if (closeBtn) {
-    closeBtn.onclick = () => {
-      mediaDrawer.classList.remove('open');
-      page.classList.remove('media-drawer-open');
-    };
-  }
-
-  const verseToggleBtn = document.getElementById('toggle-verse-btn');
-  const verseCloseBtn = document.getElementById('verse-close-btn');
-  if (verseToggleBtn) {
-    verseToggleBtn.onclick = () => {
-      verseDrawer.classList.toggle('open');
-      page.classList.toggle('verse-drawer-open');
-    };
-  }
-  if (verseCloseBtn) {
-    verseCloseBtn.onclick = () => {
-      verseDrawer.classList.remove('open');
-      page.classList.remove('verse-drawer-open');
-    };
-  }
-
-  const textToggleBtn = document.getElementById('toggle-text-btn');
-  const textCloseBtn = document.getElementById('text-close-btn');
-  if (textToggleBtn) {
-    textToggleBtn.onclick = () => {
-      textDrawer.classList.toggle('open');
-      page.classList.toggle('verse-drawer-open');
-    };
-  }
-  if (textCloseBtn) {
-    textCloseBtn.onclick = () => {
-      textDrawer.classList.remove('open');
-      page.classList.remove('verse-drawer-open');
-    };
-  }
-
-  // Store media list for sendMediaToStudent function
-  window.teacherMediaList = orderedMedia;
-}
-
-function getMediaIcon(type) {
-  const icons = {
-    video: 'videocam',
-    pdf: 'description',
-    images: 'image',
-    audio: 'audio_file',
-    document: 'assignment',
-    link: 'link',
-    presentation: 'bar_chart',
-    verse: 'menu_book'
-  };
-  return icons[type] || 'folder';
-}
-
-function setupOutlineTabs() {
-  const tabs = document.querySelectorAll('.outline-tab');
-  const tabContents = document.querySelectorAll('.tab-content');
-
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      // Remove active class from all tabs and contents
-      tabs.forEach(t => t.classList.remove('active'));
-      tabContents.forEach(c => c.classList.remove('active'));
-
-      // Add active class to clicked tab
-      tab.classList.add('active');
-
-      // Show corresponding content
-      const tabName = tab.dataset.tab;
-      const content = document.getElementById(`${tabName}-content`);
-      if (content) {
-        content.classList.add('active');
-      }
+    function getMediaIcon(type) {
+        const icons = {
+            video: 'videocam',
+            pdf: 'description',
+            images: 'image',
+            audio: 'audio_file',
+            document: 'assignment',
+            link: 'link',
+            presentation: 'bar_chart',
+            verse: 'menu_book'
+        };
+        return icons[type] || 'folder';
+    }
+    function setupOutlineTabs() {
+        const tabs = document.querySelectorAll('.outline-tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabs.forEach((tab) => {
+            if (!(tab instanceof HTMLElement))
+                return;
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
+                tabs.forEach((t) => t.classList.remove('active'));
+                tabContents.forEach((c) => c.classList.remove('active'));
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                // Show corresponding content
+                const tabName = tab.dataset.tab;
+                const content = tabName ? document.getElementById(`${tabName}-content`) : null;
+                if (content) {
+                    content.classList.add('active');
+                }
+            });
+        });
+    }
+    // Switch to a specific tab programmatically
+    function switchToTab(tabName) {
+        const tabs = document.querySelectorAll('.outline-tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabs.forEach((t) => t.classList.remove('active'));
+        tabContents.forEach((c) => c.classList.remove('active'));
+        const tab = document.querySelector(`.outline-tab[data-tab="${tabName}"]`);
+        const content = document.getElementById(`${tabName}-content`);
+        if (tab)
+            tab.classList.add('active');
+        if (content)
+            content.classList.add('active');
+    }
+    // Setup click handlers for Q&A pause markers
+    function setupQAPauseMarkerHandlers() {
+        const markers = document.querySelectorAll('.qa-pause-marker');
+        markers.forEach((marker) => {
+            if (!(marker instanceof HTMLElement))
+                return;
+            marker.addEventListener('click', () => {
+                const sectionId = marker.dataset.sectionId;
+                if (sectionId) {
+                    // Switch to the Class Guide tab
+                    switchToTab('guide');
+                    // Wait a moment for tab to switch, then open the section
+                    setTimeout(() => {
+                        openQASection(sectionId);
+                    }, 150);
+                }
+                else {
+                    // No section linked, just switch to guide tab
+                    switchToTab('guide');
+                }
+            });
+        });
+    }
+    // Open a specific Q&A section and close all others
+    function openQASection(sectionId) {
+        // Find all accordion elements in the guide content
+        const guideContent = document.getElementById('guide-content');
+        if (!guideContent)
+            return;
+        const allAccordions = guideContent.querySelectorAll('details.accordion');
+        // Close all sections first
+        allAccordions.forEach((accordion) => {
+            accordion.removeAttribute('open');
+        });
+        // Find and open the target section
+        const targetAccordion = guideContent.querySelector(`details.accordion[data-section-id="${sectionId}"]`);
+        if (targetAccordion) {
+            targetAccordion.setAttribute('open', 'open');
+            // Scroll to the section smoothly
+            setTimeout(() => {
+                targetAccordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+        else {
+            console.warn(`Could not find section with ID: ${sectionId}`);
+        }
+    }
+    function renderGeneratedOutline() {
+        const displayContainer = document.querySelector('.editor-content-display');
+        if (!displayContainer)
+            return;
+        // Display the actual editor content (HTML from TipTap editor)
+        const editorContent = classConfig.content;
+        if (!editorContent || !editorContent.html) {
+            displayContainer.innerHTML = '';
+            return;
+        }
+        // Render the editor content and make verse references clickable
+        let html = sanitizeRichTextHtml(editorContent.html);
+        // Bible verse reference pattern (matches formats like: John 3:16, Romans 5:1-8, 1 Corinthians 13, etc.)
+        const bibleBooks = [
+            'Genesis', 'Gen', 'Exodus', 'Ex', 'Exo', 'Leviticus', 'Lev', 'Numbers', 'Num', 'Deuteronomy', 'Deut', 'Deu',
+            'Joshua', 'Josh', 'Judges', 'Judg', 'Ruth', '1 Samuel', '2 Samuel', 'Samuel', 'Sam', '1 Kings', '2 Kings', 'Kings',
+            '1 Chronicles', '2 Chronicles', 'Chronicles', 'Chron', 'Chr', 'Ezra', 'Nehemiah', 'Neh', 'Esther', 'Est',
+            'Job', 'Psalm', 'Psalms', 'Ps', 'Proverbs', 'Prov', 'Pro', 'Ecclesiastes', 'Eccles', 'Ecc',
+            'Song of Solomon', 'Song', 'Isaiah', 'Isa', 'Jeremiah', 'Jer', 'Lamentations', 'Lam',
+            'Ezekiel', 'Ezek', 'Eze', 'Daniel', 'Dan', 'Hosea', 'Hos', 'Joel', 'Amos', 'Obadiah', 'Obad',
+            'Jonah', 'Jon', 'Micah', 'Mic', 'Nahum', 'Nah', 'Habakkuk', 'Hab', 'Zephaniah', 'Zeph',
+            'Haggai', 'Hag', 'Zechariah', 'Zech', 'Zec', 'Malachi', 'Mal',
+            'Matthew', 'Matt', 'Mat', 'Mark', 'Luke', 'John', 'Acts',
+            'Romans', 'Rom', '1 Corinthians', '2 Corinthians', 'Corinthians', 'Cor',
+            'Galatians', 'Gal', 'Ephesians', 'Eph', 'Philippians', 'Phil',
+            'Colossians', 'Col', '1 Thessalonians', '2 Thessalonians', 'Thessalonians', 'Thess', 'Thes',
+            '1 Timothy', '2 Timothy', 'Timothy', 'Tim', 'Titus', 'Tit', 'Philemon', 'Philem',
+            'Hebrews', 'Heb', 'James', 'Jam', 'Jas', '1 Peter', '2 Peter', 'Peter', 'Pet',
+            '1 John', '2 John', '3 John', 'Jude', 'Revelation', 'Rev'
+        ];
+        const versePattern = new RegExp(`\\b(\\d\\s+)?(${bibleBooks.join('|')})\\s+\\d+(?::\\d+)?(?:[–-]\\d+(?::\\d+)?)?\\b`, 'gi');
+        // Replace verse references with clickable spans
+        html = html.replace(versePattern, (match) => {
+            return `<span class="verse-reference" data-verse="${match.trim()}">${match}</span>`;
+        });
+        displayContainer.innerHTML = sanitizeRichTextHtml(html);
+        // Add click handlers to verse references
+        const verseRefs = displayContainer.querySelectorAll('.verse-reference');
+        verseRefs.forEach((ref) => {
+            if (!(ref instanceof HTMLElement))
+                return;
+            ref.addEventListener('click', (event) => {
+                event.preventDefault();
+                const verse = (ref.dataset.verse || ref.textContent || '').trim();
+                if (verse) {
+                    const translation = classConfig?.bibleTranslation || window.BIBLE_STUDY_CONFIG?.bibleTranslation || 'nkjv';
+                    sendVerseToStudent(verse, translation);
+                    // Visual feedback
+                    ref.style.background = 'rgba(240, 180, 41, 0.3)';
+                    setTimeout(() => {
+                        ref.style.background = '';
+                    }, 500);
+                }
+            });
+        });
+        setupEditorMediaTiles(displayContainer);
+        // Add Q&A break markers if generatedOutline exists
+        if (classConfig.generatedOutline && classConfig.generatedOutline.length > 0) {
+            insertQABreakMarkers(displayContainer, classConfig.generatedOutline);
+        }
+        // Add stopped-here markers with line numbers
+        addStoppedMarkersToEditorContent(displayContainer);
+        // Set up click handlers for Q&A pause markers (from TipTap editor)
+        setupQAPauseMarkerHandlers();
+    }
+    document.addEventListener('click', (e) => {
+        if (!(e.target instanceof Element))
+            return;
+        const link = e.target.closest('a[href]');
+        const img = e.target.closest('img');
+        if (!link && !img)
+            return;
+        const targetEl = link || img;
+        if (!(targetEl instanceof HTMLElement))
+            return;
+        const inNotes = notesEl && notesEl.contains(targetEl);
+        const inDisplay = document.querySelector('.editor-content-display')?.contains(targetEl);
+        const inGuide = document.getElementById('guide-content')?.contains(targetEl);
+        if (inNotes || inDisplay || inGuide) {
+            handleTeacherLinkClick(e, targetEl);
+        }
     });
-  });
-}
-
-// Switch to a specific tab programmatically
-function switchToTab(tabName) {
-  const tabs = document.querySelectorAll('.outline-tab');
-  const tabContents = document.querySelectorAll('.tab-content');
-
-  tabs.forEach(t => t.classList.remove('active'));
-  tabContents.forEach(c => c.classList.remove('active'));
-
-  const tab = document.querySelector(`.outline-tab[data-tab="${tabName}"]`);
-  const content = document.getElementById(`${tabName}-content`);
-
-  if (tab) tab.classList.add('active');
-  if (content) content.classList.add('active');
-}
-
-// Setup click handlers for Q&A pause markers
-function setupQAPauseMarkerHandlers() {
-  const markers = document.querySelectorAll('.qa-pause-marker');
-
-  markers.forEach(marker => {
-    marker.addEventListener('click', () => {
-      const sectionId = marker.dataset.sectionId;
-      const sectionTitle = marker.dataset.sectionTitle;
-
-      if (sectionId) {
-        // Switch to the Class Guide tab
-        switchToTab('guide');
-
-        // Wait a moment for tab to switch, then open the section
-        setTimeout(() => {
-          openQASection(sectionId);
-        }, 150);
-      } else {
-        // No section linked, just switch to guide tab
-        switchToTab('guide');
-      }
-    });
-  });
-}
-
-// Open a specific Q&A section and close all others
-function openQASection(sectionId) {
-  // Find all accordion elements in the guide content
-  const guideContent = document.getElementById('guide-content');
-  if (!guideContent) return;
-
-  const allAccordions = guideContent.querySelectorAll('details.accordion');
-
-  // Close all sections first
-  allAccordions.forEach(accordion => {
-    accordion.removeAttribute('open');
-  });
-
-  // Find and open the target section
-  const targetAccordion = guideContent.querySelector(`details.accordion[data-section-id="${sectionId}"]`);
-
-  if (targetAccordion) {
-    targetAccordion.setAttribute('open', 'open');
-
-    // Scroll to the section smoothly
-    setTimeout(() => {
-      targetAccordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  } else {
-    console.warn(`Could not find section with ID: ${sectionId}`);
-  }
-}
-
-function renderGeneratedOutline() {
-  const displayContainer = document.querySelector('.editor-content-display');
-  if (!displayContainer) return;
-
-  // Display the actual editor content (HTML from TipTap editor)
-  const editorContent = classConfig.content;
-
-  if (!editorContent || !editorContent.html) {
-    displayContainer.innerHTML = '';
-    return;
-  }
-
-  // Render the editor content and make verse references clickable
-  let html = sanitizeRichTextHtml(editorContent.html);
-
-  // Bible verse reference pattern (matches formats like: John 3:16, Romans 5:1-8, 1 Corinthians 13, etc.)
-  const bibleBooks = [
-    'Genesis', 'Gen', 'Exodus', 'Ex', 'Exo', 'Leviticus', 'Lev', 'Numbers', 'Num', 'Deuteronomy', 'Deut', 'Deu',
-    'Joshua', 'Josh', 'Judges', 'Judg', 'Ruth', '1 Samuel', '2 Samuel', 'Samuel', 'Sam', '1 Kings', '2 Kings', 'Kings',
-    '1 Chronicles', '2 Chronicles', 'Chronicles', 'Chron', 'Chr', 'Ezra', 'Nehemiah', 'Neh', 'Esther', 'Est',
-    'Job', 'Psalm', 'Psalms', 'Ps', 'Proverbs', 'Prov', 'Pro', 'Ecclesiastes', 'Eccles', 'Ecc',
-    'Song of Solomon', 'Song', 'Isaiah', 'Isa', 'Jeremiah', 'Jer', 'Lamentations', 'Lam',
-    'Ezekiel', 'Ezek', 'Eze', 'Daniel', 'Dan', 'Hosea', 'Hos', 'Joel', 'Amos', 'Obadiah', 'Obad',
-    'Jonah', 'Jon', 'Micah', 'Mic', 'Nahum', 'Nah', 'Habakkuk', 'Hab', 'Zephaniah', 'Zeph',
-    'Haggai', 'Hag', 'Zechariah', 'Zech', 'Zec', 'Malachi', 'Mal',
-    'Matthew', 'Matt', 'Mat', 'Mark', 'Luke', 'John', 'Acts',
-    'Romans', 'Rom', '1 Corinthians', '2 Corinthians', 'Corinthians', 'Cor',
-    'Galatians', 'Gal', 'Ephesians', 'Eph', 'Philippians', 'Phil',
-    'Colossians', 'Col', '1 Thessalonians', '2 Thessalonians', 'Thessalonians', 'Thess', 'Thes',
-    '1 Timothy', '2 Timothy', 'Timothy', 'Tim', 'Titus', 'Tit', 'Philemon', 'Philem',
-    'Hebrews', 'Heb', 'James', 'Jam', 'Jas', '1 Peter', '2 Peter', 'Peter', 'Pet',
-    '1 John', '2 John', '3 John', 'Jude', 'Revelation', 'Rev'
-  ];
-
-  const versePattern = new RegExp(
-    `\\b(\\d\\s+)?(${bibleBooks.join('|')})\\s+\\d+(?::\\d+)?(?:[–-]\\d+(?::\\d+)?)?\\b`,
-    'gi'
-  );
-
-  // Replace verse references with clickable spans
-  html = html.replace(versePattern, (match) => {
-    return `<span class="verse-reference" data-verse="${match.trim()}">${match}</span>`;
-  });
-
-  displayContainer.innerHTML = sanitizeRichTextHtml(html);
-
-  // Add click handlers to verse references
-  const verseRefs = displayContainer.querySelectorAll('.verse-reference');
-  verseRefs.forEach(ref => {
-    ref.addEventListener('click', (event) => {
-      event.preventDefault();
-      const verse = (ref.dataset.verse || ref.textContent || '').trim();
-      if (verse) {
-        const translation = classConfig?.bibleTranslation || window.BIBLE_STUDY_CONFIG?.bibleTranslation || 'nkjv';
-        sendVerseToStudent(verse, translation);
+    function handleTeacherLinkClick(e, element) {
+        if (element.classList.contains('editor-media-tile')) {
+            return;
+        }
+        const isImg = element.tagName.toLowerCase() === 'img';
+        const href = isImg
+            ? element.getAttribute('src') || ''
+            : element.getAttribute('href') || '';
+        if (!href || href.startsWith('bst-media:') || href === '#' || href.startsWith('#')) {
+            return;
+        }
+        e.preventDefault();
+        // If Alt is held, open locally
+        if (e.altKey) {
+            window.open(href, '_blank', 'noopener,noreferrer');
+            return;
+        }
+        // Otherwise, determine media type and send to display
+        let mediaType = isImg ? 'image' : 'link';
+        const lowerUrl = href.toLowerCase();
+        if (!isImg) {
+            if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+                mediaType = 'video';
+            }
+            else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
+                mediaType = 'video';
+            }
+            else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
+                mediaType = 'image';
+            }
+            else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
+                mediaType = 'audio';
+            }
+            else if (lowerUrl.match(/\.(pdf)$/)) {
+                mediaType = 'pdf';
+            }
+            else if (lowerUrl.includes('lh3.googleusercontent.com/d/')) {
+                mediaType = 'image';
+            }
+        }
+        const title = isImg
+            ? String(element.getAttribute('alt') || '').trim() || href
+            : String(element.textContent || '').trim() || href;
+        sendCommand('displayMedia', {
+            media: {
+                type: mediaType,
+                title: title,
+                url: href,
+                sources: [{ url: href }]
+            }
+        });
         // Visual feedback
-        ref.style.background = 'rgba(240, 180, 41, 0.3)';
+        const originalStyle = isImg ? element.style.outline : element.style.color;
+        if (isImg) {
+            element.style.outline = '3px solid #4CAF50';
+        }
+        else {
+            element.style.color = '#4CAF50';
+        }
+        element.title = 'Sent to display screen (Hold Alt to open locally)';
         setTimeout(() => {
-          ref.style.background = '';
-        }, 500);
-      }
-    });
-  });
-
-  setupEditorMediaTiles(displayContainer);
-
-  // Add Q&A break markers if generatedOutline exists
-  if (classConfig.generatedOutline && classConfig.generatedOutline.length > 0) {
-    insertQABreakMarkers(displayContainer, classConfig.generatedOutline);
-  }
-
-  // Add stopped-here markers with line numbers
-  addStoppedMarkersToEditorContent(displayContainer);
-
-  // Set up click handlers for Q&A pause markers (from TipTap editor)
-  setupQAPauseMarkerHandlers();
-}
-
-document.addEventListener('click', (e) => {
-  const link = e.target.closest('a[href]');
-  const img = e.target.closest('img');
-
-  if (!link && !img) return;
-
-  const targetEl = link || img;
-  const inNotes = notesEl && notesEl.contains(targetEl);
-  const inDisplay = document.querySelector('.editor-content-display')?.contains(targetEl);
-  const inGuide = document.getElementById('guide-content')?.contains(targetEl);
-
-  if (inNotes || inDisplay || inGuide) {
-    handleTeacherLinkClick(e, targetEl);
-  }
-});
-
-function handleTeacherLinkClick(e, element) {
-  if (element.classList.contains('editor-media-tile')) {
-    return;
-  }
-
-  const isImg = element.tagName.toLowerCase() === 'img';
-  const href = isImg ? (element.getAttribute('src') || '') : (element.getAttribute('href') || '');
-
-  if (!href || href.startsWith('bst-media:') || href === '#' || href.startsWith('#')) {
-    return;
-  }
-
-  e.preventDefault();
-
-  // If Alt is held, open locally
-  if (e.altKey) {
-    window.open(href, '_blank', 'noopener,noreferrer');
-    return;
-  }
-
-  // Otherwise, determine media type and send to display
-  let mediaType = isImg ? 'image' : 'link';
-  const lowerUrl = href.toLowerCase();
-
-  if (!isImg) {
-    if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
-      mediaType = 'video';
-    } else if (lowerUrl.match(/\.(mp4|webm|ogg)$/)) {
-      mediaType = 'video';
-    } else if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
-      mediaType = 'image';
-    } else if (lowerUrl.match(/\.(mp3|wav|m4a)$/)) {
-      mediaType = 'audio';
-    } else if (lowerUrl.match(/\.(pdf)$/)) {
-      mediaType = 'pdf';
-    } else if (lowerUrl.includes('lh3.googleusercontent.com/d/')) {
-      mediaType = 'image';
+            if (isImg) {
+                element.style.outline = originalStyle;
+            }
+            else {
+                element.style.color = originalStyle;
+            }
+            element.title = '';
+        }, 1500);
     }
-  }
-
-  const title = isImg
-    ? (String(element.getAttribute('alt') || '').trim() || href)
-    : (String(element.textContent || '').trim() || href);
-
-  sendCommand('displayMedia', {
-    media: {
-      type: mediaType,
-      title: title,
-      url: href,
-      sources: [{ url: href }]
-    }
-  });
-
-  // Visual feedback
-  const originalStyle = isImg ? element.style.outline : element.style.color;
-  if (isImg) {
-    element.style.outline = '3px solid #4CAF50';
-  } else {
-    element.style.color = '#4CAF50';
-  }
-
-  element.title = 'Sent to display screen (Hold Alt to open locally)';
-  setTimeout(() => {
-    if (isImg) {
-      element.style.outline = originalStyle;
-    } else {
-      element.style.color = originalStyle;
-    }
-    element.title = '';
-  }, 1500);
-}
-
-// Custom Context Menu for Text Selection
-let customContextMenu = null;
-function createContextMenu() {
-  if (customContextMenu) return;
-  customContextMenu = document.createElement('div');
-  customContextMenu.id = 'custom-context-menu';
-  customContextMenu.style.position = 'fixed';
-  customContextMenu.style.zIndex = '10000';
-  customContextMenu.style.background = '#1e1e1e';
-  customContextMenu.style.border = '1px solid #333';
-  customContextMenu.style.borderRadius = '4px';
-  customContextMenu.style.padding = '4px 0';
-  customContextMenu.style.minWidth = '200px';
-  customContextMenu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
-  customContextMenu.style.display = 'none';
-  customContextMenu.innerHTML = `
+    // Custom Context Menu for Text Selection
+    function createContextMenu() {
+        if (customContextMenu)
+            return;
+        customContextMenu = document.createElement('div');
+        customContextMenu.id = 'custom-context-menu';
+        customContextMenu.style.position = 'fixed';
+        customContextMenu.style.zIndex = '10000';
+        customContextMenu.style.background = '#1e1e1e';
+        customContextMenu.style.border = '1px solid #333';
+        customContextMenu.style.borderRadius = '4px';
+        customContextMenu.style.padding = '4px 0';
+        customContextMenu.style.minWidth = '200px';
+        customContextMenu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+        customContextMenu.style.display = 'none';
+        customContextMenu.innerHTML = `
     <style>
       .context-menu-item {
         padding: 10px 16px;
@@ -1097,987 +1055,953 @@ function createContextMenu() {
       <span class="material-symbols-outlined" style="font-size:18px; color: var(--accent);">cast</span> Display on Student Screen
     </div>
   `;
-  document.body.appendChild(customContextMenu);
-
-  document.getElementById('ctx-display').addEventListener('click', () => {
-    const text = window.getSelection().toString().trim();
-    if (text) {
-      sendTextToStudent('Highlighted Note', text);
-      flashStatus('Displayed highlighted text to student screen');
-    }
-    customContextMenu.style.display = 'none';
-  });
-
-  document.addEventListener('click', (e) => {
-    if (customContextMenu.style.display !== 'none' && !customContextMenu.contains(e.target)) {
-      customContextMenu.style.display = 'none';
-    }
-  });
-}
-
-document.addEventListener('contextmenu', (e) => {
-  const selection = window.getSelection().toString().trim();
-  if (selection && !e.shiftKey) { // Allow shift+right click for default menu
-    e.preventDefault();
-    createContextMenu();
-
-    let x = e.clientX;
-    let y = e.clientY;
-
-    customContextMenu.style.display = 'block';
-    const rect = customContextMenu.getBoundingClientRect();
-    if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width;
-    if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height;
-
-    customContextMenu.style.left = `${x}px`;
-    customContextMenu.style.top = `${y}px`;
-  }
-});
-
-function decodeEditorMediaPayload(encodedPayload) {
-  if (!encodedPayload) return null;
-
-  try {
-    const decoded = decodeURIComponent(encodedPayload);
-    const parsed = JSON.parse(decoded);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (err) {
-    console.warn('[Teacher] Failed to decode editor media payload:', err);
-    return null;
-  }
-}
-
-function collectTeacherMediaItems() {
-  const orderedMedia = [];
-  const classMedia = Array.isArray(classConfig?.media) ? classConfig.media : [];
-
-  orderedMedia.push(...classMedia.filter(m => m?.primary));
-
-  if (Array.isArray(classConfig?.outline)) {
-    classConfig.outline.forEach((section) => {
-      if (!Array.isArray(section?.media)) return;
-      section.media.forEach((media) => {
-        orderedMedia.push({
-          ...media,
-          sectionTitle: section.summary || ''
-        });
-      });
-    });
-  }
-
-  orderedMedia.push(...classMedia.filter(m => !m?.primary));
-  return orderedMedia.filter(Boolean);
-}
-
-function findMediaByTileText(tileText) {
-  const normalizedText = String(tileText || '').trim().toLowerCase();
-  if (!normalizedText) return null;
-
-  const items = collectTeacherMediaItems();
-  return items.find((media) => {
-    const mediaTitle = String(media?.title || media?.reference || media?.prompt || '').trim().toLowerCase();
-    return mediaTitle && mediaTitle === normalizedText;
-  }) || null;
-}
-
-function setupEditorMediaTiles(container) {
-  const mediaTiles = container.querySelectorAll('.editor-media-tile');
-
-  mediaTiles.forEach((tile) => {
-    tile.setAttribute('role', 'button');
-    tile.setAttribute('tabindex', '0');
-    tile.title = 'Click to display this media on student screen';
-
-    if (tile.tagName === 'A') {
-      tile.setAttribute('href', tile.getAttribute('href') || '#');
-    }
-
-    const activateTile = (event) => {
-      if (event) {
-        event.preventDefault();
-      }
-
-      const dataPayload = tile.getAttribute('data-media-json');
-      const href = tile.getAttribute('href') || '';
-      const hrefPayload = href.startsWith('bst-media:') ? href.slice('bst-media:'.length) : '';
-      const media = decodeEditorMediaPayload(dataPayload || hrefPayload) || findMediaByTileText(tile.textContent);
-      if (!media) {
-        return;
-      }
-
-      sendSectionMediaToStudent(media);
-      tile.classList.add('mark-active');
-      setTimeout(() => tile.classList.remove('mark-active'), 500);
-    };
-
-    tile.addEventListener('click', activateTile);
-    tile.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        activateTile(event);
-      }
-    });
-  });
-}
-
-// Insert Q&A break markers into the editor content display
-function insertQABreakMarkers(container, generatedOutline) {
-  // Find all headings in the content
-  const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
-
-  generatedOutline.forEach((section) => {
-    // Check if this section has Q&A break points
-    const qaBreaks = section.points?.filter(p =>
-      typeof p === 'object' && p.type === 'qa-break'
-    ) || [];
-
-    if (qaBreaks.length === 0) return;
-
-    // Find the heading that matches this section
-    let matchingHeading = null;
-    headings.forEach(heading => {
-      const headingText = heading.textContent.trim().toLowerCase();
-      const sectionText = section.summary.trim().toLowerCase();
-
-      // Check for partial match
-      if (headingText.includes(sectionText) || sectionText.includes(headingText)) {
-        matchingHeading = heading;
-      }
-    });
-
-    if (matchingHeading) {
-      // Create Q&A break marker
-      qaBreaks.forEach((qaBreak) => {
-        const marker = document.createElement('div');
-        marker.className = 'qa-break-marker';
-        const iconWrap = document.createElement('div');
-        iconWrap.className = 'qa-break-icon';
-
-        const icon = document.createElement('span');
-        icon.className = 'material-icons';
-        icon.textContent = 'forum';
-        iconWrap.appendChild(icon);
-
-        const content = document.createElement('div');
-        content.className = 'qa-break-content';
-
-        const title = document.createElement('strong');
-        title.textContent = 'Q&A Discussion Point';
-
-        const text = document.createElement('p');
-        text.textContent = qaBreak.text || 'Pause for discussion - See class guide';
-
-        const button = document.createElement('button');
-        button.className = 'qa-break-btn';
-        button.dataset.sectionId = section.id;
-
-        const buttonIcon = document.createElement('span');
-        buttonIcon.className = 'material-icons';
-        buttonIcon.textContent = 'assignment';
-        button.appendChild(buttonIcon);
-        button.appendChild(document.createTextNode('View Class Guide'));
-
-        content.appendChild(title);
-        content.appendChild(text);
-        content.appendChild(button);
-
-        marker.appendChild(iconWrap);
-        marker.appendChild(content);
-
-        // Insert after the heading's parent section
-        const insertPoint = matchingHeading.parentElement.nextSibling;
-        if (insertPoint) {
-          matchingHeading.parentElement.parentNode.insertBefore(marker, insertPoint);
-        } else {
-          matchingHeading.parentElement.parentNode.appendChild(marker);
-        }
-
-        // Add click handler to switch to class guide tab
-        const btn = marker.querySelector('.qa-break-btn');
-        if (btn) {
-          btn.addEventListener('click', () => {
-            // Switch to class guide tab
-            const guidTab = document.querySelector('.outline-tab[data-tab="guide"]');
-            const editorTab = document.querySelector('.outline-tab[data-tab="editor"]');
-            const guideContent = document.getElementById('guide-content');
-            const editorContent = document.getElementById('editor-content');
-
-            if (guidTab && editorTab && guideContent && editorContent) {
-              guidTab.classList.add('active');
-              editorTab.classList.remove('active');
-              guideContent.classList.add('active');
-              editorContent.classList.remove('active');
-
-              // Try to open the matching section in the class guide
-              const accordion = document.querySelector(`details.accordion[data-section-id="${section.id}"]`);
-              if (accordion) {
-                accordion.setAttribute('open', '');
-                accordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
+        document.body.appendChild(customContextMenu);
+        const ctxDisplayBtn = document.getElementById('ctx-display');
+        ctxDisplayBtn?.addEventListener('click', () => {
+            const text = window.getSelection()?.toString().trim() || '';
+            if (text) {
+                sendTextToStudent('Highlighted Note', text);
+                flashStatus('Displayed highlighted text to student screen');
             }
-          });
-        }
-      });
-    }
-  });
-}
-
-function openDisplayWindow() {
-  if (displayWindow && !displayWindow.closed) {
-    displayWindow.location.href = `${window.location.origin}/student.html?class=${classId}`;
-    displayWindow.focus();
-  } else {
-    displayWindow = window.open(`${window.location.origin}/student.html?class=${classId}`, 'display-screen', 'width=1280,height=720');
-  }
-
-  // Show the preview iframe
-  const previewShell = document.getElementById('student-preview-shell');
-  if (previewShell) {
-    previewShell.style.display = 'block';
-    syncPreviewViewport();
-  }
-
-  // Start checking if the window is closed
-  if (displayWindowCheckInterval) clearInterval(displayWindowCheckInterval);
-  displayWindowCheckInterval = setInterval(() => {
-    syncPreviewViewport();
-
-    if (displayWindow && displayWindow.closed) {
-      const previewShell = document.getElementById('student-preview-shell');
-      if (previewShell) {
-        previewShell.style.display = 'none';
-      }
-      clearInterval(displayWindowCheckInterval);
-      displayWindowCheckInterval = null;
-    }
-  }, 1000);
-}
-
-function openTeleprompter() {
-  const teleprompterUrl = `${window.location.origin}/teleprompter.html?class=${classId}`;
-  window.open(teleprompterUrl, 'teleprompter-screen', 'width=1024,height=768,menubar=no,toolbar=no');
-}
-
-function getDisplayViewportSize() {
-  if (!displayWindow || displayWindow.closed) {
-    return { width: DEFAULT_DISPLAY_WIDTH, height: DEFAULT_DISPLAY_HEIGHT };
-  }
-
-  const width = Number(displayWindow.innerWidth || displayWindow.outerWidth || DEFAULT_DISPLAY_WIDTH);
-  const height = Number(displayWindow.innerHeight || displayWindow.outerHeight || DEFAULT_DISPLAY_HEIGHT);
-
-  return {
-    width: Math.max(320, width),
-    height: Math.max(180, height)
-  };
-}
-
-function syncPreviewViewport() {
-  const previewShell = document.getElementById('student-preview-shell');
-  const previewIframe = document.getElementById('student-preview');
-  if (!previewShell || !previewIframe) return;
-
-  const { width, height } = getDisplayViewportSize();
-  const shellWidth = previewShell.clientWidth || PREVIEW_THUMB_WIDTH;
-  const shellHeight = previewShell.clientHeight || PREVIEW_THUMB_HEIGHT;
-
-  // Fill the thumbnail box and center-crop if aspect ratios differ.
-  const scale = Math.max(shellWidth / width, shellHeight / height);
-  const offsetX = (shellWidth - (width * scale)) / 2;
-  const offsetY = (shellHeight - (height * scale)) / 2;
-
-  previewIframe.style.width = `${width}px`;
-  previewIframe.style.height = `${height}px`;
-  previewIframe.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-  previewIframe.style.transformOrigin = 'top left';
-}
-
-function sendMediaToStudent(index) {
-  if (!window.teacherMediaList || index >= window.teacherMediaList.length) {
-    console.error('[Teacher] Invalid media index:', index);
-    return;
-  }
-
-  const media = window.teacherMediaList[index];
-  console.log('[Teacher] Sending media to student:', media);
-  currentMediaType = media.type || 'unknown';
-  updateControlVisibility();
-  sendCommand('displayMedia', { media });
-}
-
-function sendVerseToStudent(reference, translation = 'nkjv') {
-  if (!reference || !reference.trim()) return;
-  currentMediaType = 'verse';
-  updateControlVisibility();
-  sendCommand('displayMedia', {
-    media: {
-      type: 'verse',
-      reference: reference.trim(),
-      translation: (translation || 'nkjv').trim(),
-      title: reference.trim()
-    }
-  });
-}
-
-function sendTextToStudent(title, content) {
-  if (!content || !content.trim()) return;
-  currentMediaType = 'text';
-  updateControlVisibility();
-  sendCommand('displayMedia', {
-    media: {
-      type: 'text',
-      title: (title || 'Key Point').trim(),
-      content: content.trim()
-    }
-  });
-}
-
-// Get icon for media mark type
-function getMediaMarkIcon(type) {
-  const icons = {
-    verse: 'menu_book',
-    video: 'movie',
-    image: 'image',
-    images: 'photo_library',
-    link: 'link',
-    pdf: 'description',
-    document: 'assignment',
-    audio: 'audio_file',
-    question: 'help',
-    presentation: 'bar_chart'
-  };
-  return icons[type] || 'attach_file';
-}
-
-// Send section media directly to student
-function sendSectionMediaToStudent(media) {
-  if (!media) return;
-
-  console.log('[Teacher] Sending section media to student:', media);
-
-  // Handle verse type specially
-  if (media.type === 'verse') {
-    const reference = media.reference || media.title || '';
-    const translation = media.translation || 'nkjv';
-    sendVerseToStudent(reference, translation);
-    return;
-  }
-
-  // Handle video type - check for YouTube
-  if (media.type === 'video') {
-    currentMediaType = 'video';
-    updateControlVisibility();
-
-    // Build video media object
-    const videoMedia = {
-      type: 'video',
-      title: media.title || 'Video'
-    };
-
-    if (media.sources) {
-      videoMedia.sources = media.sources;
-    } else if (media.url) {
-      videoMedia.url = media.url;
-    }
-
-    sendCommand('displayMedia', { media: videoMedia });
-    return;
-  }
-
-  // Handle image type
-  if (media.type === 'image' || media.type === 'images') {
-    currentMediaType = 'image';
-    updateControlVisibility();
-
-    const imageMedia = {
-      type: 'image',
-      title: media.title || 'Image'
-    };
-
-    if (media.sources) {
-      imageMedia.sources = media.sources;
-    } else if (media.url) {
-      imageMedia.url = media.url;
-    }
-
-    sendCommand('displayMedia', { media: imageMedia });
-    return;
-  }
-
-  // Handle question type - display question on student screen
-  if (media.type === 'question') {
-    currentMediaType = 'question';
-    updateControlVisibility();
-    sendCommand('displayMedia', {
-      media: {
-        type: 'question',
-        prompt: media.prompt || media.title || '',
-        answer: media.answer || '',
-        title: media.title || 'Discussion Question'
-      }
-    });
-    return;
-  }
-
-  // Handle link type - display in student window
-  if (media.type === 'link') {
-    currentMediaType = 'link';
-    updateControlVisibility();
-    sendCommand('displayMedia', { media });
-    return;
-  }
-
-  // Generic media handling for other types (pdf, audio, etc.)
-  currentMediaType = media.type || 'unknown';
-  updateControlVisibility();
-  sendCommand('displayMedia', { media });
-}
-
-function sendCommand(type, payload = {}) {
-  const message = { type, ...payload, sentAt: Date.now() };
-  console.log('[Teacher] Sending command:', type, message);
-  if (channel) {
-    channel.postMessage(message);
-    console.log('[Teacher] Posted to BroadcastChannel');
-  } else {
-    console.warn('[Teacher] No BroadcastChannel available');
-  }
-  try { localStorage.setItem(STORAGE_FALLBACK_KEY, JSON.stringify(message)); } catch (err) { }
-  flashStatus(`Sent: ${labelFor(type, payload)}`);
-}
-
-function labelFor(type, payload) {
-  if (type === 'jumpToPause' && Number.isInteger(payload.index)) {
-    const idx = payload.index;
-    const point = pausePoints[idx];
-    // Prefer section title if we can map the pause index back to an outline section
-    if (classConfig?.outline) {
-      for (const sec of classConfig.outline) {
-        try {
-          const found = findPauseIndexForSection(sec);
-          if (found === idx) {
-            const time = point && typeof point.time === 'number' ? ` · ${formatTime(point.time)}` : '';
-            return `Jump to ${sec.summary}${time}`;
-          }
-        } catch (e) { /* ignore */ }
-      }
-    }
-    return point ? `Jump to ${point.label}` : 'Jump to pause';
-  }
-  if (type === 'nextPause') return 'Skip to next pause';
-  if (type === 'fullscreen') return 'Fullscreen display';
-  if (type === 'restart') return 'Restart video';
-  if (type === 'toggle') return 'Play / Pause';
-  return type.charAt(0).toUpperCase() + type.slice(1);
-}
-
-function flashStatus(text) {
-  if (statusEl) statusEl.textContent = text;
-}
-
-// Removed local fullscreen toggle; teacher should request student to fullscreen the video.
-
-function renderPauseList() {
-  if (!pauseListEl) return;
-
-  pauseListEl.innerHTML = '';
-  pausePoints.forEach((point, idx) => {
-    const item = document.createElement('div');
-    item.className = 'list-item';
-    const label = document.createElement('div');
-    label.innerHTML = `<strong>${point.label}</strong><br><small>${formatTime(point.time)}</small>`;
-    const btn = document.createElement('button');
-    btn.innerHTML = '<span class="material-symbols-outlined">skip_next</span>Jump here';
-    btn.onclick = () => sendCommand('jumpToPause', { index: idx });
-    item.appendChild(label);
-    item.appendChild(btn);
-    pauseListEl.appendChild(item);
-  });
-  if (pausePoints.length === 0) {
-    const item = document.createElement('div');
-    item.className = 'list-item';
-    item.innerHTML = '<small>No planned pauses yet. Add them in classes.json.</small>';
-    pauseListEl.appendChild(item);
-  }
-}
-
-function bindControls() {
-  const toggleBtn = document.getElementById('toggle');
-  const playBtn = document.getElementById('play');
-  const pauseBtn = document.getElementById('pause');
-  const restartBtn = document.getElementById('restart');
-  const nextBtn = document.getElementById('next');
-  const fullscreenBtn = document.getElementById('fullscreen');
-  const clearScreenBtn = document.getElementById('clear-screen');
-
-  if (toggleBtn) toggleBtn.onclick = () => sendCommand('toggle');
-  if (playBtn) playBtn.onclick = () => sendCommand('play');
-  if (pauseBtn) pauseBtn.onclick = () => sendCommand('pause');
-  if (restartBtn) restartBtn.onclick = () => sendCommand('restart');
-  if (nextBtn) nextBtn.onclick = () => sendCommand('nextPause');
-  if (fullscreenBtn) fullscreenBtn.onclick = () => sendCommand('fullscreen');
-  if (clearScreenBtn) clearScreenBtn.onclick = () => sendCommand('clearScreen');
-
-  const versePrevBtn = document.getElementById('verse-prev');
-  const verseNextBtn = document.getElementById('verse-next');
-  if (versePrevBtn) versePrevBtn.onclick = () => sendCommand('versePrevious');
-  if (verseNextBtn) verseNextBtn.onclick = () => sendCommand('verseNext');
-
-  const globalVersePrev = document.getElementById('global-verse-prev');
-  const globalVerseNext = document.getElementById('global-verse-next');
-  if (globalVersePrev) globalVersePrev.onclick = () => sendCommand('versePrevious');
-  if (globalVerseNext) globalVerseNext.onclick = () => sendCommand('verseNext');
-
-  const verseFontDecrease = document.getElementById('verse-font-decrease');
-  const verseFontIncrease = document.getElementById('verse-font-increase');
-  if (verseFontDecrease) verseFontDecrease.onclick = () => sendCommand('verseFontDecrease');
-  if (verseFontIncrease) verseFontIncrease.onclick = () => sendCommand('verseFontIncrease');
-
-  if (downloadBtn) downloadBtn.onclick = downloadNotes;
-  if (uploadBtn) uploadBtn.onclick = () => fileInput?.click();
-  if (fileInput) fileInput.onchange = importNotes;
-
-  document.querySelectorAll('.rte-toolbar button').forEach(btn => {
-    btn.onclick = () => {
-      const cmd = btn.dataset.cmd;
-      const val = btn.dataset.value || null;
-      document.execCommand(cmd, false, val);
-      if (notesEl) notesEl.focus();
-      persistNotes();
-    };
-  });
-
-  questionFields.forEach(field => {
-    const key = field.dataset.questionKey;
-    const stored = localStorage.getItem(QUESTION_PREFIX + key);
-    if (stored) field.value = stored;
-    field.addEventListener('input', () => {
-      try { localStorage.setItem(QUESTION_PREFIX + key, field.value); } catch (err) { }
-    });
-  });
-
-  renderPauseList();
-}
-
-function hydrateNotes() {
-  if (!notesEl) return;
-  notesEl.innerHTML = localStorage.getItem(NOTES_KEY) || '';
-  notesEl.addEventListener('input', persistNotes);
-}
-
-function persistNotes() {
-  if (!notesEl) return;
-  try { localStorage.setItem(NOTES_KEY, notesEl.innerHTML); } catch (err) { }
-}
-
-function downloadNotes() {
-  const questions = {};
-  questionFields.forEach(field => {
-    questions[field.dataset.questionKey] = field.value;
-  });
-  const payload = {
-    version: 1,
-    classNumber: classConfig.classNumber,
-    notesHtml: notesEl?.innerHTML || '',
-    questions
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `class${classId}-notes.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  flashStatus(`Downloaded notes file (class${classId}-notes.json).`);
-}
-
-function importNotes(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const text = reader.result || '';
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed === 'object') {
-        if (parsed.notesHtml && notesEl) notesEl.innerHTML = parsed.notesHtml;
-        if (parsed.questions && typeof parsed.questions === 'object') {
-          questionFields.forEach(field => {
-            const val = parsed.questions[field.dataset.questionKey];
-            if (typeof val === 'string') field.value = val;
-          });
-        }
-        persistNotes();
-        questionFields.forEach(field => {
-          try { localStorage.setItem(QUESTION_PREFIX + field.dataset.questionKey, field.value); } catch (err) { }
+            if (customContextMenu) {
+                customContextMenu.style.display = 'none';
+            }
         });
-        flashStatus('Imported notes and outline fields.');
-        event.target.value = '';
-        return;
-      }
-    } catch (err) {
-      // fall through to treat as raw HTML
+        document.addEventListener('click', (e) => {
+            if (customContextMenu &&
+                customContextMenu.style.display !== 'none' &&
+                e.target instanceof Node &&
+                !customContextMenu.contains(e.target)) {
+                customContextMenu.style.display = 'none';
+            }
+        });
     }
-
-    if (notesEl) notesEl.innerHTML = text;
-    persistNotes();
-    flashStatus('Imported notes (rich text).');
-    event.target.value = '';
-  };
-  reader.readAsText(file);
-}
-
-function formatTime(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = Math.floor(totalSeconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function updateControlVisibility() {
-  const controlsBar = document.querySelector('.controls-bar');
-  if (!controlsBar) return;
-
-  // Get all control elements
-  const allControls = controlsBar.querySelectorAll('[data-control-type]');
-
-  allControls.forEach(control => {
-    const controlType = control.getAttribute('data-control-type');
-
-    // Always show 'all' type controls (clear screen)
-    if (controlType === 'all') {
-      control.style.display = '';
-      return;
-    }
-
-    // Show controls that match current media type
-    if (controlType === currentMediaType) {
-      control.style.display = '';
-    } else {
-      control.style.display = 'none';
-    }
-  });
-}
-
-// ===== STOPPED HERE MARKER =====
-
-/**
- * Add stopped-here markers to editor lines with line numbers
- */
-function addStoppedMarkersToEditorContent(container) {
-  const lineCandidates = Array.from(container.childNodes).filter((node) => {
-    if (node.nodeType !== Node.ELEMENT_NODE) return false;
-    const el = /** @type {HTMLElement} */ (node);
-    return !!el.textContent?.trim();
-  });
-
-  let headingIndex = 0;
-
-  lineCandidates.forEach((lineElement, index) => {
-    const lineId = `editor-line-${index + 1}`;
-    const isHeading = /^H[1-6]$/.test(lineElement.tagName);
-    const legacyHeadingId = isHeading ? `editor-heading-${headingIndex}` : null;
-    if (isHeading) headingIndex += 1;
-
-    const isLegacyMatch = !!legacyHeadingId && classConfig.stoppedAtEditorHeading === legacyHeadingId;
-    const isStoppedHere = classConfig.stoppedAtEditorLine === lineId || isLegacyMatch;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = `editor-line-row${isStoppedHere ? ' stopped-here' : ''}`;
-    wrapper.setAttribute('data-line-id', lineId);
-
-    const markerBtn = document.createElement('button');
-    markerBtn.className = `stop-marker-btn editor-line-marker${isStoppedHere ? ' active' : ''}`;
-    markerBtn.setAttribute('type', 'button');
-    markerBtn.setAttribute('aria-label', isStoppedHere ? `Remove stop marker from line ${index + 1}` : `Set stop marker at line ${index + 1}`);
-    markerBtn.title = getStoppedMarkerButtonTitle(isStoppedHere);
-    markerBtn.innerHTML = `<span class="line-number-text">${index + 1}</span>`;
-    markerBtn.onclick = (e) => {
-      e.stopPropagation();
-      if (classConfig.stoppedAtEditorLine === lineId) {
-        setStoppedMarkerEditorLine(null);
-      } else {
-        setStoppedMarkerEditorLine(lineId);
-      }
-    };
-
-    const parent = lineElement.parentNode;
-    if (!parent) return;
-    parent.insertBefore(wrapper, lineElement);
-    wrapper.appendChild(markerBtn);
-    wrapper.appendChild(lineElement);
-    lineElement.classList.add('editor-line-content');
-  });
-}
-
-/**
- * Set the "stopped here" marker on an editor line
- * @param {string|null} lineId - Line ID to mark, or null to clear
- */
-async function setStoppedMarkerEditorLine(lineId) {
-  updateStoppedMarkerState({ lineId });
-
-  const cloudWarning = await saveStoppedMarker();
-
-  // Re-render both views to update UI (even if save failed, show local state)
-  renderOutlineWithQuestions();
-  renderGeneratedOutline();
-
-  // Show feedback
-  if (cloudWarning) {
-    flashStatus(`Warning: ${cloudWarning}`);
-  } else if (lineId) {
-    flashStatus('Marked where you stopped');
-  } else {
-    flashStatus('Marker removed');
-  }
-}
-
-/**
- * Set the "stopped here" marker on an editor heading
- * @param {string|null} headingId - Heading ID to mark, or null to clear
- */
-async function setStoppedMarkerEditor(headingId) {
-  updateStoppedMarkerState({ headingId });
-
-  // Save to server
-  const cloudWarning = await saveStoppedMarker();
-
-  // Re-render both views to update UI (even if save failed, show local state)
-  renderOutlineWithQuestions();
-  renderGeneratedOutline();
-
-  // Show feedback
-  if (cloudWarning) {
-    flashStatus(`Warning: ${cloudWarning}`);
-  } else if (headingId) {
-    flashStatus('Marked where you stopped');
-  } else {
-    flashStatus('Marker removed');
-  }
-}
-
-/**
- * Set the "stopped here" marker on a section
- * @param {string|null} sectionId - Section ID to mark, or null to clear
- */
-async function setStoppedMarker(sectionId) {
-  updateStoppedMarkerState({ sectionId });
-
-  // Save to server
-  const cloudWarning = await saveStoppedMarker();
-
-  // Re-render both views to update UI (even if save failed, show local state)
-  renderOutlineWithQuestions();
-  renderGeneratedOutline();
-
-  // Show feedback
-  if (cloudWarning) {
-    flashStatus(`Warning: ${cloudWarning}`);
-  } else if (sectionId) {
-    flashStatus('Marked where you stopped');
-  } else {
-    flashStatus('Marker removed');
-  }
-}
-
-/**
- * Save the stopped marker to server
- */
-async function saveStoppedMarker() {
-  // If allClassesData is not available, can't save
-  if (!allClassesData) {
-    console.error('Cannot save stopped marker: allClassesData not loaded');
-    return 'Data not loaded - please refresh the page';
-  }
-
-  try {
-    const response = await window.BSTApi.fetch('/api/save/classes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(allClassesData)
-    }, { requireAdmin: true });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`Server returned ${response.status}: ${errorText}`);
-    }
-
-    const result = await response.json().catch(() => ({}));
-    if (result?.partialSuccess || result?.cloudSync?.ok === false || result?.supabaseSync === false) {
-      return result.warning || result?.cloudSync?.message || 'Cloud sync failed.';
-    }
-
-    console.log('[OK] Saved stopped marker');
-    return '';
-  } catch (err) {
-    console.error('Failed to save stopped marker:', err);
-    return `Could not save marker: ${err.message || 'check server'}`;
-  }
-}
-
-function sanitizeRichTextHtml(html) {
-  if (typeof html !== 'string' || !html.trim()) {
-    return '';
-  }
-
-  const allowedTags = new Set([
-    'a', 'blockquote', 'br', 'code', 'details', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'hr', 'iframe', 'img', 'li', 'mark', 'ol', 'p', 'pre', 'span', 'strong', 'sub', 'summary',
-    'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul'
-  ]);
-  const allowedAttributes = new Set([
-    'alt', 'aria-hidden', 'class', 'colspan', 'data-section-id', 'data-verse', 'href', 'rel', 'rowspan',
-    'src', 'style', 'target', 'title', 'data-media-json'
-  ]);
-  const allowedStyleProperties = new Set(['background-color', 'color', 'text-align']);
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html');
-  const wrapper = document.createElement('div');
-
-  Array.from(doc.body.childNodes).forEach((child) => {
-    const sanitizedNode = sanitizeRichTextNode(child, {
-      allowedTags,
-      allowedAttributes,
-      allowedStyleProperties
+    document.addEventListener('contextmenu', (e) => {
+        const selection = window.getSelection()?.toString().trim() || '';
+        if (selection && !e.shiftKey) {
+            // Allow shift+right click for default menu
+            e.preventDefault();
+            createContextMenu();
+            if (!customContextMenu)
+                return;
+            let x = e.clientX;
+            let y = e.clientY;
+            customContextMenu.style.display = 'block';
+            const rect = customContextMenu.getBoundingClientRect();
+            if (x + rect.width > window.innerWidth)
+                x = window.innerWidth - rect.width;
+            if (y + rect.height > window.innerHeight)
+                y = window.innerHeight - rect.height;
+            customContextMenu.style.left = `${x}px`;
+            customContextMenu.style.top = `${y}px`;
+        }
     });
-    if (sanitizedNode) {
-      wrapper.appendChild(sanitizedNode);
+    function decodeEditorMediaPayload(encodedPayload) {
+        if (!encodedPayload)
+            return null;
+        try {
+            const decoded = decodeURIComponent(encodedPayload);
+            const parsed = JSON.parse(decoded);
+            if (parsed && typeof parsed === 'object' && 'type' in parsed) {
+                return parsed;
+            }
+            return null;
+        }
+        catch (err) {
+            console.warn('[Teacher] Failed to decode editor media payload:', err);
+            return null;
+        }
     }
-  });
-
-  return wrapper.innerHTML;
-}
-
-function sanitizeRichTextNode(node, config) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return document.createTextNode(node.textContent || '');
-  }
-
-  if (node.nodeType !== Node.ELEMENT_NODE) {
-    return null;
-  }
-
-  const tagName = node.tagName.toLowerCase();
-  const fragment = document.createDocumentFragment();
-
-  if (!config.allowedTags.has(tagName)) {
-    Array.from(node.childNodes).forEach((child) => {
-      const sanitizedChild = sanitizeRichTextNode(child, config);
-      if (sanitizedChild) {
-        fragment.appendChild(sanitizedChild);
-      }
-    });
-    return fragment;
-  }
-
-  const cleanElement = document.createElement(tagName);
-
-  Array.from(node.attributes).forEach((attribute) => {
-    const attrName = attribute.name.toLowerCase();
-    if (attrName.startsWith('on') || !config.allowedAttributes.has(attrName)) {
-      return;
+    function collectTeacherMediaItems() {
+        const orderedMedia = [];
+        const classMedia = Array.isArray(classConfig?.media) ? classConfig.media : [];
+        orderedMedia.push(...classMedia.filter((m) => m?.primary));
+        if (Array.isArray(classConfig?.outline)) {
+            classConfig.outline.forEach((section) => {
+                if (!Array.isArray(section?.media))
+                    return;
+                section.media.forEach((media) => {
+                    orderedMedia.push({
+                        ...media,
+                        sectionTitle: section.summary || ''
+                    });
+                });
+            });
+        }
+        orderedMedia.push(...classMedia.filter((m) => !m?.primary));
+        return orderedMedia.filter(Boolean);
     }
-
-    if (attrName === 'href' || attrName === 'src') {
-      const safeUrl = sanitizeTeacherUrl(attribute.value);
-      if (!safeUrl) {
-        return;
-      }
-      cleanElement.setAttribute(attrName, safeUrl);
-      if (tagName === 'a') {
-        cleanElement.setAttribute('rel', 'noopener noreferrer');
-      }
-      return;
+    function findMediaByTileText(tileText) {
+        const normalizedText = String(tileText || '').trim().toLowerCase();
+        if (!normalizedText)
+            return null;
+        const items = collectTeacherMediaItems();
+        return (items.find((media) => {
+            const mediaTitle = String(media?.title || media?.reference || media?.prompt || '')
+                .trim()
+                .toLowerCase();
+            return Boolean(mediaTitle && mediaTitle === normalizedText);
+        }) || null);
     }
-
-    if (attrName === 'style') {
-      const safeStyle = sanitizeInlineStyle(attribute.value, config.allowedStyleProperties);
-      if (safeStyle) {
-        cleanElement.setAttribute('style', safeStyle);
-      }
-      return;
+    function setupEditorMediaTiles(container) {
+        const mediaTiles = container.querySelectorAll('.editor-media-tile');
+        mediaTiles.forEach((tile) => {
+            if (!(tile instanceof HTMLElement))
+                return;
+            tile.setAttribute('role', 'button');
+            tile.setAttribute('tabindex', '0');
+            tile.title = 'Click to display this media on student screen';
+            if (tile.tagName === 'A') {
+                tile.setAttribute('href', tile.getAttribute('href') || '#');
+            }
+            const activateTile = (event) => {
+                if (event) {
+                    event.preventDefault();
+                }
+                const dataPayload = tile.getAttribute('data-media-json');
+                const href = tile.getAttribute('href') || '';
+                const hrefPayload = href.startsWith('bst-media:') ? href.slice('bst-media:'.length) : '';
+                const media = decodeEditorMediaPayload(dataPayload || hrefPayload) ||
+                    findMediaByTileText(tile.textContent);
+                if (!media) {
+                    return;
+                }
+                sendSectionMediaToStudent(media);
+                tile.classList.add('mark-active');
+                setTimeout(() => tile.classList.remove('mark-active'), 500);
+            };
+            tile.addEventListener('click', activateTile);
+            tile.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    activateTile(event);
+                }
+            });
+        });
     }
-
-    if (attrName === 'class') {
-      const safeClasses = attribute.value
-        .split(/\s+/)
-        .filter(token => /^[a-zA-Z0-9_-]+$/.test(token));
-      if (safeClasses.length > 0) {
-        cleanElement.setAttribute('class', safeClasses.join(' '));
-      }
-      return;
+    // Insert Q&A break markers into the editor content display
+    function insertQABreakMarkers(container, generatedOutline) {
+        // Find all headings in the content
+        const headings = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+        generatedOutline.forEach((section) => {
+            // Check if this section has Q&A break points
+            const qaBreaks = (section.points || []).filter((p) => typeof p === 'object' && p.type === 'qa-break');
+            if (qaBreaks.length === 0)
+                return;
+            // Find the heading that matches this section
+            let matchingHeading = null;
+            for (const heading of headings) {
+                const headingText = (heading.textContent || '').trim().toLowerCase();
+                const sectionText = section.summary.trim().toLowerCase();
+                // Check for partial match
+                if (headingText.includes(sectionText) || sectionText.includes(headingText)) {
+                    matchingHeading = heading;
+                }
+            }
+            if (matchingHeading) {
+                const headingParent = matchingHeading.parentElement;
+                const grandParent = headingParent?.parentNode;
+                if (!headingParent || !grandParent)
+                    return;
+                // Create Q&A break marker
+                qaBreaks.forEach((qaBreak) => {
+                    const marker = document.createElement('div');
+                    marker.className = 'qa-break-marker';
+                    const iconWrap = document.createElement('div');
+                    iconWrap.className = 'qa-break-icon';
+                    const icon = document.createElement('span');
+                    icon.className = 'material-icons';
+                    icon.textContent = 'forum';
+                    iconWrap.appendChild(icon);
+                    const content = document.createElement('div');
+                    content.className = 'qa-break-content';
+                    const title = document.createElement('strong');
+                    title.textContent = 'Q&A Discussion Point';
+                    const text = document.createElement('p');
+                    text.textContent = qaBreak.text || 'Pause for discussion - See class guide';
+                    const button = document.createElement('button');
+                    button.className = 'qa-break-btn';
+                    button.dataset.sectionId = section.id;
+                    const buttonIcon = document.createElement('span');
+                    buttonIcon.className = 'material-icons';
+                    buttonIcon.textContent = 'assignment';
+                    button.appendChild(buttonIcon);
+                    button.appendChild(document.createTextNode('View Class Guide'));
+                    content.appendChild(title);
+                    content.appendChild(text);
+                    content.appendChild(button);
+                    marker.appendChild(iconWrap);
+                    marker.appendChild(content);
+                    // Insert after the heading's parent section
+                    const insertPoint = headingParent.nextSibling;
+                    if (insertPoint) {
+                        grandParent.insertBefore(marker, insertPoint);
+                    }
+                    else {
+                        grandParent.appendChild(marker);
+                    }
+                    // Add click handler to switch to class guide tab
+                    const btn = marker.querySelector('.qa-break-btn');
+                    if (btn) {
+                        btn.addEventListener('click', () => {
+                            // Switch to class guide tab
+                            const guidTab = document.querySelector('.outline-tab[data-tab="guide"]');
+                            const editorTab = document.querySelector('.outline-tab[data-tab="editor"]');
+                            const guideContent = document.getElementById('guide-content');
+                            const editorContent = document.getElementById('editor-content');
+                            if (guidTab && editorTab && guideContent && editorContent) {
+                                guidTab.classList.add('active');
+                                editorTab.classList.remove('active');
+                                guideContent.classList.add('active');
+                                editorContent.classList.remove('active');
+                                // Try to open the matching section in the class guide
+                                const accordion = document.querySelector(`details.accordion[data-section-id="${section.id}"]`);
+                                if (accordion) {
+                                    accordion.setAttribute('open', '');
+                                    accordion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
     }
-
-    cleanElement.setAttribute(attrName, attribute.value);
-  });
-
-  Array.from(node.childNodes).forEach((child) => {
-    const sanitizedChild = sanitizeRichTextNode(child, config);
-    if (sanitizedChild) {
-      cleanElement.appendChild(sanitizedChild);
+    function openDisplayWindow() {
+        if (displayWindow && !displayWindow.closed) {
+            displayWindow.location.href = `${window.location.origin}/student.html?class=${classId}`;
+            displayWindow.focus();
+        }
+        else {
+            displayWindow = window.open(`${window.location.origin}/student.html?class=${classId}`, 'display-screen', 'width=1280,height=720');
+        }
+        // Show the preview iframe
+        const previewShell = document.getElementById('student-preview-shell');
+        if (previewShell) {
+            previewShell.style.display = 'block';
+            syncPreviewViewport();
+        }
+        // Start checking if the window is closed
+        if (displayWindowCheckInterval !== null) {
+            window.clearInterval(displayWindowCheckInterval);
+        }
+        displayWindowCheckInterval = window.setInterval(() => {
+            syncPreviewViewport();
+            if (displayWindow && displayWindow.closed) {
+                const shell = document.getElementById('student-preview-shell');
+                if (shell) {
+                    shell.style.display = 'none';
+                }
+                if (displayWindowCheckInterval !== null) {
+                    window.clearInterval(displayWindowCheckInterval);
+                    displayWindowCheckInterval = null;
+                }
+            }
+        }, 1000);
     }
-  });
-
-  return cleanElement;
-}
-
-function sanitizeTeacherUrl(url) {
-  if (typeof url !== 'string') {
-    return '';
-  }
-
-  const trimmed = url.trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  if (trimmed.startsWith('bst-media:')) {
-    return trimmed;
-  }
-
-  try {
-    const parsed = new URL(trimmed, window.location.origin);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return parsed.href;
+    function openTeleprompter() {
+        const teleprompterUrl = `${window.location.origin}/teleprompter.html?class=${classId}`;
+        window.open(teleprompterUrl, 'teleprompter-screen', 'width=1024,height=768,menubar=no,toolbar=no');
     }
-  } catch (err) {
-    // Ignore parse failures and fall back to local-path validation.
-  }
-
-  return trimmed.startsWith('/') || trimmed.startsWith('assets/') || trimmed.startsWith('./') || trimmed.startsWith('../')
-    ? trimmed
-    : '';
-}
-
-function sanitizeInlineStyle(styleValue, allowedProperties) {
-  if (typeof styleValue !== 'string') {
-    return '';
-  }
-
-  return styleValue
-    .split(';')
-    .map(rule => rule.trim())
-    .filter(Boolean)
-    .map((rule) => {
-      const [property, ...valueParts] = rule.split(':');
-      const normalizedProperty = property?.trim().toLowerCase();
-      const normalizedValue = valueParts.join(':').trim();
-
-      if (!allowedProperties.has(normalizedProperty)) {
-        return '';
-      }
-
-      if (!/^[#(),.%\-\w\s]+$/.test(normalizedValue)) {
-        return '';
-      }
-
-      return `${normalizedProperty}: ${normalizedValue}`;
-    })
-    .filter(Boolean)
-    .join('; ');
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadClassConfig);
-} else {
-  loadClassConfig();
-}
+    function getDisplayViewportSize() {
+        if (!displayWindow || displayWindow.closed) {
+            return { width: DEFAULT_DISPLAY_WIDTH, height: DEFAULT_DISPLAY_HEIGHT };
+        }
+        const width = Number(displayWindow.innerWidth || displayWindow.outerWidth || DEFAULT_DISPLAY_WIDTH);
+        const height = Number(displayWindow.innerHeight || displayWindow.outerHeight || DEFAULT_DISPLAY_HEIGHT);
+        return {
+            width: Math.max(320, width),
+            height: Math.max(180, height)
+        };
+    }
+    function syncPreviewViewport() {
+        const previewShell = document.getElementById('student-preview-shell');
+        const previewIframe = document.getElementById('student-preview');
+        if (!previewShell || !(previewIframe instanceof HTMLElement))
+            return;
+        const { width, height } = getDisplayViewportSize();
+        const shellWidth = previewShell.clientWidth || PREVIEW_THUMB_WIDTH;
+        const shellHeight = previewShell.clientHeight || PREVIEW_THUMB_HEIGHT;
+        // Fill the thumbnail box and center-crop if aspect ratios differ.
+        const scale = Math.max(shellWidth / width, shellHeight / height);
+        const offsetX = (shellWidth - width * scale) / 2;
+        const offsetY = (shellHeight - height * scale) / 2;
+        previewIframe.style.width = `${width}px`;
+        previewIframe.style.height = `${height}px`;
+        previewIframe.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        previewIframe.style.transformOrigin = 'top left';
+    }
+    function sendMediaToStudent(index) {
+        if (!window.teacherMediaList || index >= window.teacherMediaList.length) {
+            console.error('[Teacher] Invalid media index:', index);
+            return;
+        }
+        const media = window.teacherMediaList[index];
+        console.log('[Teacher] Sending media to student:', media);
+        currentMediaType = media.type || 'unknown';
+        updateControlVisibility();
+        sendCommand('displayMedia', { media });
+    }
+    function sendVerseToStudent(reference, translation = 'nkjv') {
+        if (!reference || !reference.trim())
+            return;
+        currentMediaType = 'verse';
+        updateControlVisibility();
+        sendCommand('displayMedia', {
+            media: {
+                type: 'verse',
+                reference: reference.trim(),
+                translation: (translation || 'nkjv').trim(),
+                title: reference.trim()
+            }
+        });
+    }
+    function sendTextToStudent(title, content) {
+        if (!content || !content.trim())
+            return;
+        currentMediaType = 'text';
+        updateControlVisibility();
+        sendCommand('displayMedia', {
+            media: {
+                type: 'text',
+                title: (title || 'Key Point').trim(),
+                content: content.trim()
+            }
+        });
+    }
+    // Get icon for media mark type
+    function getMediaMarkIcon(type) {
+        const icons = {
+            verse: 'menu_book',
+            video: 'movie',
+            image: 'image',
+            images: 'photo_library',
+            link: 'link',
+            pdf: 'description',
+            document: 'assignment',
+            audio: 'audio_file',
+            question: 'help',
+            presentation: 'bar_chart'
+        };
+        return icons[type] || 'attach_file';
+    }
+    // Send section media directly to student
+    function sendSectionMediaToStudent(media) {
+        if (!media)
+            return;
+        console.log('[Teacher] Sending section media to student:', media);
+        // Handle verse type specially
+        if (media.type === 'verse') {
+            const reference = media.reference || media.title || '';
+            const translation = media.translation || 'nkjv';
+            sendVerseToStudent(reference, translation);
+            return;
+        }
+        // Handle video type - check for YouTube
+        if (media.type === 'video') {
+            currentMediaType = 'video';
+            updateControlVisibility();
+            // Build video media object
+            const videoMedia = {
+                type: 'video',
+                title: media.title || 'Video'
+            };
+            if (media.sources) {
+                videoMedia.sources = media.sources;
+            }
+            else if (media.url) {
+                videoMedia.url = media.url;
+            }
+            sendCommand('displayMedia', { media: videoMedia });
+            return;
+        }
+        // Handle image type
+        if (media.type === 'image' || media.type === 'images') {
+            currentMediaType = 'image';
+            updateControlVisibility();
+            const imageMedia = {
+                type: 'image',
+                title: media.title || 'Image'
+            };
+            if (media.sources) {
+                imageMedia.sources = media.sources;
+            }
+            else if (media.url) {
+                imageMedia.url = media.url;
+            }
+            sendCommand('displayMedia', { media: imageMedia });
+            return;
+        }
+        // Handle question type - display question on student screen
+        if (media.type === 'question') {
+            currentMediaType = 'question';
+            updateControlVisibility();
+            sendCommand('displayMedia', {
+                media: {
+                    type: 'question',
+                    prompt: media.prompt || media.title || '',
+                    answer: media.answer || '',
+                    title: media.title || 'Discussion Question'
+                }
+            });
+            return;
+        }
+        // Handle link type - display in student window
+        if (media.type === 'link') {
+            currentMediaType = 'link';
+            updateControlVisibility();
+            sendCommand('displayMedia', { media });
+            return;
+        }
+        // Generic media handling for other types (pdf, audio, etc.)
+        currentMediaType = media.type || 'unknown';
+        updateControlVisibility();
+        sendCommand('displayMedia', { media });
+    }
+    function sendCommand(type, payload = {}) {
+        const message = { type, ...payload, sentAt: Date.now() };
+        console.log('[Teacher] Sending command:', type, message);
+        if (channel) {
+            channel.postMessage(message);
+            console.log('[Teacher] Posted to BroadcastChannel');
+        }
+        else {
+            console.warn('[Teacher] No BroadcastChannel available');
+        }
+        try {
+            localStorage.setItem(STORAGE_FALLBACK_KEY, JSON.stringify(message));
+        }
+        catch {
+            // ignore storage errors
+        }
+        flashStatus(`Sent: ${labelFor(type, payload)}`);
+    }
+    function labelFor(type, payload) {
+        if (type === 'jumpToPause' && typeof payload.index === 'number' && Number.isInteger(payload.index)) {
+            const idx = payload.index;
+            const point = pausePoints[idx];
+            // Prefer section title if we can map the pause index back to an outline section
+            if (classConfig?.outline) {
+                for (const sec of classConfig.outline) {
+                    try {
+                        const found = findPauseIndexForSection(sec);
+                        if (found === idx) {
+                            const time = point && typeof point.time === 'number' ? ` · ${formatTime(point.time)}` : '';
+                            return `Jump to ${sec.summary}${time}`;
+                        }
+                    }
+                    catch {
+                        /* ignore */
+                    }
+                }
+            }
+            return point ? `Jump to ${point.label}` : 'Jump to pause';
+        }
+        if (type === 'nextPause')
+            return 'Skip to next pause';
+        if (type === 'fullscreen')
+            return 'Fullscreen display';
+        if (type === 'restart')
+            return 'Restart video';
+        if (type === 'toggle')
+            return 'Play / Pause';
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+    function flashStatus(text) {
+        if (statusEl)
+            statusEl.textContent = text;
+    }
+    // Removed local fullscreen toggle; teacher should request student to fullscreen the video.
+    function renderPauseList() {
+        if (!pauseListEl)
+            return;
+        pauseListEl.innerHTML = '';
+        pausePoints.forEach((point, idx) => {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            const label = document.createElement('div');
+            label.innerHTML = `<strong>${point.label}</strong><br><small>${formatTime(point.time)}</small>`;
+            const btn = document.createElement('button');
+            btn.innerHTML = '<span class="material-symbols-outlined">skip_next</span>Jump here';
+            btn.onclick = () => sendCommand('jumpToPause', { index: idx });
+            item.appendChild(label);
+            item.appendChild(btn);
+            pauseListEl?.appendChild(item);
+        });
+        if (pausePoints.length === 0) {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            item.innerHTML = '<small>No planned pauses yet. Add them in classes.json.</small>';
+            pauseListEl.appendChild(item);
+        }
+    }
+    function bindControls() {
+        const toggleBtn = document.getElementById('toggle');
+        const playBtn = document.getElementById('play');
+        const pauseBtn = document.getElementById('pause');
+        const restartBtn = document.getElementById('restart');
+        const nextBtn = document.getElementById('next');
+        const fullscreenBtn = document.getElementById('fullscreen');
+        const clearScreenBtn = document.getElementById('clear-screen');
+        if (toggleBtn)
+            toggleBtn.onclick = () => sendCommand('toggle');
+        if (playBtn)
+            playBtn.onclick = () => sendCommand('play');
+        if (pauseBtn)
+            pauseBtn.onclick = () => sendCommand('pause');
+        if (restartBtn)
+            restartBtn.onclick = () => sendCommand('restart');
+        if (nextBtn)
+            nextBtn.onclick = () => sendCommand('nextPause');
+        if (fullscreenBtn)
+            fullscreenBtn.onclick = () => sendCommand('fullscreen');
+        if (clearScreenBtn)
+            clearScreenBtn.onclick = () => sendCommand('clearScreen');
+        const versePrevBtn = document.getElementById('verse-prev');
+        const verseNextBtn = document.getElementById('verse-next');
+        if (versePrevBtn)
+            versePrevBtn.onclick = () => sendCommand('versePrevious');
+        if (verseNextBtn)
+            verseNextBtn.onclick = () => sendCommand('verseNext');
+        const globalVersePrev = document.getElementById('global-verse-prev');
+        const globalVerseNext = document.getElementById('global-verse-next');
+        if (globalVersePrev)
+            globalVersePrev.onclick = () => sendCommand('versePrevious');
+        if (globalVerseNext)
+            globalVerseNext.onclick = () => sendCommand('verseNext');
+        const verseFontDecrease = document.getElementById('verse-font-decrease');
+        const verseFontIncrease = document.getElementById('verse-font-increase');
+        if (verseFontDecrease)
+            verseFontDecrease.onclick = () => sendCommand('verseFontDecrease');
+        if (verseFontIncrease)
+            verseFontIncrease.onclick = () => sendCommand('verseFontIncrease');
+        if (downloadBtn)
+            downloadBtn.onclick = downloadNotes;
+        if (uploadBtn)
+            uploadBtn.onclick = () => fileInput?.click();
+        if (fileInput)
+            fileInput.onchange = importNotes;
+        document.querySelectorAll('.rte-toolbar button').forEach((btn) => {
+            if (!(btn instanceof HTMLButtonElement))
+                return;
+            btn.onclick = () => {
+                const cmd = btn.dataset.cmd;
+                if (!cmd)
+                    return;
+                const val = btn.dataset.value || undefined;
+                document.execCommand(cmd, false, val);
+                if (notesEl)
+                    notesEl.focus();
+                persistNotes();
+            };
+        });
+        questionFields.forEach((field) => {
+            const key = field.dataset.questionKey || '';
+            const stored = localStorage.getItem(QUESTION_PREFIX + key);
+            if (stored)
+                field.value = stored;
+            field.addEventListener('input', () => {
+                try {
+                    localStorage.setItem(QUESTION_PREFIX + key, field.value);
+                }
+                catch {
+                    // ignore storage errors
+                }
+            });
+        });
+        renderPauseList();
+    }
+    function hydrateNotes() {
+        if (!notesEl)
+            return;
+        notesEl.innerHTML = localStorage.getItem(NOTES_KEY) || '';
+        notesEl.addEventListener('input', persistNotes);
+    }
+    function persistNotes() {
+        if (!notesEl)
+            return;
+        try {
+            localStorage.setItem(NOTES_KEY, notesEl.innerHTML);
+        }
+        catch {
+            // ignore storage errors
+        }
+    }
+    function downloadNotes() {
+        const questions = {};
+        questionFields.forEach((field) => {
+            const key = field.dataset.questionKey;
+            if (key) {
+                questions[key] = field.value;
+            }
+        });
+        const payload = {
+            version: 1,
+            classNumber: classConfig.classNumber,
+            notesHtml: notesEl?.innerHTML || '',
+            questions
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `class${classId}-notes.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        flashStatus(`Downloaded notes file (class${classId}-notes.json).`);
+    }
+    function importNotes(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement))
+            return;
+        const file = target.files?.[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const text = typeof reader.result === 'string' ? reader.result : '';
+            try {
+                const parsedRaw = JSON.parse(text);
+                if (parsedRaw && typeof parsedRaw === 'object') {
+                    const parsed = parsedRaw;
+                    if (typeof parsed.notesHtml === 'string' && notesEl) {
+                        notesEl.innerHTML = parsed.notesHtml;
+                    }
+                    if (parsed.questions && typeof parsed.questions === 'object') {
+                        const questionsMap = parsed.questions;
+                        questionFields.forEach((field) => {
+                            const key = field.dataset.questionKey;
+                            if (!key)
+                                return;
+                            const val = questionsMap[key];
+                            if (typeof val === 'string')
+                                field.value = val;
+                        });
+                    }
+                    persistNotes();
+                    questionFields.forEach((field) => {
+                        const key = field.dataset.questionKey || '';
+                        try {
+                            localStorage.setItem(QUESTION_PREFIX + key, field.value);
+                        }
+                        catch {
+                            // ignore storage errors
+                        }
+                    });
+                    flashStatus('Imported notes and outline fields.');
+                    target.value = '';
+                    return;
+                }
+            }
+            catch {
+                // fall through to treat as raw HTML
+            }
+            if (notesEl)
+                notesEl.innerHTML = text;
+            persistNotes();
+            flashStatus('Imported notes (rich text).');
+            target.value = '';
+        };
+        reader.readAsText(file);
+    }
+    function formatTime(totalSeconds) {
+        const m = Math.floor(totalSeconds / 60);
+        const s = Math.floor(totalSeconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+    function updateControlVisibility() {
+        const controlsBar = document.querySelector('.controls-bar');
+        if (!controlsBar)
+            return;
+        // Get all control elements
+        const allControls = controlsBar.querySelectorAll('[data-control-type]');
+        allControls.forEach((control) => {
+            if (!(control instanceof HTMLElement))
+                return;
+            const controlType = control.getAttribute('data-control-type');
+            // Always show 'all' type controls (clear screen)
+            if (controlType === 'all') {
+                control.style.display = '';
+                return;
+            }
+            // Show controls that match current media type
+            if (controlType === currentMediaType) {
+                control.style.display = '';
+            }
+            else {
+                control.style.display = 'none';
+            }
+        });
+    }
+    // ===== STOPPED HERE MARKER =====
+    /**
+     * Add stopped-here markers to editor lines with line numbers
+     */
+    function addStoppedMarkersToEditorContent(container) {
+        const lineCandidates = Array.from(container.childNodes).filter((node) => node instanceof HTMLElement && Boolean(node.textContent?.trim()));
+        let headingIndex = 0;
+        lineCandidates.forEach((lineElement, index) => {
+            const lineId = `editor-line-${index + 1}`;
+            const isHeading = /^H[1-6]$/.test(lineElement.tagName);
+            const legacyHeadingId = isHeading ? `editor-heading-${headingIndex}` : null;
+            if (isHeading)
+                headingIndex += 1;
+            const isLegacyMatch = Boolean(legacyHeadingId) && classConfig.stoppedAtEditorHeading === legacyHeadingId;
+            const isStoppedHere = classConfig.stoppedAtEditorLine === lineId || isLegacyMatch;
+            const wrapper = document.createElement('div');
+            wrapper.className = `editor-line-row${isStoppedHere ? ' stopped-here' : ''}`;
+            wrapper.setAttribute('data-line-id', lineId);
+            const markerBtn = document.createElement('button');
+            markerBtn.className = `stop-marker-btn editor-line-marker${isStoppedHere ? ' active' : ''}`;
+            markerBtn.setAttribute('type', 'button');
+            markerBtn.setAttribute('aria-label', isStoppedHere
+                ? `Remove stop marker from line ${index + 1}`
+                : `Set stop marker at line ${index + 1}`);
+            markerBtn.title = getStoppedMarkerButtonTitle(isStoppedHere);
+            markerBtn.innerHTML = `<span class="line-number-text">${index + 1}</span>`;
+            markerBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (classConfig.stoppedAtEditorLine === lineId) {
+                    void setStoppedMarkerEditorLine(null);
+                }
+                else {
+                    void setStoppedMarkerEditorLine(lineId);
+                }
+            };
+            const parent = lineElement.parentNode;
+            if (!parent)
+                return;
+            parent.insertBefore(wrapper, lineElement);
+            wrapper.appendChild(markerBtn);
+            wrapper.appendChild(lineElement);
+            lineElement.classList.add('editor-line-content');
+        });
+    }
+    /**
+     * Set the "stopped here" marker on an editor line
+     */
+    async function setStoppedMarkerEditorLine(lineId) {
+        updateStoppedMarkerState({ lineId });
+        const cloudWarning = await saveStoppedMarker();
+        // Re-render both views to update UI (even if save failed, show local state)
+        renderOutlineWithQuestions();
+        renderGeneratedOutline();
+        // Show feedback
+        if (cloudWarning) {
+            flashStatus(`Warning: ${cloudWarning}`);
+        }
+        else if (lineId) {
+            flashStatus('Marked where you stopped');
+        }
+        else {
+            flashStatus('Marker removed');
+        }
+    }
+    /**
+     * Set the "stopped here" marker on a section
+     */
+    async function setStoppedMarker(sectionId) {
+        updateStoppedMarkerState({ sectionId });
+        // Save to server
+        const cloudWarning = await saveStoppedMarker();
+        // Re-render both views to update UI (even if save failed, show local state)
+        renderOutlineWithQuestions();
+        renderGeneratedOutline();
+        // Show feedback
+        if (cloudWarning) {
+            flashStatus(`Warning: ${cloudWarning}`);
+        }
+        else if (sectionId) {
+            flashStatus('Marked where you stopped');
+        }
+        else {
+            flashStatus('Marker removed');
+        }
+    }
+    /**
+     * Save the stopped marker to server
+     */
+    async function saveStoppedMarker() {
+        // If allClassesData is not available, can't save
+        if (!allClassesData) {
+            console.error('Cannot save stopped marker: allClassesData not loaded');
+            return 'Data not loaded - please refresh the page';
+        }
+        if (!window.BSTApi) {
+            console.error('Cannot save stopped marker: BSTApi not available');
+            return 'API client not loaded - please refresh the page';
+        }
+        try {
+            const response = await window.BSTApi.fetch('/api/save/classes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(allClassesData)
+            }, { requireAdmin: true });
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => 'Unknown error');
+                throw new Error(`Server returned ${response.status}: ${errorText}`);
+            }
+            const resultRaw = await response.json().catch(() => ({}));
+            const result = resultRaw && typeof resultRaw === 'object' ? resultRaw : {};
+            if (result.partialSuccess ||
+                result.cloudSync?.ok === false ||
+                result.supabaseSync === false) {
+                return result.warning || result.cloudSync?.message || 'Cloud sync failed.';
+            }
+            console.log('[OK] Saved stopped marker');
+            return '';
+        }
+        catch (err) {
+            console.error('Failed to save stopped marker:', err);
+            const message = err instanceof Error ? err.message : 'check server';
+            return `Could not save marker: ${message}`;
+        }
+    }
+    function sanitizeRichTextHtml(html) {
+        if (typeof html !== 'string' || !html.trim()) {
+            return '';
+        }
+        const allowedTags = new Set([
+            'a', 'blockquote', 'br', 'code', 'details', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+            'hr', 'iframe', 'img', 'li', 'mark', 'ol', 'p', 'pre', 'span', 'strong', 'sub', 'summary',
+            'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul'
+        ]);
+        const allowedAttributes = new Set([
+            'alt', 'aria-hidden', 'class', 'colspan', 'data-section-id', 'data-verse', 'href', 'rel', 'rowspan',
+            'src', 'style', 'target', 'title', 'data-media-json'
+        ]);
+        const allowedStyleProperties = new Set(['background-color', 'color', 'text-align']);
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html');
+        const wrapper = document.createElement('div');
+        Array.from(doc.body.childNodes).forEach((child) => {
+            const sanitizedNode = sanitizeRichTextNode(child, {
+                allowedTags,
+                allowedAttributes,
+                allowedStyleProperties
+            });
+            if (sanitizedNode) {
+                wrapper.appendChild(sanitizedNode);
+            }
+        });
+        return wrapper.innerHTML;
+    }
+    function sanitizeRichTextNode(node, config) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return document.createTextNode(node.textContent || '');
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE || !(node instanceof Element)) {
+            return null;
+        }
+        const tagName = node.tagName.toLowerCase();
+        const fragment = document.createDocumentFragment();
+        if (!config.allowedTags.has(tagName)) {
+            Array.from(node.childNodes).forEach((child) => {
+                const sanitizedChild = sanitizeRichTextNode(child, config);
+                if (sanitizedChild) {
+                    fragment.appendChild(sanitizedChild);
+                }
+            });
+            return fragment;
+        }
+        const cleanElement = document.createElement(tagName);
+        Array.from(node.attributes).forEach((attribute) => {
+            const attrName = attribute.name.toLowerCase();
+            if (attrName.startsWith('on') || !config.allowedAttributes.has(attrName)) {
+                return;
+            }
+            if (attrName === 'href' || attrName === 'src') {
+                const safeUrl = sanitizeTeacherUrl(attribute.value);
+                if (!safeUrl) {
+                    return;
+                }
+                cleanElement.setAttribute(attrName, safeUrl);
+                if (tagName === 'a') {
+                    cleanElement.setAttribute('rel', 'noopener noreferrer');
+                }
+                return;
+            }
+            if (attrName === 'style') {
+                const safeStyle = sanitizeInlineStyle(attribute.value, config.allowedStyleProperties);
+                if (safeStyle) {
+                    cleanElement.setAttribute('style', safeStyle);
+                }
+                return;
+            }
+            if (attrName === 'class') {
+                const safeClasses = attribute.value
+                    .split(/\s+/)
+                    .filter((token) => /^[a-zA-Z0-9_-]+$/.test(token));
+                if (safeClasses.length > 0) {
+                    cleanElement.setAttribute('class', safeClasses.join(' '));
+                }
+                return;
+            }
+            cleanElement.setAttribute(attrName, attribute.value);
+        });
+        Array.from(node.childNodes).forEach((child) => {
+            const sanitizedChild = sanitizeRichTextNode(child, config);
+            if (sanitizedChild) {
+                cleanElement.appendChild(sanitizedChild);
+            }
+        });
+        return cleanElement;
+    }
+    function sanitizeTeacherUrl(url) {
+        if (typeof url !== 'string') {
+            return '';
+        }
+        const trimmed = url.trim();
+        if (!trimmed) {
+            return '';
+        }
+        if (trimmed.startsWith('bst-media:')) {
+            return trimmed;
+        }
+        try {
+            const parsed = new URL(trimmed, window.location.origin);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                return parsed.href;
+            }
+        }
+        catch {
+            // Ignore parse failures and fall back to local-path validation.
+        }
+        return trimmed.startsWith('/') ||
+            trimmed.startsWith('assets/') ||
+            trimmed.startsWith('./') ||
+            trimmed.startsWith('../')
+            ? trimmed
+            : '';
+    }
+    function sanitizeInlineStyle(styleValue, allowedProperties) {
+        if (typeof styleValue !== 'string') {
+            return '';
+        }
+        return styleValue
+            .split(';')
+            .map((rule) => rule.trim())
+            .filter(Boolean)
+            .map((rule) => {
+            const [property, ...valueParts] = rule.split(':');
+            const normalizedProperty = property?.trim().toLowerCase();
+            const normalizedValue = valueParts.join(':').trim();
+            if (!normalizedProperty || !allowedProperties.has(normalizedProperty)) {
+                return '';
+            }
+            if (!/^[#(),.%\-\w\s]+$/.test(normalizedValue)) {
+                return '';
+            }
+            return `${normalizedProperty}: ${normalizedValue}`;
+        })
+            .filter(Boolean)
+            .join('; ');
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            void loadClassConfig();
+        });
+    }
+    else {
+        void loadClassConfig();
+    }
+})();

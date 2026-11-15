@@ -1,5 +1,5 @@
-// requests.js - Frontend logic for the Guest Request UI
-
+"use strict";
+// requests.ts - Frontend logic for the Guest Request UI
 document.addEventListener('DOMContentLoaded', () => {
     const preApprovedListEl = document.getElementById('preApprovedList');
     const queueListEl = document.getElementById('queueList');
@@ -10,82 +10,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const requestForm = document.getElementById('requestForm');
     const selectedTrackDisplay = document.getElementById('selectedTrackDisplay');
     const toastEl = document.getElementById('toast');
-
     let currentSelectedTrack = null;
-    let searchTimeout = null;
-    let votedSongs = JSON.parse(localStorage.getItem('djVotedSongs') || '[]');
-
-    // --- Initialization ---
-    fetchPreApproved();
-    fetchQueue();
-
-    // Accordion Logic
-    const quickPicksHeader = document.getElementById('quickPicksHeader');
-    const quickPicksContent = document.getElementById('quickPicksContent');
-    
-    // Set initial state
-    quickPicksHeader.classList.add('collapsed');
-    
-    quickPicksHeader.addEventListener('click', () => {
-        const isCollapsed = quickPicksHeader.classList.contains('collapsed');
-        if (isCollapsed) {
-            quickPicksHeader.classList.remove('collapsed');
-            quickPicksContent.classList.remove('hidden');
-        } else {
-            quickPicksHeader.classList.add('collapsed');
-            quickPicksContent.classList.add('hidden');
-        }
-    });
-
-    // Refresh queue every 15 seconds to keep up with DJ actions
-    setInterval(fetchQueue, 15000);
-
-    // --- Search Logic ---
-    searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        const query = e.target.value.trim();
-
-        if (query.length < 2) {
-            searchResults.classList.add('hidden');
-            return;
-        }
-
-        searchTimeout = setTimeout(() => {
-            performSearch(query);
-        }, 400); // debounce
-    });
-
-    // Close search results when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.add('hidden');
-        }
-    });
-
-    async function performSearch(query) {
-        try {
-            searchResults.innerHTML = '<div class="loading">Searching...</div>';
-            searchResults.classList.remove('hidden');
-
-            const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.error);
-
-            renderSearchResults(data.results);
-        } catch (err) {
-            searchResults.innerHTML = `<div style="padding:1rem;color:red;">Error: ${err.message}</div>`;
+    let searchTimeout;
+    let votedSongs = [];
+    try {
+        const parsed = JSON.parse(localStorage.getItem('djVotedSongs') || '[]');
+        if (Array.isArray(parsed)) {
+            votedSongs = parsed.map(String);
         }
     }
-
+    catch {
+        votedSongs = [];
+    }
+    function getErrorMessage(err, fallback) {
+        return err instanceof Error && err.message ? err.message : fallback;
+    }
+    function escapeHTML(str) {
+        if (!str)
+            return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+    function showToast(message, type = 'success') {
+        if (!toastEl)
+            return;
+        toastEl.textContent = message;
+        toastEl.className = `toast ${type}`;
+        setTimeout(() => {
+            toastEl.classList.add('hidden');
+        }, 3000);
+    }
     function renderSearchResults(results) {
+        if (!searchResults)
+            return;
         if (!results || results.length === 0) {
             searchResults.innerHTML = '<div style="padding:1rem;">No results found.</div>';
             return;
         }
-
-        searchResults.innerHTML = results.map(track => `
-            <div class="track-item" onclick='selectTrackForRequest(${JSON.stringify(track).replace(/'/g, "&apos;")})'>
+        searchResults.innerHTML = results
+            .map((track) => `
+            <div class="track-item" onclick='selectTrackForRequest(${JSON.stringify(track).replace(/'/g, '&apos;')})'>
                 <img class="track-art" src="${track.thumbnail || '/assets/images/icon.png'}" alt="Art" onerror="this.src='/assets/images/icon.png'">
                 <div class="track-info">
                     <div class="track-title">${escapeHTML(track.title)}</div>
@@ -93,61 +61,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <button class="btn btn-secondary btn-icon"><i class="fas fa-plus"></i></button>
             </div>
-        `).join('');
+        `)
+            .join('');
     }
-
-    // --- Pre-approved & Queue Fetching ---
-    async function fetchPreApproved() {
+    async function performSearch(query) {
+        if (!searchResults)
+            return;
         try {
-            const res = await fetch('/api/dj/pre-approved');
-            const data = await res.json();
-            renderPreApproved(data);
-        } catch (err) {
-            preApprovedListEl.innerHTML = `<div class="loading">Error loading list</div>`;
+            searchResults.innerHTML = '<div class="loading">Searching...</div>';
+            searchResults.classList.remove('hidden');
+            const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
+            const data = (await res.json());
+            if (!res.ok)
+                throw new Error(data.error || 'Search failed');
+            renderSearchResults(data.results);
+        }
+        catch (err) {
+            searchResults.innerHTML = `<div style="padding:1rem;color:red;">Error: ${escapeHTML(getErrorMessage(err, 'Search failed'))}</div>`;
         }
     }
-
-    async function fetchQueue() {
-        try {
-            const res = await fetch('/api/dj/queue');
-            const data = await res.json();
-            renderQueue(data);
-        } catch (err) {
-            queueListEl.innerHTML = `<div class="loading">Error loading queue</div>`;
-        }
-    }
-
     function renderPreApproved(list) {
+        if (!preApprovedListEl)
+            return;
         if (!list || list.length === 0) {
             preApprovedListEl.innerHTML = '<div class="loading">No quick picks available.</div>';
             return;
         }
-
-        preApprovedListEl.innerHTML = list.map(track => `
+        preApprovedListEl.innerHTML = list
+            .map((track) => `
             <div class="track-item">
                 <div class="track-info">
                     <div class="track-title">${escapeHTML(track.title)}</div>
                     <div class="track-artist">${escapeHTML(track.artist)}</div>
                 </div>
-                <button class="btn btn-secondary" onclick='selectTrackForRequest(${JSON.stringify(track).replace(/'/g, "&apos;")}, true)'>
+                <button class="btn btn-secondary" onclick='selectTrackForRequest(${JSON.stringify(track).replace(/'/g, '&apos;')}, true)'>
                     Request
                 </button>
             </div>
-        `).join('');
+        `)
+            .join('');
     }
-
     function renderQueue(queue) {
-        // Only show 'approved' songs in the upcoming list
+        if (!queueListEl)
+            return;
         const upcoming = queue
-            .filter(q => q.status === 'approved')
+            .filter((q) => q.status === 'approved')
             .sort((a, b) => (b.votes || 0) - (a.votes || 0));
-
         if (upcoming.length === 0) {
             queueListEl.innerHTML = '<div class="loading">Queue is currently empty. Be the first to request!</div>';
             return;
         }
-
-        queueListEl.innerHTML = upcoming.map(track => {
+        queueListEl.innerHTML = upcoming
+            .map((track) => {
             const hasVoted = votedSongs.includes(track.id);
             return `
             <div class="track-item">
@@ -165,19 +130,83 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
                 </div>
             </div>
-        `}).join('');
+        `;
+        })
+            .join('');
     }
-
+    async function fetchPreApproved() {
+        try {
+            const res = await fetch('/api/dj/pre-approved');
+            const data = (await res.json());
+            renderPreApproved(data);
+        }
+        catch {
+            if (preApprovedListEl) {
+                preApprovedListEl.innerHTML = '<div class="loading">Error loading list</div>';
+            }
+        }
+    }
+    async function fetchQueue() {
+        try {
+            const res = await fetch('/api/dj/queue');
+            const data = (await res.json());
+            renderQueue(data);
+        }
+        catch {
+            if (queueListEl) {
+                queueListEl.innerHTML = '<div class="loading">Error loading queue</div>';
+            }
+        }
+    }
+    void fetchPreApproved();
+    void fetchQueue();
+    // Accordion Logic
+    const quickPicksHeader = document.getElementById('quickPicksHeader');
+    const quickPicksContent = document.getElementById('quickPicksContent');
+    quickPicksHeader?.classList.add('collapsed');
+    quickPicksHeader?.addEventListener('click', () => {
+        const isCollapsed = quickPicksHeader.classList.contains('collapsed');
+        if (isCollapsed) {
+            quickPicksHeader.classList.remove('collapsed');
+            quickPicksContent?.classList.remove('hidden');
+        }
+        else {
+            quickPicksHeader.classList.add('collapsed');
+            quickPicksContent?.classList.add('hidden');
+        }
+    });
+    setInterval(() => {
+        void fetchQueue();
+    }, 15000);
+    // --- Search Logic ---
+    searchInput?.addEventListener('input', (e) => {
+        if (searchTimeout !== undefined) {
+            clearTimeout(searchTimeout);
+        }
+        const query = e.target instanceof HTMLInputElement ? e.target.value.trim() : '';
+        if (query.length < 2) {
+            searchResults?.classList.add('hidden');
+            return;
+        }
+        searchTimeout = setTimeout(() => {
+            void performSearch(query);
+        }, 400);
+    });
+    document.addEventListener('click', (e) => {
+        const target = e.target instanceof Node ? e.target : null;
+        if (searchInput && searchResults && target && !searchInput.contains(target) && !searchResults.contains(target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
     // --- Global Handlers (attached to window for inline onclick) ---
     window.selectTrackForRequest = (track, isPreApproved = false) => {
         currentSelectedTrack = { ...track, isPreApproved };
-        
-        // Hide search results if open
-        searchResults.classList.add('hidden');
-        searchInput.value = '';
-
-        // Populate Modal
-        selectedTrackDisplay.innerHTML = `
+        searchResults?.classList.add('hidden');
+        if (searchInput instanceof HTMLInputElement) {
+            searchInput.value = '';
+        }
+        if (selectedTrackDisplay) {
+            selectedTrackDisplay.innerHTML = `
             <div class="track-item" style="border: none; padding: 0;">
                 ${track.thumbnail ? `<img class="track-art" src="${track.thumbnail}" alt="Art">` : ''}
                 <div class="track-info">
@@ -187,100 +216,82 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         `;
-
-        // Pre-fill name from localStorage if exists
+        }
         const savedName = localStorage.getItem('djGuestName');
-        if (savedName) document.getElementById('guestName').value = savedName;
-
-        requestModal.classList.remove('hidden');
+        const guestNameInput = document.getElementById('guestName');
+        if (savedName && guestNameInput instanceof HTMLInputElement) {
+            guestNameInput.value = savedName;
+        }
+        requestModal?.classList.remove('hidden');
     };
-
     window.upvoteTrack = async (id) => {
-        if (votedSongs.includes(id)) return; // Already voted
-
+        if (votedSongs.includes(id))
+            return;
         try {
             const res = await fetch(`/api/dj/queue/${id}/upvote`, { method: 'POST' });
-            if (!res.ok) throw new Error('Failed to upvote');
-            
-            // Save locally
+            if (!res.ok)
+                throw new Error('Failed to upvote');
             votedSongs.push(id);
             localStorage.setItem('djVotedSongs', JSON.stringify(votedSongs));
-            
             showToast('Vote added!', 'success');
-            fetchQueue(); // Refresh UI
-        } catch (err) {
-            showToast(err.message, 'error');
+            void fetchQueue();
+        }
+        catch (err) {
+            showToast(getErrorMessage(err, 'Failed to upvote'), 'error');
         }
     };
-
     // --- Modal & Form Logic ---
-    closeModalBtn.addEventListener('click', () => {
-        requestModal.classList.add('hidden');
+    closeModalBtn?.addEventListener('click', () => {
+        requestModal?.classList.add('hidden');
     });
-
-    requestForm.addEventListener('submit', async (e) => {
+    requestForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const guestName = document.getElementById('guestName').value.trim();
-        const dedication = document.getElementById('dedication').value.trim();
-
-        if (!currentSelectedTrack || !guestName) return;
-
-        // Save name for future requests
+        const guestNameEl = document.getElementById('guestName');
+        const dedicationEl = document.getElementById('dedication');
+        const guestName = guestNameEl instanceof HTMLInputElement ? guestNameEl.value.trim() : '';
+        const dedication = dedicationEl instanceof HTMLInputElement || dedicationEl instanceof HTMLTextAreaElement
+            ? dedicationEl.value.trim()
+            : '';
+        if (!currentSelectedTrack || !guestName)
+            return;
         localStorage.setItem('djGuestName', guestName);
-
         const payload = {
-            id: currentSelectedTrack.id, // Custom iTunes tracks have string IDs
+            id: currentSelectedTrack.id,
             title: currentSelectedTrack.title,
             artist: currentSelectedTrack.artist,
             url: currentSelectedTrack.url,
             requestedBy: guestName,
-            dedication: dedication,
-            status: currentSelectedTrack.isPreApproved ? 'approved' : 'pending' // Pre-approved skip 'pending' state
+            dedication,
+            status: currentSelectedTrack.isPreApproved ? 'approved' : 'pending'
         };
-
         const submitBtn = requestForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending...';
-
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+        }
         try {
             const res = await fetch('/api/dj/request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-
-            if (!res.ok) throw new Error('Failed to submit request');
-
+            if (!res.ok)
+                throw new Error('Failed to submit request');
             showToast(currentSelectedTrack.isPreApproved ? 'Song added to queue!' : 'Request sent to DJ!', 'success');
-            requestModal.classList.add('hidden');
-            requestForm.reset();
-            fetchQueue();
-        } catch (err) {
-            showToast(err.message, 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Send to DJ';
+            requestModal?.classList.add('hidden');
+            if (requestForm instanceof HTMLFormElement) {
+                requestForm.reset();
+            }
+            void fetchQueue();
+        }
+        catch (err) {
+            showToast(getErrorMessage(err, 'Failed to submit request'), 'error');
+        }
+        finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send to DJ';
+            }
         }
     });
-
-    // --- Utils ---
-    function escapeHTML(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    function showToast(message, type = 'success') {
-        toastEl.textContent = message;
-        toastEl.className = `toast ${type}`;
-        
-        setTimeout(() => {
-            toastEl.classList.add('hidden');
-        }, 3000);
-    }
 });

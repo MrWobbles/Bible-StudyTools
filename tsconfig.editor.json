@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "rootDir": "src/editor",
+    "outDir": "assets/js",
+    "types": []
+  },
+  "include": ["src/editor/**/*.ts", "src/types/**/*.d.ts"]
+}
