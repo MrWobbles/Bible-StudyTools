@@ -6,7 +6,7 @@ const {
   deleteLessonPlanRecord,
   upsertNoteRecord,
   deleteNoteRecord
-} = require('../../db');
+} = require('../db');
 const { LESSON_PLANS_SEGMENT, LEGACY_LESSON_PLANS_SEGMENT } = require('../config/env');
 const { requireAuthenticatedAccess } = require('../middleware/auth');
 const { markLegacyLessonPlansRoute } = require('../middleware/legacyRoutes');

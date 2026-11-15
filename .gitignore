@@ -46,3 +46,7 @@ assets/data/Can-I-Trust-the-Bible-Episode-1.mp4
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Python bytecode
+__pycache__/
+*.pyc

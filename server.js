@@ -4,7 +4,7 @@
  */
 
 const { app, startServer, stopServer, paths } = require('./server/app');
-const { closeDB } = require('./db');
+const { closeDB } = require('./server/db');
 
 if (require.main === module) {
   startServer().catch(async (err) => {

@@ -1,280 +1,35 @@
-"use strict";
-// dj-dashboard.ts
-document.addEventListener('DOMContentLoaded', () => {
-    const pendingList = document.getElementById('pendingList');
-    const activeList = document.getElementById('activeList');
-    const historyList = document.getElementById('historyList');
-    const pendingCount = document.getElementById('pendingCount');
-    const activeCount = document.getElementById('activeCount');
-    const historyCount = document.getElementById('historyCount');
-    const showQrBtn = document.getElementById('showQrBtn');
-    const qrModal = document.getElementById('qrModal');
-    const closeQrBtn = document.getElementById('closeQrBtn');
-    const qrcodeContainer = document.getElementById('qrcode');
-    const qrUrlEl = document.getElementById('qrUrl');
-    const toastEl = document.getElementById('toast');
-    function getErrorMessage(err, fallback) {
-        return err instanceof Error && err.message ? err.message : fallback;
-    }
-    function escapeHTML(str) {
-        if (!str)
-            return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-    function showToast(message, isError = false) {
-        if (!toastEl)
-            return;
-        toastEl.textContent = message;
-        toastEl.style.backgroundColor = isError ? 'var(--error)' : 'var(--text-primary)';
-        toastEl.style.color = isError ? '#fff' : 'var(--bg-dark)';
-        toastEl.classList.remove('hidden');
-        setTimeout(() => {
-            toastEl.classList.add('hidden');
-        }, 3000);
-    }
-    function renderTrackCard(track, type) {
-        const hasDedication = Boolean(track.dedication && track.dedication.trim().length > 0);
-        let actionButtons = '';
-        if (type === 'pending') {
-            actionButtons = `
-                <button class="btn btn-block btn-success" onclick="updateStatus('${track.id}', 'approved')"><i class="fas fa-check"></i> Approve</button>
-                <button class="btn btn-block btn-danger" onclick="updateStatus('${track.id}', 'rejected')"><i class="fas fa-times"></i> Reject</button>
-            `;
-        }
-        else if (type === 'active') {
-            const spotifySearchUrl = `https://open.spotify.com/search/${encodeURIComponent(`${track.title} ${track.artist}`)}`;
-            actionButtons = `
-                <a href="${spotifySearchUrl}" target="_blank" class="btn btn-block btn-link" style="background-color: #1DB954; color: white; border: none;"><i class="fab fa-spotify"></i> Spotify</a>
-                <button class="btn btn-block btn-outline" onclick="updateStatus('${track.id}', 'played')"><i class="fas fa-play-circle"></i> Mark Played</button>
-                <button class="btn btn-block btn-danger" onclick="deleteTrack('${track.id}')"><i class="fas fa-trash"></i> Delete</button>
-            `;
-        }
-        else if (type === 'history') {
-            actionButtons = `
-                <button class="btn btn-block btn-outline" onclick="updateStatus('${track.id}', 'approved')"><i class="fas fa-undo"></i> Requeue</button>
-            `;
-        }
-        return `
-            <div class="track-card status-${track.status || 'pending'}">
+function e(){let e=document.getElementById(`showQrBtn`),t=document.getElementById(`qrModal`),n=document.getElementById(`closeQrBtn`),r=document.getElementById(`qrcode`),i=document.getElementById(`qrUrl`),a=!1;e?.addEventListener(`click`,()=>{if(t?.classList.remove(`hidden`),!a){let e=`${window.location.protocol}//${window.location.host}/requests`;i&&(i.textContent=e),r&&(r.innerHTML=``),QRCode.toCanvas(e,{width:300,margin:2,color:{dark:`#000000`,light:`#ffffff`}},(e,t)=>{r&&(e?(r.innerHTML=`<span style="color:red">Failed to generate QR</span>`,console.error(e)):(r.appendChild(t),a=!0))})}}),n?.addEventListener(`click`,()=>{t?.classList.add(`hidden`)}),t?.addEventListener(`click`,e=>{e.target===t&&t.classList.add(`hidden`)})}function t(e){return e?String(e).replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`).replace(/'/g,`&#039;`):``}function n(e,n){let r=!!(e.dedication&&e.dedication.trim().length>0),i=``;return n===`pending`?i=`
+                <button class="btn btn-block btn-success" onclick="updateStatus('${e.id}', 'approved')"><i class="fas fa-check"></i> Approve</button>
+                <button class="btn btn-block btn-danger" onclick="updateStatus('${e.id}', 'rejected')"><i class="fas fa-times"></i> Reject</button>
+            `:n===`active`?i=`
+                <a href="${`https://open.spotify.com/search/${encodeURIComponent(`${e.title} ${e.artist}`)}`}" target="_blank" class="btn btn-block btn-link" style="background-color: #1DB954; color: white; border: none;"><i class="fab fa-spotify"></i> Spotify</a>
+                <button class="btn btn-block btn-outline" onclick="updateStatus('${e.id}', 'played')"><i class="fas fa-play-circle"></i> Mark Played</button>
+                <button class="btn btn-block btn-danger" onclick="deleteTrack('${e.id}')"><i class="fas fa-trash"></i> Delete</button>
+            `:n===`history`&&(i=`
+                <button class="btn btn-block btn-outline" onclick="updateStatus('${e.id}', 'approved')"><i class="fas fa-undo"></i> Requeue</button>
+            `),`
+            <div class="track-card status-${e.status||`pending`}">
                 <div class="track-header">
                     <div class="track-info">
-                        <div class="track-title">${escapeHTML(track.title)}</div>
-                        <div class="track-artist">${escapeHTML(track.artist)}</div>
+                        <div class="track-title">${t(e.title)}</div>
+                        <div class="track-artist">${t(e.artist)}</div>
                     </div>
-                    ${type === 'active' ? `<div class="track-votes"><i class="fas fa-arrow-up"></i> ${track.votes || 0}</div>` : ''}
-                    ${track.status === 'rejected' ? '<div class="badge" style="background:var(--error);color:black;">Rejected</div>' : ''}
+                    ${n===`active`?`<div class="track-votes"><i class="fas fa-arrow-up"></i> ${e.votes||0}</div>`:``}
+                    ${e.status===`rejected`?`<div class="badge" style="background:var(--error);color:black;">Rejected</div>`:``}
                 </div>
                 
                 <div class="track-meta-row">
-                    <div><i class="fas fa-user"></i> <strong>Req by:</strong> ${escapeHTML(track.requestedBy || 'Guest')}</div>
-                    ${hasDedication ? `
+                    <div><i class="fas fa-user"></i> <strong>Req by:</strong> ${t(e.requestedBy||`Guest`)}</div>
+                    ${r?`
                         <div class="dedication-box">
-                            <i class="fas fa-comment-dots"></i> "${escapeHTML(track.dedication)}"
+                            <i class="fas fa-comment-dots"></i> "${t(e.dedication)}"
                         </div>
-                    ` : ''}
+                    `:``}
                 </div>
 
                 <div class="track-actions">
-                    ${actionButtons}
+                    ${i}
                 </div>
             </div>
-        `;
-    }
-    function renderDashboard(queue) {
-        if (!Array.isArray(queue))
-            return;
-        const tracks = queue;
-        const pending = tracks.filter((q) => q.status === 'pending');
-        const active = tracks.filter((q) => q.status === 'approved').sort((a, b) => (b.votes || 0) - (a.votes || 0));
-        const history = tracks.filter((q) => q.status === 'played' || q.status === 'rejected').reverse();
-        if (pendingCount)
-            pendingCount.textContent = String(pending.length);
-        if (activeCount)
-            activeCount.textContent = String(active.length);
-        if (historyCount)
-            historyCount.textContent = String(history.length);
-        if (pendingList) {
-            pendingList.innerHTML = pending.length
-                ? pending.map((track) => renderTrackCard(track, 'pending')).join('')
-                : '<div class="loading">No pending requests</div>';
-        }
-        if (activeList) {
-            activeList.innerHTML = active.length
-                ? active.map((track) => renderTrackCard(track, 'active')).join('')
-                : '<div class="loading">Queue is empty</div>';
-        }
-        if (historyList) {
-            historyList.innerHTML = history.length
-                ? history.map((track) => renderTrackCard(track, 'history')).join('')
-                : '<div class="loading">No history</div>';
-        }
-    }
-    async function fetchQueue() {
-        try {
-            const res = await fetch('/api/dj/queue');
-            const data = await res.json();
-            renderDashboard(data);
-        }
-        catch (err) {
-            console.error('Failed to fetch queue', err);
-            showToast('Connection error. Retrying...', true);
-        }
-    }
-    void fetchQueue();
-    setInterval(() => {
-        void fetchQueue();
-    }, 5000);
-    window.updateStatus = async (id, status) => {
-        try {
-            const res = await fetch(`/api/dj/queue/${id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
-            });
-            if (!res.ok)
-                throw new Error('Update failed');
-            void fetchQueue();
-        }
-        catch (err) {
-            showToast(getErrorMessage(err, 'Update failed'), true);
-        }
-    };
-    window.deleteTrack = async (id) => {
-        if (!confirm('Are you sure you want to permanently delete this request?'))
-            return;
-        try {
-            const res = await fetch(`/api/dj/queue/${id}`, { method: 'DELETE' });
-            if (!res.ok)
-                throw new Error('Delete failed');
-            void fetchQueue();
-        }
-        catch (err) {
-            showToast(getErrorMessage(err, 'Delete failed'), true);
-        }
-    };
-    // --- File Upload Logic ---
-    const uploadPicksBtn = document.getElementById('uploadPicksBtn');
-    const uploadModal = document.getElementById('uploadModal');
-    const closeUploadBtn = document.getElementById('closeUploadBtn');
-    const picksFileInput = document.getElementById('picksFileInput');
-    const processUploadBtn = document.getElementById('processUploadBtn');
-    const uploadProgress = document.getElementById('uploadProgress');
-    uploadPicksBtn?.addEventListener('click', () => {
-        uploadModal?.classList.remove('hidden');
-        if (picksFileInput instanceof HTMLInputElement) {
-            picksFileInput.value = '';
-        }
-        uploadProgress?.classList.add('hidden');
-    });
-    closeUploadBtn?.addEventListener('click', () => {
-        uploadModal?.classList.add('hidden');
-    });
-    uploadModal?.addEventListener('click', (e) => {
-        if (e.target === uploadModal)
-            uploadModal.classList.add('hidden');
-    });
-    processUploadBtn?.addEventListener('click', async () => {
-        const file = picksFileInput instanceof HTMLInputElement ? picksFileInput.files?.[0] : undefined;
-        if (!file) {
-            showToast('Please select a file first.', true);
-            return;
-        }
-        if (processUploadBtn instanceof HTMLButtonElement) {
-            processUploadBtn.disabled = true;
-        }
-        try {
-            const text = await file.text();
-            const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-            if (lines.length === 0)
-                throw new Error('File is empty.');
-            uploadProgress?.classList.remove('hidden');
-            const resolvedTracks = [];
-            for (let i = 0; i < lines.length; i++) {
-                const query = lines[i];
-                if (uploadProgress) {
-                    uploadProgress.textContent = `Resolving track ${i + 1} of ${lines.length}...`;
-                }
-                try {
-                    const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
-                    if (res.ok) {
-                        const data = (await res.json());
-                        if (data.results && data.results.length > 0) {
-                            resolvedTracks.push(data.results[0]);
-                        }
-                    }
-                }
-                catch {
-                    console.warn('Failed to resolve:', query);
-                }
-                // Slight delay to be nice to iTunes API
-                await new Promise((r) => setTimeout(r, 200));
-            }
-            if (uploadProgress) {
-                uploadProgress.textContent = 'Saving to database...';
-            }
-            const saveRes = await fetch('/api/dj/pre-approved', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ list: resolvedTracks })
-            });
-            if (!saveRes.ok)
-                throw new Error('Failed to save pre-approved list.');
-            showToast(`Successfully updated Quick Picks with ${resolvedTracks.length} tracks!`);
-            uploadModal?.classList.add('hidden');
-        }
-        catch (err) {
-            showToast(getErrorMessage(err, 'Failed to process upload'), true);
-        }
-        finally {
-            if (processUploadBtn instanceof HTMLButtonElement) {
-                processUploadBtn.disabled = false;
-            }
-        }
-    });
-    // --- QR Code Logic ---
-    let qrGenerated = false;
-    showQrBtn?.addEventListener('click', () => {
-        qrModal?.classList.remove('hidden');
-        if (!qrGenerated) {
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const fullUrl = `${protocol}//${host}/requests`;
-            if (qrUrlEl)
-                qrUrlEl.textContent = fullUrl;
-            if (qrcodeContainer)
-                qrcodeContainer.innerHTML = '';
-            QRCode.toCanvas(fullUrl, {
-                width: 300,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, (err, canvas) => {
-                if (!qrcodeContainer)
-                    return;
-                if (err) {
-                    qrcodeContainer.innerHTML = '<span style="color:red">Failed to generate QR</span>';
-                    console.error(err);
-                }
-                else {
-                    qrcodeContainer.appendChild(canvas);
-                    qrGenerated = true;
-                }
-            });
-        }
-    });
-    closeQrBtn?.addEventListener('click', () => {
-        qrModal?.classList.add('hidden');
-    });
-    qrModal?.addEventListener('click', (e) => {
-        if (e.target === qrModal) {
-            qrModal.classList.add('hidden');
-        }
-    });
-});
+        `}function r(e,t){if(!Array.isArray(e))return;let r=e,i=r.filter(e=>e.status===`pending`),a=r.filter(e=>e.status===`approved`).sort((e,t)=>(t.votes||0)-(e.votes||0)),o=r.filter(e=>e.status===`played`||e.status===`rejected`).reverse();t.pendingCount&&(t.pendingCount.textContent=String(i.length)),t.activeCount&&(t.activeCount.textContent=String(a.length)),t.historyCount&&(t.historyCount.textContent=String(o.length)),t.pendingList&&(t.pendingList.innerHTML=i.length?i.map(e=>n(e,`pending`)).join(``):`<div class="loading">No pending requests</div>`),t.activeList&&(t.activeList.innerHTML=a.length?a.map(e=>n(e,`active`)).join(``):`<div class="loading">Queue is empty</div>`),t.historyList&&(t.historyList.innerHTML=o.length?o.map(e=>n(e,`history`)).join(``):`<div class="loading">No history</div>`)}function i(e,t){return e instanceof Error&&e.message?e.message:t}function a(e){let t=document.getElementById(`uploadPicksBtn`),n=document.getElementById(`uploadModal`),r=document.getElementById(`closeUploadBtn`),a=document.getElementById(`picksFileInput`),o=document.getElementById(`processUploadBtn`),s=document.getElementById(`uploadProgress`);t?.addEventListener(`click`,()=>{n?.classList.remove(`hidden`),a instanceof HTMLInputElement&&(a.value=``),s?.classList.add(`hidden`)}),r?.addEventListener(`click`,()=>{n?.classList.add(`hidden`)}),n?.addEventListener(`click`,e=>{e.target===n&&n.classList.add(`hidden`)}),o?.addEventListener(`click`,async()=>{let t=a instanceof HTMLInputElement?a.files?.[0]:void 0;if(!t)e(`Please select a file first.`,!0);else{o instanceof HTMLButtonElement&&(o.disabled=!0);try{let r=(await t.text()).split(`
+`).map(e=>e.trim()).filter(e=>e.length>0);if(r.length===0)throw Error(`File is empty.`);s?.classList.remove(`hidden`);let i=[];for(let e=0;e<r.length;e++){let t=r[e];s&&(s.textContent=`Resolving track ${e+1} of ${r.length}...`);try{let e=await fetch(`/api/music/search?q=${encodeURIComponent(t)}`);if(e.ok){let t=await e.json();t.results&&t.results.length>0&&i.push(t.results[0])}}catch{console.warn(`Failed to resolve:`,t)}await new Promise(e=>setTimeout(e,200))}if(s&&(s.textContent=`Saving to database...`),!(await fetch(`/api/dj/pre-approved`,{method:`POST`,headers:{"Content-Type":`application/json`},body:JSON.stringify({list:i})})).ok)throw Error(`Failed to save pre-approved list.`);e(`Successfully updated Quick Picks with ${i.length} tracks!`),n?.classList.add(`hidden`)}catch(t){e(i(t,`Failed to process upload`),!0)}finally{o instanceof HTMLButtonElement&&(o.disabled=!1)}}})}function o(e,t){return e instanceof Error&&e.message?e.message:t}document.addEventListener(`DOMContentLoaded`,()=>{let t=document.getElementById(`pendingList`),n=document.getElementById(`activeList`),i=document.getElementById(`historyList`),s=document.getElementById(`pendingCount`),c=document.getElementById(`activeCount`),l=document.getElementById(`historyCount`),u=document.getElementById(`toast`);function d(e,t=!1){u&&(u.textContent=e,u.style.backgroundColor=t?`var(--error)`:`var(--text-primary)`,u.style.color=t?`#fff`:`var(--bg-dark)`,u.classList.remove(`hidden`),setTimeout(()=>{u.classList.add(`hidden`)},3e3))}async function f(){try{r(await(await fetch(`/api/dj/queue`)).json(),{pendingList:t,activeList:n,historyList:i,pendingCount:s,activeCount:c,historyCount:l})}catch(e){console.error(`Failed to fetch queue`,e),d(`Connection error. Retrying...`,!0)}}f(),setInterval(()=>{f()},5e3),window.updateStatus=async(e,t)=>{try{if(!(await fetch(`/api/dj/queue/${e}/status`,{method:`PUT`,headers:{"Content-Type":`application/json`},body:JSON.stringify({status:t})})).ok)throw Error(`Update failed`);f()}catch(e){d(o(e,`Update failed`),!0)}},window.deleteTrack=async e=>{if(confirm(`Are you sure you want to permanently delete this request?`))try{if(!(await fetch(`/api/dj/queue/${e}`,{method:`DELETE`})).ok)throw Error(`Delete failed`);f()}catch(e){d(o(e,`Delete failed`),!0)}},a(d),e()});

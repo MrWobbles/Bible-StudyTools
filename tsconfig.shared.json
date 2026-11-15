@@ -5,7 +5,7 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "rootDir": "src/shared",
-    "types": []
+    "types": ["node"]
   },
   "include": ["src/shared/**/*.ts", "src/types/**/*.d.ts"]
 }

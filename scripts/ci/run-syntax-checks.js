@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 
 const filesToCheck = [
   'server.js',
-  'db.js',
+  'server/db/index.js',
   'assets/js/admin.js',
   'assets/js/api.js',
   'assets/js/editor.js',

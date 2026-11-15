@@ -1,5 +1,5 @@
 const express = require('express');
-const { isConnected, loadDoc, saveDoc } = require('../../db');
+const { isConnected, loadDoc, saveDoc } = require('../db');
 const {
   SUPABASE_AUTH_ENABLED,
   DATA_DOC_MAP,

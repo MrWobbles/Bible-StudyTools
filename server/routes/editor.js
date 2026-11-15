@@ -5,7 +5,7 @@ const {
   saveEditorRecordIfRevision,
   listEditorVersions,
   getEditorVersion
-} = require('../../db');
+} = require('../db');
 const { editorSaveSchema, parseBodyWithSchema } = require('../config/schemas');
 const { requireAuthenticatedAccess } = require('../middleware/auth');
 const { getRequestOwnerOptions, sendApiError } = require('../services/httpHelpers');

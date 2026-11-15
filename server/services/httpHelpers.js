@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { isConnected } = require('../../db');
+const { isConnected } = require('../db');
 const {
   ADMIN_TOKEN,
   AUTH_COOKIE_NAME,

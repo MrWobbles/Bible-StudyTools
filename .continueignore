@@ -2,6 +2,8 @@
 assets/js/
 assets/css/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Large media, themes, and binary assets
 assets/audio/

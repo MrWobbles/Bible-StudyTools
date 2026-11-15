@@ -38,7 +38,9 @@ export default defineConfig({
         'js/vbs': resolve(import.meta.dirname, 'src/features/vbs/vbs.ts'),
         'js/vbs-control': resolve(import.meta.dirname, 'src/features/vbs/vbs-control.ts'),
         'js/user-admin': resolve(import.meta.dirname, 'src/features/user-admin/user-admin.ts'),
-        'js/loader': resolve(import.meta.dirname, 'src/features/loader/loader.ts')
+        'js/loader': resolve(import.meta.dirname, 'src/features/loader/loader.ts'),
+        'js/dj-dashboard': resolve(import.meta.dirname, 'src/features/dj-dashboard/dj-dashboard.ts'),
+        'js/requests': resolve(import.meta.dirname, 'src/features/requests/requests.ts')
       },
       output: {
         entryFileNames: (chunkInfo) => {

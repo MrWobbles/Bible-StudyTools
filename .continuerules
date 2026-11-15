@@ -1,0 +1,36 @@
+# Bible Study Tools — AI & Small-Context Working Rules
+
+## Core Rules
+- **Never edit compiled outputs** in `assets/js/` or `assets/css/`. Edit source files under `src/` and rebuild.
+- **Keep files small (<250 lines)** and single-purpose so they fit comfortably in small local-AI context windows.
+- **Verify changes** with `npm run typecheck` and `npm run build` (plus `npm run check:syntax` or `npm run test:unit` when touching shared/server code).
+
+## Where Things Live
+- `*.html` (root): Page entrypoints (`index`, `teacher`, `student`, `editor`, `admin`, `user-admin`, `teleprompter`, `vbs`, `vbs-control`, `dj-dashboard`, `requests`, `auth`, `settings`, `speech-test`). Keep inline `<style>` and `<script>` out of HTML; load built assets from `assets/css/` and `assets/js/`.
+- `src/features/<name>/`: Page-specific TypeScript modules (`admin`, `dj-dashboard`, `loader`, `requests`, `student`, `teacher`, `teleprompter`, `user-admin`, `vbs`).
+- `src/editor/`: TipTap rich-text editor (`extensions/`, `services/`, `ui/`, entry `editor.ts`).
+- `src/shared/`: Cross-page utilities (`api/`, `auth/`, `theme/`, `ui/`, `ai/`).
+- `src/scss/`: Modular Sass (`abstracts/`, `base/`, `components/`, `layouts/`, `vendor/`).
+- `src/types/`: Ambient TypeScript declarations (`global.d.ts`, `study.d.ts`).
+- `server.js` & `server/`: Express backend (`config/`, `db/`, `middleware/`, `routes/`, `services/`).
+
+## SCSS Guidelines (`src/scss/`)
+- Top-level entries (`admin.scss`, `editor.scss`, `student.scss`, `teacher.scss`, `vbs.scss`, `vbs-control.scss`) are wired in `vite.config.mts` and emit `assets/css/<name>.css`.
+- Place page-specific layout rules in `src/scss/layouts/_<page>.scss` and reusable UI in `src/scss/components/`.
+- Use theme CSS custom properties (`--bg-page`, `--bg-surface-primary`, `--text-primary`, `--accent-color`, `--border-subtle`, etc.) instead of hardcoded colors so all 5 themes (`dark`, `light`, `sepia`, `night`, `vivid`) stay contrast-safe.
+
+## TypeScript / JS Guidelines (`src/`)
+- **Features & Editor (`src/features/`, `src/editor/`):**
+  - Built as ES modules by `vite.config.mts` (`<script type="module" src="assets/js/<name>.js">`).
+  - Typechecked by `tsconfig.features.json` and `tsconfig.editor.json`.
+  - If HTML uses inline `onclick="..."` handlers (e.g., `dj-dashboard.html`, `requests.html`), attach those functions to `window` and declare them in `src/types/global.d.ts`.
+- **Shared Classic Scripts (`src/shared/`):**
+  - Built as self-contained IIFE/UMD bundles by `scripts/build-shared.mjs` (called by `npm run build`) so classic `<script src="assets/js/...">` tags work without `type="module"`.
+  - Typechecked by `tsconfig.shared.json`.
+  - Preserve global APIs (`window.BSTApi`, `window.BSTPalette`, `window.BSTTheme`, `window.BSTBackground`, `window.BIBLE_STUDY_CONFIG`, etc.) when refactoring.
+  - `src/shared/theme/palette/index.ts` is built as UMD (`export default api`) because `tests/api/palette.test.js` loads `assets/js/palette.js` with Node `require()`.
+
+## Feature Notes
+- **Theme & Dynamic Palette:** `src/shared/theme/palette/` computes WCAG AA colors from background hues; `theme.ts` and `background.ts` coordinate via `window.BSTPalette`.
+- **AI / Outline Generation:** `src/shared/ai/llmService.ts` talks to Ollama; `src/shared/ai/outline/` parses TipTap JSON and optionally enhances via `window.checkOllamaAvailability` / `window.generateOutlineStructure`.
+- **Server & DB:** Always import the database layer from `server/db` (`../db` inside `server/`, `./server/db` from `server.js`). Do not recreate root shims.

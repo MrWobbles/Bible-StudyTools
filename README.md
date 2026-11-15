@@ -15,22 +15,20 @@ Or run directly in your browser using the web version (see [Quick Start](#quick-
 
 ```
 Bible-StudyTools/
-├── index.html              # Student/display view (show on TV/projector)
-├── teacher.html            # Presenter control panel (keep on laptop)
-├── assets/
-│   ├── css/
-│   │   ├── student.css     # Styles for student view
-│   │   └── teacher.css     # Styles for teacher view
-│   ├── js/
-│   │   ├── config.js       # Video and pause point configuration
-│   │   ├── student.js      # Student view functionality
-│   │   └── teacher.js      # Teacher control panel functionality
-│   ├── images/             # Store images here
-│   └── video/              # Store video files here (if needed)
-└── docs/
-    ├── README.md           # Class-specific documentation
-    ├── SERVE.md            # Server setup instructions
-    └── serve.py            # Development server script
+├── *.html                  # Top-level page entrypoints (index, teacher, student, editor, admin, vbs, etc.)
+├── server.js               # Node/Express server entrypoint
+├── src/
+│   ├── editor/             # Rich-text TipTap editor, verse lookup, and outline tools
+│   ├── features/           # Page-specific TypeScript modules (admin, dj-dashboard, loader, requests, student, teacher, teleprompter, user-admin, vbs)
+│   ├── shared/             # Cross-page TypeScript utilities (api, auth, theme, ai, ui) bundled to assets/js/
+│   ├── scss/               # Modular Sass stylesheets compiled to assets/css/
+│   └── types/              # Shared TypeScript ambient declarations
+├── server/                 # Express app, routes, middleware, services, and Supabase/local DB layer (server/db/)
+├── assets/                 # Compiled JS/CSS outputs plus static media, themes, data, and documents
+├── docs/                   # Project guides, setup docs, and planning notes (including plan.agent.md)
+├── scripts/                # Build helpers (build-shared.mjs), CI checks, and Supabase schema scripts
+├── tests/                  # Vitest API/unit tests and Playwright E2E specs
+└── desktop/                # Electron desktop wrapper
 ```
 
 ## Quick Start

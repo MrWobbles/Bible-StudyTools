@@ -1,3 +1,14 @@
+const path = require('path');
+
+function clearServerDbCache() {
+  const serverDbDir = path.join(__dirname, '..', '..', 'server', 'db') + path.sep;
+  for (const cacheKey of Object.keys(require.cache)) {
+    if (cacheKey.startsWith(serverDbDir)) {
+      delete require.cache[cacheKey];
+    }
+  }
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -225,9 +236,9 @@ describe('db Supabase normalized storage behavior', () => {
       }
     };
 
-    dbPath = require.resolve('../../db');
-    delete require.cache[dbPath];
-    dbModule = require('../../db');
+    clearServerDbCache();
+    dbPath = require.resolve('../../server/db');
+    dbModule = require('../../server/db');
   });
 
   afterEach(async () => {
@@ -350,9 +361,8 @@ describe('db Supabase normalized storage behavior', () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     vi.resetModules();
-    const freshDbPath = require.resolve('../../db');
-    delete require.cache[freshDbPath];
-    dbModule = require('../../db');
+    clearServerDbCache();
+    dbModule = require('../../server/db');
 
     const connected = await dbModule.connectDB();
     expect(connected).toBe(false);

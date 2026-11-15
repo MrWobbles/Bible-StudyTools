@@ -2,7 +2,7 @@
  * server/db/versions.js - Compact editor version history storage and retrieval.
  */
 
-const { isSnapshotSeq, getSnapshotSeq, makePatch, rebuildFromRows } = require('../../editor-versions');
+const { isSnapshotSeq, getSnapshotSeq, makePatch, rebuildFromRows } = require('./editor-versions');
 const {
   TABLE_EDITOR_VERSIONS,
   MAX_VERSION_LIST,
