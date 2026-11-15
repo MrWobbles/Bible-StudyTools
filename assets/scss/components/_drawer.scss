@@ -1,0 +1,107 @@
+/* Slide-over media and quick-verse drawer styles. */
+
+//Drawer Shell
+body.page--teacher .media-drawer,
+body.page--teacher .verse-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: min(420px, 92vw);
+  height: 100vh;
+  z-index: 1400;
+  transform: translateX(-100%);
+  transition: transform var(--duration-normal) var(--ease-standard);
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  box-shadow: 10px 0 28px rgba(0, 0, 0, 0.45);
+
+  &.open {
+    transform: translateX(0);
+  }
+}
+
+body.page--teacher .media-drawer-header {
+  position: relative;
+  padding: 16px;
+  padding-right: 80px;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  background: var(--panel-bg);
+}
+
+body.page--teacher #media-close-btn,
+body.page--teacher #verse-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  margin: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+
+  .material-symbols-outlined {
+    font-size: 20px;
+  }
+}
+
+body.page--teacher .media-drawer-body {
+  padding: 12px 16px;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  background: var(--panel-bg);
+}
+
+//Quick Verse Controls
+body.page--teacher .quick-verse-form-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+body.page--teacher .quick-verse-main-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+body.page--teacher .quick-verse-nav-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body.page--teacher .quick-verse-btn {
+  min-height: 40px;
+  width: 100%;
+  justify-content: center;
+}
+
+body.page--teacher .quick-verse-select,
+body.page--teacher .quick-verse-input {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+}
+
+body.page--teacher .quick-verse-select option {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+}
+
+body.page--teacher .quick-verse-btn-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  .material-symbols-outlined {
+    margin: 0 !important;
+  }
+}

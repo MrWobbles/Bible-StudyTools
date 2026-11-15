@@ -1,0 +1,281 @@
+/* Teleprompter stage: points list, scroll view, continuous script, and reading marker. */
+
+//Main Content Area
+.teleprompter {
+  &__container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: var(--space-xl);
+    gap: var(--space-xl);
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+    flex-grow: 1;
+  }
+
+  &__section-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--accent-purple);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: var(--space-lg);
+    border-bottom: 2px solid color-mix(in srgb, var(--accent-purple) 30%, transparent);
+    padding-bottom: var(--space-md);
+  }
+
+  &__points-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxl);
+    flex-grow: 1;
+  }
+
+  &__point {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-xl);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface-secondary);
+    border: 1px solid var(--border-subtle);
+    transition: all var(--duration-normal) var(--ease-standard);
+
+    &.current {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent-purple) 15%, transparent) 0%, color-mix(in srgb, var(--accent-blue) 15%, transparent) 100%);
+      border: 2px solid var(--accent-purple);
+      box-shadow: 0 0 30px color-mix(in srgb, var(--accent-purple) 25%, transparent);
+      padding: var(--space-xxl);
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    &.upcoming {
+      background: var(--bg-surface-primary);
+      border-color: var(--border-strong);
+      opacity: 0.6;
+      transform: scale(0.95);
+    }
+
+    &.current .point-type-badge {
+      align-self: center;
+    }
+
+    &.upcoming .point-text {
+      font-size: 18px;
+    }
+  }
+
+  &__word {
+    display: inline;
+    transition: opacity var(--duration-normal) var(--ease-standard);
+    cursor: default;
+
+    &.read {
+      opacity: 0.35;
+      color: var(--text-muted);
+    }
+  }
+
+  &__upcoming {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  &__scroll-view {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    overflow: hidden;
+
+    .teleprompter__point {
+      padding: var(--space-lg) var(--space-xl);
+      background: var(--bg-surface-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      transition: all var(--duration-normal) var(--ease-standard);
+      font-size: 18px;
+      opacity: 0.4;
+      transform: scale(0.85);
+      line-height: 1.6;
+    }
+
+    .teleprompter__point.scroll-center {
+      font-size: 32px;
+      font-weight: 700;
+      transform: scale(1.25);
+      opacity: 1;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent-purple) 15%, transparent) 0%, color-mix(in srgb, var(--accent-blue) 15%, transparent) 100%);
+      border: 2px solid var(--accent-purple);
+      box-shadow: 0 0 30px color-mix(in srgb, var(--accent-purple) 30%, transparent);
+      padding: var(--space-xl);
+    }
+
+    .teleprompter__point.scroll-near {
+      font-size: 24px;
+      font-weight: 600;
+      transform: scale(1.15);
+      opacity: 0.7;
+    }
+
+    .teleprompter__point.scroll-far {
+      font-size: 16px;
+      font-weight: 400;
+      transform: scale(0.9);
+      opacity: 0.5;
+    }
+
+    .teleprompter__point.scroll-fading {
+      opacity: 0.2;
+    }
+
+    .point-text {
+      font-size: inherit;
+      font-weight: inherit;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .point-type-badge {
+      display: none;
+    }
+  }
+
+  &__scroll-viewport {
+    flex-grow: 1;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__all-points {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 50vh 0;
+    gap: var(--space-md);
+  }
+
+  &__script {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 0 70vh;
+    font-size: 40px;
+    line-height: 1.5;
+  }
+
+  &__line {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text-primary);
+    opacity: 0.55;
+    transition: opacity var(--duration-normal) var(--ease-standard);
+
+    &.current {
+      opacity: 1;
+    }
+
+    &--image {
+      position: relative;
+      height: 100px;
+      margin: 1em 0;
+    }
+
+    &--heading {
+      font-size: 1.1em;
+      color: var(--accent-purple);
+    }
+  }
+
+  &__link {
+    color: var(--accent-blue);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  &__marker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 30%;
+    height: 0;
+    border-top: 2px solid var(--accent-purple);
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 5;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: -8px;
+      border-left: 12px solid var(--accent-purple);
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+    }
+  }
+}
+
+//Image Line Descendants
+.teleprompter__line--image img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  left: -50px;
+}
+
+.teleprompter__line--image::after {
+  content: '';
+  position: absolute;
+  left: -15px;
+  top: 50%;
+  width: 10px;
+  height: 2px;
+  background-color: var(--accent-purple);
+  opacity: 0.5;
+}
+
+//Teleprompter Point Typography
+.page--teleprompter .point-type-badge {
+  display: inline-block;
+  padding: var(--space-xs) var(--space-md);
+  background: color-mix(in srgb, var(--accent-purple) 20%, transparent);
+  border: 1px solid var(--accent-purple);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-purple);
+  width: fit-content;
+}
+
+.page--teleprompter .point-text {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+  word-wrap: break-word;
+}

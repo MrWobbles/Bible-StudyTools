@@ -1,0 +1,140 @@
+/* Editor focus mode and light/sepia theme overrides. */
+
+//Editor Light & Sepia Overrides
+html:is([data-theme='light'], [data-theme='sepia']) body.page--editor {
+  .save-status.saved {
+    color: var(--status-success);
+  }
+
+  .save-status.error {
+    color: var(--status-error);
+  }
+
+  .save-status.warning {
+    color: var(--status-warning);
+  }
+
+  .editor {
+    background: var(--bg-surface-elevated);
+  }
+
+  .prose,
+  .prose p,
+  .prose li,
+  .prose strong,
+  .prose em,
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4,
+  .prose h5,
+  .prose h6,
+  .tiptap,
+  .tiptap p,
+  .tiptap li,
+  .tiptap h1,
+  .tiptap h2,
+  .tiptap h3,
+  .tiptap h4,
+  .tiptap h5,
+  .tiptap h6 {
+    color: var(--text-primary);
+  }
+
+  .prose [style*='color: rgb(248, 249, 250)'],
+  .prose [style*='color: rgb(249, 250, 251)'],
+  .prose [style*='color: rgb(255, 255, 255)'],
+  .prose [style*='color: #f8f9fa'],
+  .prose [style*='color: #f9fafb'],
+  .prose [style*='color:#f9fafb'],
+  .prose [style*='color:#f8f9fa'],
+  .prose [style*='color: #ffffff'],
+  .prose [style*='color:#ffffff'],
+  .prose [style*='color: #fff'],
+  .prose [style*='color:#fff'],
+  .prose [style*='color: white'],
+  .prose [style*='color:white'],
+  .tiptap [style*='color: rgb(248, 249, 250)'],
+  .tiptap [style*='color: rgb(249, 250, 251)'],
+  .tiptap [style*='color: rgb(255, 255, 255)'],
+  .tiptap [style*='color: #f8f9fa'],
+  .tiptap [style*='color: #f9fafb'],
+  .tiptap [style*='color:#f9fafb'],
+  .tiptap [style*='color:#f8f9fa'],
+  .tiptap [style*='color: #ffffff'],
+  .tiptap [style*='color:#ffffff'],
+  .tiptap [style*='color: #fff'],
+  .tiptap [style*='color:#fff'],
+  .tiptap [style*='color: white'],
+  .tiptap [style*='color:white'] {
+    color: var(--text-primary) !important;
+  }
+
+  .suggestions,
+  #search-results,
+  #outline-preview {
+    border: 1px solid var(--glass-border);
+    background: var(--bg-surface-elevated);
+  }
+}
+
+//Editor Focus Mode
+body.page--editor.is-focus-mode {
+  overflow: hidden;
+
+  .editor-container {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    padding: 0;
+    margin: 0;
+  }
+
+  .editor-header,
+  .outline-navigator {
+    display: none;
+  }
+
+  .editor-main {
+    grid-template-columns: minmax(0, 1fr);
+    flex: 1;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    gap: 0;
+  }
+
+  .editor-content {
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .editor {
+    max-height: none;
+    padding: clamp(20px, 5vw, 64px);
+  }
+
+  .prose {
+    max-width: none;
+  }
+
+  .focus-mode-hint {
+    display: block;
+    position: fixed;
+    z-index: 101;
+    right: 16px;
+    bottom: 16px;
+    padding: 8px 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: 999px;
+    background: var(--panel-bg);
+    color: var(--text-secondary);
+    font-size: 13px;
+    pointer-events: none;
+  }
+}

@@ -1,0 +1,210 @@
+/* Teacher presenter dashboard layout styles. */
+
+//Teacher Page Shell
+body.page--teacher {
+  padding: 16px 16px 100px;
+
+  .layout {
+    grid-template-columns: 250px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .drawer-toggles {
+    position: sticky;
+    top: 16px;
+    width: 250px;
+    display: grid;
+    gap: 10px;
+    z-index: 1;
+    align-self: start;
+
+    .pill-link {
+      justify-content: center;
+      display: inline-flex;
+      width: 100%;
+    }
+  }
+
+  #question-bank {
+    min-width: 0;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 4px;
+    border: 1px solid var(--glass-border-strong);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .outline-tabs {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .outline-tab.active {
+    border-color: var(--border-accent-blue);
+    box-shadow: var(--shadow-glow-blue);
+  }
+
+  .tab-content {
+    display: none;
+
+    &.active {
+      display: block;
+    }
+  }
+
+  .list,
+  .media-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  #question-bank .list {
+    gap: 0;
+  }
+
+  details.accordion .stop-marker-btn {
+    margin-left: 8px;
+  }
+
+  .list-item,
+  .media-item {
+    border-radius: 4px;
+    border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+    background: var(--glass-surface, rgba(27, 31, 34, 0.78));
+    padding: 12px;
+  }
+
+  .question-notes {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 8px 0;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  .card.notes {
+    margin-top: 18px !important;
+    border: 0;
+    border-top: 1px solid var(--glass-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 16px 0 0;
+  }
+
+  .verse-bar {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 1200;
+    padding: 10px;
+    max-width: 1160px;
+    margin: 0 auto;
+  }
+
+  .controls-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .controls-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--glass-border-strong);
+  }
+
+  @media (max-width: 1280px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+
+    .drawer-toggles {
+      position: static;
+      width: 100%;
+      max-width: 250px;
+      margin-top: 0;
+      z-index: 1;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .drawer-toggles {
+      position: static;
+      width: 100%;
+      max-width: none;
+      margin-top: 10px;
+    }
+  }
+}
+
+//Teacher Light & Sepia Overrides
+html:is([data-theme='light'], [data-theme='sepia']) body.page--teacher {
+  .editor-line-content,
+  .editor-line-content p,
+  .editor-line-content li,
+  .editor-line-content strong,
+  .editor-line-content em,
+  .editor-line-content h1,
+  .editor-line-content h2,
+  .editor-line-content h3,
+  .editor-line-content h4,
+  .editor-line-content h5,
+  .editor-line-content h6,
+  .editor-content-display .qa-pause-title,
+  .editor-content-display .qa-break-content strong {
+    color: var(--text-primary);
+  }
+
+  .editor-line-content [style*='color: rgb(248, 249, 250)'],
+  .editor-line-content [style*='color: rgb(249, 250, 251)'],
+  .editor-line-content [style*='color: rgb(255, 255, 255)'],
+  .editor-line-content [style*='color: #f8f9fa'],
+  .editor-line-content [style*='color:#f8f9fa'],
+  .editor-line-content [style*='color: #f9fafb'],
+  .editor-line-content [style*='color:#f9fafb'],
+  .editor-line-content [style*='color: #ffffff'],
+  .editor-line-content [style*='color:#ffffff'],
+  .editor-line-content [style*='color: #fff'],
+  .editor-line-content [style*='color:#fff'],
+  .editor-line-content [style*='color: white'],
+  .editor-line-content [style*='color:white'] {
+    color: var(--text-primary) !important;
+  }
+
+  .editor-line-content {
+    border-left-color: var(--glass-border-strong);
+  }
+
+  .quick-verse-select,
+  .quick-verse-input {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+  }
+
+  .quick-verse-select option {
+    background: var(--bg-surface-elevated);
+    color: var(--text-primary);
+  }
+}

@@ -1,0 +1,42 @@
+/* Modal overlay, dialog container, header, body, and footer styles. */
+
+//Modal Overlay
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  padding: var(--space-xl);
+  background: var(--modal-overlay);
+  z-index: 3000;
+
+  &.is-open {
+    display: grid;
+  }
+}
+
+//Modal Content
+.modal-content {
+  width: min(860px, 100%);
+  max-height: 92vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--modal-surface);
+}
+
+.modal-body {
+  overflow: auto;
+}
+
+.modal-header,
+.modal-footer,
+.panel-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+}
+
+.modal-footer {
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  border-bottom: 0;
+}

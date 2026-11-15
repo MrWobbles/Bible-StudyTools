@@ -1,0 +1,106 @@
+/* Q&A pause and break marker component styles. */
+
+//Editor Q&A Pause Marker
+body.page--editor .qa-pause-marker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent-text);
+  border-left: 4px solid var(--accent-text);
+  border-radius: 12px;
+  background: var(--accent-tint);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--accent-tint-strong);
+  }
+}
+
+body.page--editor .qa-pause-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--on-accent);
+  background: var(--accent-color);
+  flex: 0 0 auto;
+}
+
+body.page--editor .qa-pause-content {
+  min-width: 0;
+}
+
+body.page--editor .qa-pause-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+body.page--editor .qa-pause-subtitle {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+//Teacher Notes Q&A Markers
+body.page--teacher .editor-content-display .qa-pause-marker,
+body.page--teacher .editor-content-display .qa-break-marker {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-amber) 55%, transparent);
+  border-left: 4px solid var(--accent-text);
+  background: color-mix(in srgb, var(--accent-amber) 14%, transparent);
+
+  &:hover {
+    background: color-mix(in srgb, var(--accent-amber) 20%, transparent);
+  }
+}
+
+body.page--teacher .editor-content-display .qa-pause-marker {
+  cursor: pointer;
+}
+
+body.page--teacher .editor-content-display .qa-pause-title,
+body.page--teacher .editor-content-display .qa-break-content strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+body.page--teacher .editor-content-display .qa-pause-subtitle,
+body.page--teacher .editor-content-display .qa-break-content p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+body.page--teacher .editor-content-display .qa-break-marker {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+body.page--teacher .editor-content-display .qa-break-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent-amber) 28%, transparent);
+  color: var(--text-primary);
+  flex: 0 0 auto;
+}
+
+body.page--teacher .editor-content-display .qa-break-content {
+  min-width: 0;
+}
+
+body.page--teacher .editor-content-display .qa-break-btn {
+  margin-top: 8px;
+}

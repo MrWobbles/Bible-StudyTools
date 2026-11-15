@@ -1,0 +1,48 @@
+/* Collapsible details.accordion component styles. */
+
+//Accordion
+details.accordion {
+  border: 0;
+  border-top: 1px solid rgba(55, 65, 81, 0.5);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  padding: 10px 0;
+
+  &:first-of-type {
+    border-top: 0;
+  }
+
+  &[open] summary::after {
+    content: 'remove';
+  }
+
+  > :not(summary) {
+    margin-top: 8px;
+    padding: 0 0 0 4px;
+  }
+}
+
+//Accordion Summary
+details.accordion summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+  font-size: 16px;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &::after {
+    content: 'add';
+    margin-left: auto;
+    font-family: 'Material Symbols Outlined';
+    font-size: 20px;
+    line-height: 1;
+    color: var(--text-secondary);
+  }
+}

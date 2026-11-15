@@ -1,0 +1,14 @@
+//Mixins
+
+//Responsive Breakpoints
+@mixin up($name) {
+  @media (min-width: map-get($breakpoints, $name)) {
+    @content;
+  }
+}
+
+@mixin down($name) {
+  @media (max-width: map-get($breakpoints, $name)) {
+    @content;
+  }
+}

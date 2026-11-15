@@ -1,0 +1,127 @@
+/* Global reset, document shell, and background layer rules. */
+
+//Box Sizing
+* {
+  box-sizing: border-box;
+}
+
+//Document Root
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+//Body
+body {
+  font-family: $font-sans;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--page-bg, var(--bg-page));
+  position: relative;
+  overflow-x: hidden;
+
+  &::before,
+  &::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  &::before {
+    z-index: -2;
+    background-image:
+      linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)),
+      linear-gradient(145deg, rgba(3, 6, 14, 0.65), rgba(10, 20, 36, 0.55)),
+      var(--bst-bg-image, var(--bst-bg-image, url('../images/nature-background.jpg')));
+    background-size: auto, auto, cover;
+    background-position: center, center, center;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-attachment: fixed;
+  }
+
+  &::after {
+    z-index: -1;
+    background-image:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, transparent 52%),
+      radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.06), transparent 36%);
+    opacity: 0.9;
+  }
+}
+
+//Light & Sepia Background Overrides
+html:is([data-theme='light'], [data-theme='sepia']) body::before {
+  background-image:
+    linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)),
+    var(--bst-bg-image, var(--bst-bg-image, url('../images/nature-background.jpg')));
+  background-size: auto, auto, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed;
+}
+
+html:is([data-theme='light'], [data-theme='sepia']) body::after {
+  opacity: 0.35;
+}
+
+//Background Crossfade Layer
+.bst-bg-fade {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
+  background-image:
+    linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)),
+    linear-gradient(145deg, rgba(3, 6, 14, 0.65), rgba(10, 20, 36, 0.55)),
+    var(--bst-bg-image);
+  background-size: auto, auto, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+
+  &.is-visible {
+    opacity: 1;
+  }
+}
+
+html:is([data-theme='light'], [data-theme='sepia']) .bst-bg-fade {
+  background-image:
+    linear-gradient(to top, var(--bg-overlay), var(--bg-overlay)),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(241, 245, 249, 0.2)),
+    var(--bst-bg-image);
+}
+
+//Theme Color Transition
+html.bst-color-fade *,
+html.bst-color-fade *::before,
+html.bst-color-fade *::after {
+  transition:
+    background-color var(--bst-fade-ms, 0.8s) ease,
+    color var(--bst-fade-ms, 0.8s) ease,
+    border-color var(--bst-fade-ms, 0.8s) ease,
+    box-shadow var(--bst-fade-ms, 0.8s) ease,
+    fill var(--bst-fade-ms, 0.8s) ease,
+    stroke var(--bst-fade-ms, 0.8s) ease !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--bst-fade-ms, 0.8s);
+  animation-timing-function: ease-in-out;
+}
+
+//Reduced Motion
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

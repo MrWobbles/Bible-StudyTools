@@ -1,0 +1,50 @@
+/* Inline media tile chip styles for editor and teacher notes. */
+
+//Editor Media Tile
+body.page--editor .editor-media-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px 2px 0;
+  padding: 3px 9px;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 999px;
+  background: var(--accent-tint);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 0.9em;
+  line-height: 1.4;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--accent-tint-strong);
+  }
+
+  .material-symbols-outlined {
+    font-size: 16px;
+  }
+}
+
+//Teacher Notes Media Tile
+body.page--teacher .editor-line-content .editor-media-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px 2px 0;
+  padding: 2px 9px;
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--text-primary);
+  background: var(--accent-tint);
+  cursor: pointer;
+
+  &:hover,
+  &.mark-active {
+    background: var(--accent-tint-strong);
+  }
+
+  .material-symbols-outlined {
+    font-size: 15px;
+  }
+}

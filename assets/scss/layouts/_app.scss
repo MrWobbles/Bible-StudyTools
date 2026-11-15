@@ -1,0 +1,90 @@
+/* Shared application container, header, and grid layout styles. */
+
+//App Container
+.app {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  padding: var(--space-xl);
+  position: relative;
+  z-index: 1;
+
+  * {
+    min-width: 0;
+  }
+
+  &__header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-lg);
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-xl);
+    border: 1px solid var(--header-border, rgba(255, 255, 255, 0.1));
+    border-radius: var(--radius-lg);
+    background: var(--panel-bg, var(--layer-surface-toolbar));
+    box-shadow: var(--shadow-card-soft);
+  }
+
+  &__layout {
+    margin-top: var(--space-xl);
+    display: grid;
+    gap: var(--space-xl);
+
+    > * {
+      min-width: 0;
+    }
+  }
+}
+
+//Semantic Header & Layout Grids
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-xl);
+  border: 1px solid var(--header-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg, var(--layer-surface-toolbar));
+  box-shadow: var(--shadow-card-soft);
+}
+
+.layout,
+.layout-admin,
+.editor-main {
+  margin-top: var(--space-xl);
+  display: grid;
+  gap: var(--space-xl);
+
+  > * {
+    min-width: 0;
+  }
+}
+
+//Responsive App Shell
+@media (max-width: 1024px) {
+  .app {
+    padding: 12px;
+
+    &__header {
+      padding: 12px;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    &__title {
+      font-size: clamp(22px, 6vw, 32px);
+    }
+  }
+
+  header {
+    padding: 12px;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  h1 {
+    font-size: clamp(22px, 6vw, 32px);
+  }
+}
