@@ -28,12 +28,22 @@ export default defineConfig({
         'css/editor': resolve(import.meta.dirname, 'src/scss/editor.scss'),
         'css/student': resolve(import.meta.dirname, 'src/scss/student.scss'),
         'css/teacher': resolve(import.meta.dirname, 'src/scss/teacher.scss'),
-        'js/editor': resolve(import.meta.dirname, 'src/editor/editor.ts')
+        'css/vbs': resolve(import.meta.dirname, 'src/scss/vbs.scss'),
+        'css/vbs-control': resolve(import.meta.dirname, 'src/scss/vbs-control.scss'),
+        'js/editor': resolve(import.meta.dirname, 'src/editor/editor.ts'),
+        'js/teacher': resolve(import.meta.dirname, 'src/features/teacher/teacher.ts'),
+        'js/admin': resolve(import.meta.dirname, 'src/features/admin/admin.ts'),
+        'js/teleprompter': resolve(import.meta.dirname, 'src/features/teleprompter/teleprompter.ts'),
+        'js/student': resolve(import.meta.dirname, 'src/features/student/student.ts'),
+        'js/vbs': resolve(import.meta.dirname, 'src/features/vbs/vbs.ts'),
+        'js/vbs-control': resolve(import.meta.dirname, 'src/features/vbs/vbs-control.ts'),
+        'js/user-admin': resolve(import.meta.dirname, 'src/features/user-admin/user-admin.ts'),
+        'js/loader': resolve(import.meta.dirname, 'src/features/loader/loader.ts')
       },
       output: {
         entryFileNames: (chunkInfo) => {
-          if (chunkInfo.name === 'js/editor') {
-            return 'js/editor.js';
+          if (chunkInfo.name.startsWith('js/')) {
+            return `${chunkInfo.name}.js`;
           }
           return '.vite-stubs/[name].js';
         },

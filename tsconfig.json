@@ -2,6 +2,8 @@
   "files": [],
   "references": [
     { "path": "./tsconfig.scripts.json" },
-    { "path": "./tsconfig.editor.json" }
+    { "path": "./tsconfig.editor.json" },
+    { "path": "./tsconfig.features.json" },
+    { "path": "./tsconfig.shared.json" }
   ]
 }

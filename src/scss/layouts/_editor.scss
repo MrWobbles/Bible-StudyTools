@@ -213,6 +213,13 @@ body.page--editor {
     margin-bottom: 8px;
   }
 
+  .CodeMirror {
+    height: 100%;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 14px;
+    flex: 1;
+  }
+
   @media (max-width: 1100px) {
     .editor-main {
       grid-template-columns: 1fr;

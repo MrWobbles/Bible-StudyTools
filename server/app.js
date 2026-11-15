@@ -11,7 +11,7 @@ const {
   remoteWriteRateLimit
 } = require('./middleware/auditAndRateLimit');
 const errorHandler = require('./middleware/errorHandler');
-const { ensureBootstrapAdminAccount } = require('./services/supabaseAdmin');
+const { ensureBootstrapAdminAccount } = require('./services/supabaseUsers');
 
 const editorRoutes = require('./routes/editor');
 const dataRoutes = require('./routes/data');

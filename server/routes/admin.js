@@ -7,15 +7,17 @@ const { requireAdminAccess } = require('../middleware/auth');
 const { supabaseServiceClient } = require('../services/supabaseClient');
 const {
   listSignupRequests,
-  listAllUserProfiles,
   findSignupRequestById,
   createInviteRecord,
-  updateSignupRequestApproval,
+  updateSignupRequestApproval
+} = require('../services/supabaseInvitesAndRequests');
+const {
+  listAllUserProfiles,
   findUserProfileByIdentifier,
   updateSupabaseAuthUser,
   deleteSupabaseAuthUser,
   deleteUserProfileRecord
-} = require('../services/supabaseAdmin');
+} = require('../services/supabaseUsers');
 
 const router = express.Router();
 

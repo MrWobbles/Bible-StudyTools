@@ -20,13 +20,15 @@ const {
 } = require('../services/supabaseAuth');
 const {
   findInviteRecord,
-  findExistingUserProfile,
-  createSupabaseAuthUser,
-  upsertUserProfileRecord,
   markInviteUsed,
   saveSignupRequestToDatabase,
   sendSignupRequestNotification
-} = require('../services/supabaseAdmin');
+} = require('../services/supabaseInvitesAndRequests');
+const {
+  findExistingUserProfile,
+  createSupabaseAuthUser,
+  upsertUserProfileRecord
+} = require('../services/supabaseUsers');
 
 const router = express.Router();
 

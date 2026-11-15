@@ -3,7 +3,18 @@ assets/js/
 assets/css/
 *.tsbuildinfo
 
-# Desktop build & duplicated resources
+# Large media, themes, and binary assets
+assets/audio/
+assets/data/
+assets/documents/
+assets/images/
+assets/themes/
+assets/vbc/
+assets/video/
+assets/json/design-spec.json
+
+# Desktop build, binaries & duplicated resources
+desktop/bin/
 desktop/dist/
 desktop/build/
 desktop/node_modules/
