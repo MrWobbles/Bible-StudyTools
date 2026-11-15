@@ -21,12 +21,6 @@ import { handleQAPauseClick, updateOutlineNavigator } from './ui/outlinePanel';
 import { initSpeechTimeBox, updateSpeechTime } from './ui/speechTime';
 import { setupEventListeners, updateToolbarActiveStates } from './ui/toolbar';
 
-declare global {
-  interface Window {
-    editor: Editor | null;
-  }
-}
-
 export type { VerseLookupThoughtState } from './types';
 export { pasteClipboardTextIntoEditor } from './services/mediaSidebar';
 export { extractText } from './ui/outlinePanel';
