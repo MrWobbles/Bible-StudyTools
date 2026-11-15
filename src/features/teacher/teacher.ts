@@ -1,4 +1,5 @@
 import { renderTextDrawer, setupTeacherLinkDelegation } from './customDisplay';
+import { openStudentQrModal } from '../shared/studentQrModal';
 import { renderGeneratedOutline } from './editorContent';
 import { renderMediaGallery } from './media';
 import {
@@ -187,6 +188,20 @@ function initializePage(): void {
   const openTeleprompterBtn = document.getElementById('open-teleprompter-btn');
   if (openTeleprompterBtn) {
     openTeleprompterBtn.addEventListener('click', openTeleprompter);
+  }
+
+  const shareQrBtn = document.getElementById('share-student-qr-btn');
+  if (shareQrBtn) {
+    shareQrBtn.addEventListener('click', () => {
+      void openStudentQrModal({
+        classId: teacherState.classId,
+        onShowOnScreen: (url) => {
+          sendCommand('displayMedia', {
+            media: { type: 'qr', url, title: 'Follow Along on Your Screen' }
+          });
+        }
+      });
+    });
   }
 
   if (teacherState.statusEl) {

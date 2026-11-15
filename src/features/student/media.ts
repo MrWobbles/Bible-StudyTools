@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import { onPlayerReady, onPlayerStateChange } from './player';
 import { escapeHtml, isInIframe, setPlayer, studentState } from './state';
 import type { StudentMediaItem, VideoInfo } from './types';
@@ -174,6 +175,9 @@ export function handlePendingMedia(): void {
   } else if (media.type === 'text') {
     studentState.pendingMedia = null;
     renderTextMedia(media);
+  } else if (media.type === 'qr') {
+    studentState.pendingMedia = null;
+    void renderQrMedia(media);
   }
 }
 
@@ -186,6 +190,44 @@ function getMediaSourceUrl(media: StudentMediaItem): string {
     if (typeof first?.path === 'string' && first.path.trim()) return first.path.trim();
   }
   return '';
+}
+
+async function renderQrMedia(media: StudentMediaItem): Promise<void> {
+  const playerDiv = document.querySelector('.player-shell');
+  if (!playerDiv) return;
+
+  const targetUrl =
+    getMediaSourceUrl(media) ||
+    `${window.location.origin}/student.html?class=${encodeURIComponent(
+      new URLSearchParams(window.location.search).get('class') || '1'
+    )}`;
+
+  destroyActivePlayer();
+
+  const safeTitle = escapeHtml(media.title || 'Follow Along on Your Screen');
+  const safeUrl = escapeHtml(targetUrl);
+
+  let qrDataUrl = '';
+  try {
+    qrDataUrl = await QRCode.toDataURL(targetUrl, {
+      width: 360,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+  } catch (err) {
+    console.error('[Student] Failed to generate QR code:', err);
+  }
+
+  playerDiv.innerHTML = `
+    <div class="qr-frame" style="padding:48px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:24px;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);text-align:center;">
+      <h1 style="margin:0;color:#fff;font-size:clamp(28px,4vw,48px);font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,0.35);">${safeTitle}</h1>
+      <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" title="Click to open Student Screen" style="position:relative;display:inline-flex;flex-direction:column;align-items:center;padding:20px;background:#fff;border-radius:20px;text-decoration:none;box-shadow:0 20px 50px rgba(0,0,0,0.45);">
+        ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR code to open the student screen" style="display:block;width:min(320px,45vh);height:min(320px,45vh);border-radius:8px;" />` : ''}
+        <span style="margin-top:12px;padding:6px 16px;border-radius:999px;background:#0f172a;color:#fff;font-size:16px;font-weight:600;">Click QR or Scan to Open &nearr;</span>
+      </a>
+      <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--brand,#f0b429);font-size:clamp(16px,2vw,24px);font-weight:600;word-break:break-all;text-decoration:underline;">${safeUrl}</a>
+    </div>
+  `;
 }
 
 function renderQuestionMedia(media: StudentMediaItem): void {

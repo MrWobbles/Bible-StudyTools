@@ -1,3 +1,4 @@
+import { openStudentQrModal } from '../shared/studentQrModal';
 import {
   clearDisplay,
   sendDisplayMessage,
@@ -88,6 +89,17 @@ export function setupControls(): void {
   resetBtn?.addEventListener('click', () => advanceToPoint(0));
   document.getElementById('open-display')?.addEventListener('click', () => {
     window.open(`student.html?class=${state.classId}`, 'display-screen', 'width=1280,height=720');
+  });
+  document.getElementById('share-student-qr')?.addEventListener('click', () => {
+    void openStudentQrModal({
+      classId: state.classId,
+      onShowOnScreen: (url) => {
+        sendDisplayMessage({
+          type: 'displayMedia',
+          media: { type: 'qr', url, title: 'Follow Along on Your Screen' }
+        });
+      }
+    });
   });
   document.getElementById('clear-display')?.addEventListener('click', clearDisplay);
   closeBtn?.addEventListener('click', () => {

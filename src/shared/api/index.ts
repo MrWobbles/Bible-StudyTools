@@ -34,6 +34,7 @@ import {
   setAdminToken,
   setAuthSession,
 } from './client';
+import { sendDisplayCommand } from './display';
 import {
   getEditorDocument,
   getEditorVersion,
@@ -51,6 +52,7 @@ window.BSTApi = {
   getEditorDocument,
   saveEditorDocument,
   uploadImageToDrive,
+  sendDisplayCommand,
   listEditorVersions,
   getEditorVersion,
   deleteSupabaseClass,

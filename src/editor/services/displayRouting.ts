@@ -132,6 +132,8 @@ export async function sendEditorLinkToDisplay(
     console.warn('Failed to write display link fallback:', err);
   }
 
+  void window.BSTApi?.sendDisplayCommand(getDisplayChannelName(), message);
+
   return !!channel;
 }
 

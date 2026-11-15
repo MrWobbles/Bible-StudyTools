@@ -33,6 +33,7 @@ export function sendCommand(type: string, payload: CommandPayload = {}): void {
   } catch {
     // ignore storage errors
   }
+  void window.BSTApi?.sendDisplayCommand(teacherState.channelKey, message);
   flashStatus(`Sent: ${labelFor(type, payload)}`);
 }
 

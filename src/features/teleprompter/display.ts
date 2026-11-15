@@ -29,19 +29,21 @@ export function getDisplayChannelKey(): string {
 
 export function sendDisplayMessage(message: DisplayMessagePayload): void {
   const payload: DisplayMessagePayload = { ...message, sentAt: Date.now() };
+  const channelKey = getDisplayChannelKey();
   if (!state.displayChannel) {
     if (window.bst?.createBroadcastChannel) {
-      state.displayChannel = window.bst.createBroadcastChannel(getDisplayChannelKey());
+      state.displayChannel = window.bst.createBroadcastChannel(channelKey);
     } else if ('BroadcastChannel' in window) {
-      state.displayChannel = new BroadcastChannel(getDisplayChannelKey());
+      state.displayChannel = new BroadcastChannel(channelKey);
     }
   }
   if (state.displayChannel) state.displayChannel.postMessage(payload);
   try {
-    localStorage.setItem(`${getDisplayChannelKey()}-storage`, JSON.stringify(payload));
+    localStorage.setItem(`${channelKey}-storage`, JSON.stringify(payload));
   } catch {
     /* ignore storage errors */
   }
+  void window.BSTApi?.sendDisplayCommand(channelKey, payload);
 }
 
 export function showImageOnDisplay(point: IndexedOutlinePoint): void {

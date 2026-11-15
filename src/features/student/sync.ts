@@ -5,8 +5,53 @@ import type { RemoteCommandData } from './types';
 import { adjustVerseFont, nextVersePage, previousVersePage } from './verses';
 import { goFullscreen } from './view';
 
+const MAX_RECENT_COMMAND_IDS = 50;
+const recentCommandIds = new Set<string>();
+let displayEventSource: EventSource | null = null;
+let displayReconnectTimer: number | null = null;
+
+function connectDisplayEvents(): void {
+  if (typeof EventSource === 'undefined' || !studentState.channelKey) {
+    return;
+  }
+  if (displayReconnectTimer !== null) {
+    window.clearTimeout(displayReconnectTimer);
+    displayReconnectTimer = null;
+  }
+  if (displayEventSource) {
+    displayEventSource.close();
+    displayEventSource = null;
+  }
+
+  const url = `/api/display/events?channel=${encodeURIComponent(studentState.channelKey)}`;
+  const source = new EventSource(url);
+  displayEventSource = source;
+
+  source.onmessage = (event: MessageEvent<string>) => {
+    try {
+      const data: unknown = JSON.parse(event.data);
+      handleRemoteCommand({ data });
+    } catch (err) {
+      console.warn('[Student] SSE message failed to parse:', err);
+    }
+  };
+
+  source.onerror = () => {
+    source.close();
+    if (displayEventSource === source) {
+      displayEventSource = null;
+    }
+    if (displayReconnectTimer === null) {
+      displayReconnectTimer = window.setTimeout(() => {
+        displayReconnectTimer = null;
+        connectDisplayEvents();
+      }, 3000);
+    }
+  };
+}
+
 /**
- * Connect to the teacher control channel via Electron IPC, BroadcastChannel, and storage fallback.
+ * Connect to the teacher control channel via Electron IPC, BroadcastChannel, storage fallback, and server SSE.
  */
 export function setupControlChannel(): void {
   console.log(
@@ -47,6 +92,8 @@ export function setupControlChannel(): void {
       console.warn('Control message failed to parse', err);
     }
   });
+
+  connectDisplayEvents();
 }
 
 function isRemoteCommandData(value: unknown): value is RemoteCommandData {
@@ -75,11 +122,23 @@ export function handleRemoteCommand(event: unknown): void {
   if (!data || !data.type) return;
 
   const commandId = `${data.type}-${String(data.sentAt ?? '')}`;
-  if (commandId === studentState.lastProcessedCommandId) {
+  if (
+    commandId === studentState.lastProcessedCommandId ||
+    (data.sentAt != null && recentCommandIds.has(commandId))
+  ) {
     console.log('[Student] Ignoring duplicate command:', data.type);
     return;
   }
   studentState.lastProcessedCommandId = commandId;
+  if (data.sentAt != null) {
+    recentCommandIds.add(commandId);
+    if (recentCommandIds.size > MAX_RECENT_COMMAND_IDS) {
+      const oldest = recentCommandIds.values().next().value;
+      if (oldest !== undefined) {
+        recentCommandIds.delete(oldest);
+      }
+    }
+  }
 
   console.log('[Student] Received command:', data.type, data);
 

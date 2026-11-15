@@ -29,6 +29,7 @@ interface BSTApiClient {
   getEditorDocument: (docType: string, recordId: string) => Promise<Record<string, unknown>>;
   saveEditorDocument: (docType: string, recordId: string, payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
   uploadImageToDrive: (folderName: string, file: File) => Promise<Record<string, unknown>>;
+  sendDisplayCommand: (channel: string, command: object) => Promise<void>;
   listEditorVersions: (docType: string, recordId: string) => Promise<unknown>;
   getEditorVersion: (docType: string, recordId: string, seq: string | number) => Promise<unknown>;
   deleteSupabaseClass: (classId: string) => Promise<unknown>;
@@ -196,4 +197,16 @@ interface CodeMirrorInstance {
   refresh: () => void;
   toTextArea: () => void;
   on: (event: string, handler: () => void) => void;
+}
+
+declare module 'qrcode' {
+  export interface QRCodeToDataURLOptions {
+    width?: number;
+    margin?: number;
+    color?: {
+      dark?: string;
+      light?: string;
+    };
+  }
+  export function toDataURL(text: string, options?: QRCodeToDataURLOptions): Promise<string>;
 }

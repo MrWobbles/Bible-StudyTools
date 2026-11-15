@@ -21,6 +21,7 @@ const adminRoutes = require('./routes/admin');
 const supabaseRecordsRoutes = require('./routes/supabaseRecords');
 const uploadAndVideoRoutes = require('./routes/uploadAndVideo');
 const vbsRoutes = require('./routes/vbs');
+const displaySyncRoutes = require('./routes/displaySync');
 const djRoutes = require('./routes/dj');
 const staticPagesRoutes = require('./routes/staticPages');
 
@@ -42,6 +43,7 @@ app.use(adminRoutes);
 app.use(supabaseRecordsRoutes);
 app.use(uploadAndVideoRoutes);
 app.use(vbsRoutes);
+app.use(displaySyncRoutes);
 app.use(djRoutes);
 
 // ===== STATIC FILES (must be after API routes) =====
