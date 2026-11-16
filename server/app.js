@@ -1,6 +1,6 @@
 const express = require('express');
 const { exec } = require('child_process');
-const { connectDB, closeDB } = require('../db');
+const { connectDB, closeDB } = require('./db');
 const {
   PORT,
   SHOULD_AUTO_OPEN_BROWSER,
