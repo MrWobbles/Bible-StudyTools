@@ -59,11 +59,37 @@ export function extractYoutubeVideoInfo(value: string): { id: string; start: num
   return { id, start };
 }
 
+function isStudentView(): boolean {
+  const path = window.location.pathname.toLowerCase();
+  return path.endsWith('/student.html') || path.endsWith('/student');
+}
+
+async function fetchPublicStudentClassConfig(): Promise<unknown> {
+  const res = await fetch(`/api/display/class-config?class=${encodeURIComponent(classId)}`);
+  if (!res.ok) {
+    throw new Error(`Failed to load student class config (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function fetchClassConfig(): Promise<ClassConfig | null> {
   if (!window.BSTApi) {
     throw new Error('BSTApi is not loaded');
   }
-  const raw = await window.BSTApi.getClasses();
+  let raw: unknown;
+  const hasAuthToken = Boolean(window.BSTApi.getAccessToken?.() || window.BSTApi.getAdminToken?.());
+  if (isStudentView() && !hasAuthToken && !window.BSTApi.isLoopbackHost?.()) {
+    raw = await fetchPublicStudentClassConfig();
+  } else {
+    try {
+      raw = await window.BSTApi.getClasses();
+    } catch (err) {
+      if (!isStudentView()) {
+        throw err;
+      }
+      raw = await fetchPublicStudentClassConfig();
+    }
+  }
 
   const classesArr: ClassConfig[] = Array.isArray(raw)
     ? raw

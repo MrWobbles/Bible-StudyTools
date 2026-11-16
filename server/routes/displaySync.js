@@ -1,5 +1,8 @@
 const express = require('express');
+const { isConnected, loadDoc } = require('../db');
 const { requireAuthenticatedAccess } = require('../middleware/auth');
+const { sendApiError } = require('../services/httpHelpers');
+const { loadLocalData } = require('../services/localData');
 
 const router = express.Router();
 
@@ -105,6 +108,44 @@ router.post('/api/display/command', requireAuthenticatedAccess, (req, res) => {
 
   const clientsNotified = broadcastToChannel(channel, command);
   return res.json({ success: true, channel, clientsNotified });
+});
+
+router.get('/api/display/class-config', async (req, res) => {
+  try {
+    const requestedClass = String(req.query?.class || '1').trim();
+    const doc = isConnected()
+      ? await loadDoc('classes')
+      : await loadLocalData('classes');
+
+    const classesArr = Array.isArray(doc)
+      ? doc
+      : (doc && Array.isArray(doc.classes) ? doc.classes : []);
+
+    const matched =
+      classesArr.find((c) => String(c?.classNumber ?? '') === requestedClass || String(c?.id ?? '') === requestedClass) ||
+      classesArr[0] ||
+      null;
+
+    if (!matched) {
+      return res.json({ classes: [] });
+    }
+
+    return res.json({
+      classes: [
+        {
+          id: matched.id,
+          classNumber: matched.classNumber,
+          title: matched.title,
+          subtitle: matched.subtitle,
+          instructor: matched.instructor,
+          channelName: matched.channelName,
+          media: Array.isArray(matched.media) ? matched.media : []
+        }
+      ]
+    });
+  } catch (err) {
+    return sendApiError(res, err, 'Failed to load public student class config');
+  }
 });
 
 module.exports = router;

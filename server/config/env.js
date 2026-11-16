@@ -115,7 +115,7 @@ const PUBLIC_HTML_FILES = [
   'speech-test.html'
 ];
 const PUBLIC_ASSET_DIRS = ['css', 'js', 'images', 'audio', 'video', 'documents'];
-const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html', 'vbs.html', 'teleprompter.html', 'speech-test.html']);
+const AUTH_PUBLIC_HTML_FILES = new Set(['auth.html', 'requests.html', 'vbs.html', 'teleprompter.html', 'speech-test.html', 'student.html']);
 const ADMIN_HTML_FILES = new Set(['user-admin.html']);
 
 module.exports = {
