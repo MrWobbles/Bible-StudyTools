@@ -5,6 +5,17 @@ import { fetchVerseText, searchVersesByKeywords } from './verseApi';
 
 export { fetchVerseText };
 
+function buildVerseBlockquoteHtml(
+  reference: string,
+  bodyHtml: string,
+  translationLabel?: string,
+): string {
+  const safeRef = reference.replace(/"/g, '&quot;');
+  const trimmedBody = bodyHtml.trim().startsWith('<p>') ? bodyHtml : `<p>${bodyHtml}</p>`;
+  const transSuffix = translationLabel ? ` (${translationLabel})` : '';
+  return `<blockquote>${trimmedBody}<p style="text-align: right; font-size: 0.9em; color: #666;">— <a href="#" class="verse-reference" data-verse="${safeRef}">${reference}</a>${transSuffix}</p></blockquote>`;
+}
+
 export async function insertVerseReference(): Promise<void> {
   const { editor } = editorState;
   if (!editor) return;
@@ -41,15 +52,11 @@ export async function insertVerseReference(): Promise<void> {
       const verseData = await fetchVerseText(verseInput, translation);
 
       if (verseData && verseData.text) {
-        const bodyHtml = verseData.text.trim().startsWith('<p>')
-          ? verseData.text
-          : `<p>${verseData.text}</p>`;
-        const safeRef = verseData.title.replace(/"/g, '&quot;');
         editor
           .chain()
           .focus()
           .insertContent(
-            `<blockquote>${bodyHtml}<p style="text-align: right; font-size: 0.9em; color: #666;">— <a href="#" class="verse-reference" data-verse="${safeRef}">${verseData.title}</a> (${verseData.translation})</p></blockquote>`,
+            buildVerseBlockquoteHtml(verseData.title, verseData.text, verseData.translation),
           )
           .run();
       } else {
@@ -58,7 +65,10 @@ export async function insertVerseReference(): Promise<void> {
           .chain()
           .focus()
           .insertContent(
-            `<blockquote><p><em>[Verse text not available - please add manually]</em></p><p style="text-align: right; font-size: 0.9em; color: #666;">— <a href="#" class="verse-reference" data-verse="${safeVerseInput}">${verseInput}</a></p></blockquote>`,
+            buildVerseBlockquoteHtml(
+              verseInput,
+              '<p><em>[Verse text not available - please add manually]</em></p>',
+            ),
           )
           .run();
       }
@@ -211,9 +221,27 @@ export async function handleVerseLookupByThought(
   }
   window._verseLookupThoughtResults = { from, to, verses };
 
+  const formatThoughtVerseHtml = async (item: VerseLookupResult): Promise<string> => {
+    try {
+      const fetched = await fetchVerseText(item.reference, translation);
+      if (fetched && fetched.text) {
+        return buildVerseBlockquoteHtml(fetched.title, fetched.text, fetched.translation);
+      }
+    } catch {
+      // Fall back to the search result text below
+    }
+    const verseNumMatch = item.reference.match(/:(\d+)/);
+    const versePrefix = verseNumMatch ? `<sup>${verseNumMatch[1]}</sup> ` : '';
+    return buildVerseBlockquoteHtml(
+      item.reference,
+      `<p>${versePrefix}${item.text}</p>`,
+      translation.toUpperCase(),
+    );
+  };
+
   const insertSelectedBtn = document.getElementById('btn-insert-selected-verses');
   if (insertSelectedBtn) {
-    insertSelectedBtn.onclick = () => {
+    insertSelectedBtn.onclick = async () => {
       const currentEditor = editorState.editor;
       if (!currentEditor) return;
       const data = window._verseLookupThoughtResults;
@@ -228,13 +256,26 @@ export async function handleVerseLookupByThought(
         .map((cb) => data.verses[parseInt(cb.dataset.index || '', 10)])
         .filter((v): v is VerseLookupResult => Boolean(v));
       if (!selected.length) return;
-      const insertText = selected.map((v) => `${v.reference}: ${v.text}`).join('<br>');
-      currentEditor
-        .chain()
-        .focus()
-        .insertContentAt({ from: data.from, to: data.to }, insertText + '<br>')
-        .run();
-      closeModal('verse-lookup-thought-modal');
+
+      const originalBtnHtml = insertSelectedBtn.innerHTML;
+      if (insertSelectedBtn instanceof HTMLButtonElement) {
+        insertSelectedBtn.disabled = true;
+        insertSelectedBtn.textContent = 'Inserting...';
+      }
+      try {
+        const blocks = await Promise.all(selected.map(formatThoughtVerseHtml));
+        currentEditor
+          .chain()
+          .focus()
+          .insertContentAt({ from: data.from, to: data.to }, blocks.join(''))
+          .run();
+        closeModal('verse-lookup-thought-modal');
+      } finally {
+        if (insertSelectedBtn instanceof HTMLButtonElement) {
+          insertSelectedBtn.innerHTML = originalBtnHtml;
+          insertSelectedBtn.disabled = false;
+        }
+      }
     };
   }
 
