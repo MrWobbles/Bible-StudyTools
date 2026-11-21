@@ -50,8 +50,15 @@ router.post('/api/ai/generate', requireAuthenticatedAccess, async (req, res) => 
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       console.error(`Gemini API error (${response.status}): ${detail.slice(0, 300)}`);
+      let upstreamMessage = '';
+      try {
+        const parsed = JSON.parse(detail);
+        upstreamMessage = typeof parsed?.error?.message === 'string' ? parsed.error.message : '';
+      } catch {
+        // ignore non-JSON error body
+      }
       return res.status(response.status === 429 ? 429 : 502).json({
-        error: 'Gemini API request failed',
+        error: upstreamMessage || `Gemini API request failed (${response.status})`,
         upstreamStatus: response.status
       });
     }

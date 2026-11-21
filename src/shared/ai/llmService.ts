@@ -74,7 +74,7 @@
    */
   async function getInstalledModels(): Promise<unknown[]> {
     if (await checkGeminiAvailability()) {
-      return [{ name: geminiModelCache || 'gemini-2.5-flash', size: 0 }];
+      return [{ name: geminiModelCache || 'gemini-3.8-flash', size: 0 }];
     }
     try {
       const response = await fetch(`${LLM_CONFIG.baseUrl}/api/tags`);
