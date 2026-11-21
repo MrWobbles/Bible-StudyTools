@@ -116,6 +116,10 @@ export interface BibleApiSimpleResponse {
   text?: string;
   reference?: string;
   translation_name?: string;
+  verses?: Array<{
+    verse?: number | string;
+    text?: string;
+  }>;
 }
 
 export interface ApiBibleItem {

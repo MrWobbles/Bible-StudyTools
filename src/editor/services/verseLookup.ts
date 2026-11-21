@@ -39,11 +39,14 @@ export async function insertVerseReference(): Promise<void> {
       const verseData = await fetchVerseText(verseInput, translation);
 
       if (verseData && verseData.text) {
+        const bodyHtml = verseData.text.trim().startsWith('<p>')
+          ? verseData.text
+          : `<p>${verseData.text}</p>`;
         editor
           .chain()
           .focus()
           .insertContent(
-            `<blockquote><p><em>${verseData.text}</em></p><p style="text-align: right; font-size: 0.9em; color: #666;">— ${verseData.title} (${verseData.translation})</p></blockquote>`,
+            `<blockquote>${bodyHtml}<p style="text-align: right; font-size: 0.9em; color: #666;">— ${verseData.title} (${verseData.translation})</p></blockquote>`,
           )
           .run();
       } else {

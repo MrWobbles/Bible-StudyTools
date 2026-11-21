@@ -297,6 +297,28 @@ body.page--editor {
   }
 
   .ProseMirror {
+    blockquote {
+      border-left: 3px solid var(--accent-primary, #3b82f6);
+      padding: 6px 14px;
+      margin: 10px 0;
+      background: rgba(148, 163, 184, 0.08);
+      border-radius: 0 8px 8px 0;
+
+      p {
+        margin: 4px 0;
+        line-height: 1.65;
+      }
+    }
+
+    sup {
+      font-size: 0.72em;
+      font-weight: 600;
+      color: var(--text-muted, #64748b);
+      vertical-align: super;
+      line-height: 0;
+      margin-right: 2px;
+    }
+
     .search-match {
       background-color: rgba(250, 204, 21, 0.42);
       border-radius: 2px;

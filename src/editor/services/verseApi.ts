@@ -7,6 +7,95 @@ import type {
   LabsBibleVerseItem,
 } from '../types';
 
+const CHRIST_WORDS_COLOR = '#b91c1c';
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function formatApiBibleHtml(content: string): string {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = content;
+  tempDiv.querySelectorAll('.f, .x').forEach((el) => el.remove());
+
+  const lines: string[] = [];
+  let currentLine = '';
+
+  const flushLine = (): void => {
+    const cleaned = currentLine.replace(/\s+/g, ' ').trim();
+    if (cleaned) {
+      lines.push(`<p>${cleaned}</p>`);
+    }
+    currentLine = '';
+  };
+
+  const renderInline = (node: Node, inChristWords = false): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || '';
+      return escapeHtml(text);
+    }
+    if (!(node instanceof Element)) return '';
+
+    if (node.classList.contains('v')) {
+      const verseNum = (node.getAttribute('data-number') || node.textContent || '').trim();
+      flushLine();
+      return verseNum ? `<sup>${escapeHtml(verseNum)}</sup> ` : '';
+    }
+
+    const isWj = inChristWords || node.classList.contains('wj');
+    const isItalic =
+      node.tagName === 'EM' || node.tagName === 'I' || node.classList.contains('add');
+
+    if (node.tagName === 'BR') {
+      return ' ';
+    }
+
+    let inner = '';
+    node.childNodes.forEach((child) => {
+      inner += renderInline(child, isWj);
+    });
+
+    if (!inner) return '';
+
+    if (node.classList.contains('wj') && !inChristWords) {
+      inner = `<span style="color: ${CHRIST_WORDS_COLOR};">${inner}</span>`;
+    }
+    if (isItalic) {
+      inner = `<em>${inner}</em>`;
+    }
+    if (node.tagName === 'P' || node.tagName === 'DIV') {
+      if (currentLine.trim()) {
+        currentLine += ` ${inner}`;
+      } else {
+        currentLine += inner;
+      }
+      return '';
+    }
+
+    return inner;
+  };
+
+  tempDiv.childNodes.forEach((child) => {
+    const rendered = renderInline(child, false);
+    if (rendered) {
+      currentLine += rendered;
+    }
+  });
+  flushLine();
+
+  if (lines.length > 0) {
+    return lines.join('');
+  }
+
+  const fallbackText = (tempDiv.textContent || '').replace(/\s+/g, ' ').trim();
+  return fallbackText ? `<p>${escapeHtml(fallbackText)}</p>` : '';
+}
+
 async function fetchVerseFromLabs(
   reference: string,
   translation: string,
@@ -21,10 +110,13 @@ async function fetchVerseFromLabs(
     if (!Array.isArray(data) || data.length === 0) return null;
 
     const lines = (data as LabsBibleVerseItem[]).map((item) => {
-      const cleanText = String(item.text || '').replace(/<[^>]*>/g, '');
-      return `<sup>${item.verse}</sup> ${cleanText}`;
+      const cleanText = String(item.text || '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return `<p><sup>${escapeHtml(String(item.verse))}</sup> ${escapeHtml(cleanText)}</p>`;
     });
-    return { title: reference, text: lines.join(' '), translation: version };
+    return { title: reference, text: lines.join(''), translation: version };
   } catch (err: unknown) {
     console.warn('labs.bible.org fetch failed:', err);
     return null;
@@ -42,13 +134,29 @@ async function fetchVerseFromBibleApi(
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = (await res.json()) as BibleApiSimpleResponse;
-    const text = (data.text || '').trim();
-    if (!text) return null;
 
-    const cleanText = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    let formatted = '';
+    if (Array.isArray(data.verses) && data.verses.length > 0) {
+      formatted = data.verses
+        .map((v) => {
+          const cleanText = String(v.text || '').replace(/\s+/g, ' ').trim();
+          const num = v.verse !== undefined ? `<sup>${escapeHtml(String(v.verse))}</sup> ` : '';
+          return cleanText ? `<p>${num}${escapeHtml(cleanText)}</p>` : '';
+        })
+        .filter(Boolean)
+        .join('');
+    }
+
+    if (!formatted) {
+      const text = (data.text || '').trim();
+      if (!text) return null;
+      const cleanText = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+      formatted = `<p>${escapeHtml(cleanText)}</p>`;
+    }
+
     return {
       title: data.reference || reference,
-      text: cleanText,
+      text: formatted,
       translation: (data.translation_name || version).toUpperCase(),
     };
   } catch (err: unknown) {
@@ -121,10 +229,7 @@ export async function fetchVerseText(
             }
           }
           if (passage && passage.content) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = passage.content;
-            tempDiv.querySelectorAll('.f, .x').forEach((el) => el.remove());
-            const text = (tempDiv.textContent || '').replace(/\s+/g, ' ').trim();
+            const text = formatApiBibleHtml(passage.content);
             if (text) {
               return {
                 title: passage.reference || reference,

@@ -14,6 +14,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import Underline from '@tiptap/extension-underline';
 import { QAPauseMarker } from './extensions/qaPauseMarker';
 import { SearchHighlight } from './extensions/searchHighlight';
+import { Superscript } from './extensions/superscript';
 import { handleEditorLinkClick } from './services/displayRouting';
 import { initializeAutoSave, loadDocument } from './services/documents';
 import { markEditorDirty, persistEditorDraft } from './services/drafts';
@@ -71,6 +72,7 @@ function initializeEditor(): void {
       }),
       QAPauseMarker,
       SearchHighlight,
+      Superscript,
       Table.configure({
         resizable: true,
       }),
