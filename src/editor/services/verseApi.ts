@@ -57,6 +57,22 @@ async function fetchVerseFromBibleApi(
   }
 }
 
+const BIBLE_API_SUPPORTED = new Set([
+  'web',
+  'kjv',
+  'asv',
+  'bbe',
+  'darby',
+  'dra',
+  'ylt',
+  'oeb-cw',
+  'oeb-us',
+  'webbe',
+  'clementine',
+  'almeida',
+  'rccv',
+]);
+
 export async function fetchVerseText(
   reference: string,
   translation: string,
@@ -127,8 +143,10 @@ export async function fetchVerseText(
     );
   }
 
-  const bibleApi = await fetchVerseFromBibleApi(reference, normTrans);
-  if (bibleApi) return bibleApi;
+  if (BIBLE_API_SUPPORTED.has(normTrans)) {
+    const bibleApi = await fetchVerseFromBibleApi(reference, normTrans);
+    if (bibleApi) return bibleApi;
+  }
 
   if (normTrans === 'net') {
     const labs = await fetchVerseFromLabs(reference, normTrans);

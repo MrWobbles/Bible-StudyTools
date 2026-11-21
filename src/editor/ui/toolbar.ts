@@ -27,7 +27,15 @@ import {
   openOutlineModal,
 } from './outlineModal';
 import { insertQAPauseMarker } from './outlinePanel';
-import { findNext, replaceAll, replaceOne } from './searchReplace';
+import {
+  closeSearchPanel,
+  findNext,
+  findPrevious,
+  openSearchPanel,
+  replaceAll,
+  replaceOne,
+  setupSearchReplaceListeners,
+} from './searchReplace';
 import { setEditorFocusMode, setupKeyboardAndPasteListeners } from './shortcuts';
 
 export function updateToolbarActiveStates(ed: Editor | null): void {
@@ -188,9 +196,7 @@ export function setupEventListeners(onViewTeacher: () => void): void {
 
   document.getElementById('btn-view-teacher')?.addEventListener('click', onViewTeacher);
 
-  document.getElementById('btn-search')?.addEventListener('click', () => {
-    openModal('search-modal');
-  });
+  document.getElementById('btn-search')?.addEventListener('click', openSearchPanel);
 
   document.getElementById('btn-version-history')?.addEventListener('click', () => {
     void openVersionHistory();
@@ -236,9 +242,12 @@ export function setupEventListeners(onViewTeacher: () => void): void {
   document.getElementById('btn-insert-link')?.addEventListener('click', insertLink);
   document.getElementById('btn-insert-qa-pause')?.addEventListener('click', insertQAPauseMarker);
 
+  document.getElementById('btn-find-prev')?.addEventListener('click', findPrevious);
   document.getElementById('btn-find-next')?.addEventListener('click', findNext);
+  document.getElementById('btn-close-search')?.addEventListener('click', closeSearchPanel);
   document.getElementById('btn-replace')?.addEventListener('click', replaceOne);
   document.getElementById('btn-replace-all')?.addEventListener('click', replaceAll);
+  setupSearchReplaceListeners();
 
   document.getElementById('btn-start-generation')?.addEventListener('click', () => {
     void generateAndShowOutline();

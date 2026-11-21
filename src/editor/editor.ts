@@ -13,6 +13,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import Underline from '@tiptap/extension-underline';
 import { QAPauseMarker } from './extensions/qaPauseMarker';
+import { SearchHighlight } from './extensions/searchHighlight';
 import { handleEditorLinkClick } from './services/displayRouting';
 import { initializeAutoSave, loadDocument } from './services/documents';
 import { markEditorDirty, persistEditorDraft } from './services/drafts';
@@ -69,6 +70,7 @@ function initializeEditor(): void {
         },
       }),
       QAPauseMarker,
+      SearchHighlight,
       Table.configure({
         resizable: true,
       }),

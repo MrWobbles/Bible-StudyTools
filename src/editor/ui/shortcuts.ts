@@ -8,6 +8,7 @@ import { saveDocument } from '../services/documents';
 import { isEditorTarget } from '../services/mediaSidebar';
 import { fetchVerseText, handleVerseLookupByThought } from '../services/verseLookup';
 import { openModal } from './modals';
+import { openSearchPanel } from './searchReplace';
 
 export function setEditorFocusMode(enabled: boolean): void {
   const focusModeButton = document.getElementById('btn-focus-mode');
@@ -60,7 +61,7 @@ export function setupKeyboardAndPasteListeners(): void {
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
       e.preventDefault();
-      openModal('search-modal');
+      openSearchPanel();
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {

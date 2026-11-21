@@ -6,6 +6,7 @@ const {
   UNSPLASH_CACHE_TTL_MS
 } = require('../config/env');
 const { sendApiError } = require('../services/httpHelpers');
+const { parseUsfmPassageId } = require('../services/bibleRef');
 
 const router = express.Router();
 const unsplashCache = new Map();
@@ -71,7 +72,7 @@ router.get('/api/bible/bibles', async (req, res) => {
     });
 
     const body = await response.text();
-    res.status(response.status).send(body);
+    res.status(response.status).type('application/json').send(body);
   } catch (err) {
     console.error('Error proxying API.Bible bibles request:', err);
     res.status(500).json({ error: 'Failed to fetch Bible list from API.Bible' });
@@ -110,13 +111,25 @@ router.get('/api/bible/passages', async (req, res) => {
   }
 
   try {
-    const url = `${API_BIBLE_BASE_URL}/bibles/${encodeURIComponent(bibleId)}/search?query=${encodeURIComponent(reference)}`;
-    const response = await fetch(url, {
+    const passageId = parseUsfmPassageId(reference);
+    if (passageId) {
+      const passageUrl = `${API_BIBLE_BASE_URL}/bibles/${encodeURIComponent(bibleId)}/passages/${encodeURIComponent(passageId)}?content-type=html&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=true`;
+      const passageRes = await fetch(passageUrl, {
+        headers: { 'api-key': API_BIBLE_KEY }
+      });
+      if (passageRes.ok) {
+        const body = await passageRes.text();
+        return res.status(passageRes.status).type('application/json').send(body);
+      }
+    }
+
+    const searchUrl = `${API_BIBLE_BASE_URL}/bibles/${encodeURIComponent(bibleId)}/search?query=${encodeURIComponent(reference)}`;
+    const response = await fetch(searchUrl, {
       headers: { 'api-key': API_BIBLE_KEY }
     });
 
     const body = await response.text();
-    res.status(response.status).send(body);
+    res.status(response.status).type('application/json').send(body);
   } catch (err) {
     console.error('Error proxying API.Bible passages request:', err);
     res.status(500).json({ error: 'Failed to fetch passage from API.Bible' });
