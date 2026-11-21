@@ -20,13 +20,15 @@ export async function insertVerseReference(): Promise<void> {
     return;
   }
 
-  editor
-    .chain()
-    .focus()
-    .insertContent(`<a href="#" class="verse-reference" data-verse="${verseInput}">${verseInput}</a> `)
-    .run();
+  const safeVerseInput = verseInput.replace(/"/g, '&quot;');
 
-  if (insertText) {
+  if (!insertText) {
+    editor
+      .chain()
+      .focus()
+      .insertContent(`<a href="#" class="verse-reference" data-verse="${safeVerseInput}">${verseInput}</a> `)
+      .run();
+  } else {
     const insertBtn = document.getElementById('btn-insert-verse');
     const originalText = insertBtn ? insertBtn.innerHTML : '';
     if (insertBtn instanceof HTMLButtonElement) {
@@ -42,11 +44,12 @@ export async function insertVerseReference(): Promise<void> {
         const bodyHtml = verseData.text.trim().startsWith('<p>')
           ? verseData.text
           : `<p>${verseData.text}</p>`;
+        const safeRef = verseData.title.replace(/"/g, '&quot;');
         editor
           .chain()
           .focus()
           .insertContent(
-            `<blockquote>${bodyHtml}<p style="text-align: right; font-size: 0.9em; color: #666;">— ${verseData.title} (${verseData.translation})</p></blockquote>`,
+            `<blockquote>${bodyHtml}<p style="text-align: right; font-size: 0.9em; color: #666;">— <a href="#" class="verse-reference" data-verse="${safeRef}">${verseData.title}</a> (${verseData.translation})</p></blockquote>`,
           )
           .run();
       } else {
@@ -55,7 +58,7 @@ export async function insertVerseReference(): Promise<void> {
           .chain()
           .focus()
           .insertContent(
-            '<blockquote><p><em>[Verse text not available - please add manually]</em></p></blockquote>',
+            `<blockquote><p><em>[Verse text not available - please add manually]</em></p><p style="text-align: right; font-size: 0.9em; color: #666;">— <a href="#" class="verse-reference" data-verse="${safeVerseInput}">${verseInput}</a></p></blockquote>`,
           )
           .run();
       }
