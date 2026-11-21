@@ -33,6 +33,7 @@
     try {
       const response = await fetch('/api/ai/status', {
         method: 'GET',
+        credentials: 'same-origin',
         signal: AbortSignal.timeout(4000)
       });
       if (!response.ok) {

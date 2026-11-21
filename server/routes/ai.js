@@ -4,7 +4,7 @@ const { requireAuthenticatedAccess } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.get('/api/ai/status', (_req, res) => {
+router.get('/api/ai/status', requireAuthenticatedAccess, (_req, res) => {
   res.json({
     configured: Boolean(GEMINI_API_KEY),
     provider: GEMINI_API_KEY ? 'gemini' : null,
