@@ -18,9 +18,7 @@ const exported = {
   enhanceOutlineWithLLM
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = exported;
-} else {
+if (typeof window !== 'undefined') {
   window.generateOutlineFromEditor = generateOutlineFromEditor;
   window.parseEditorToOutline = parseEditorToOutline;
   window.extractVerseReferences = extractVerseReferences;
@@ -29,4 +27,8 @@ if (typeof module !== 'undefined' && module.exports) {
   window.generateOutlineWithLLM = generateOutlineWithLLM;
   window.generateOutline = generateOutline;
   window.enhanceOutlineWithLLM = enhanceOutlineWithLLM;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = exported;
 }

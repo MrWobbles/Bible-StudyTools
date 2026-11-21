@@ -84,6 +84,13 @@
     return POINT_ICON_MAP[type] ?? 'check_circle';
   }
 
+  if (typeof window !== 'undefined') {
+    window.getIconHTML = getIconHTML;
+    window.getMediaIcon = getMediaIcon;
+    window.getPointIcon = getPointIcon;
+    window.ICON_MAP = { ...ICON_MAP };
+  }
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       getIconHTML,
@@ -91,10 +98,5 @@
       getPointIcon,
       ICON_MAP
     };
-  } else {
-    window.getIconHTML = getIconHTML;
-    window.getMediaIcon = getMediaIcon;
-    window.getPointIcon = getPointIcon;
-    window.ICON_MAP = { ...ICON_MAP };
   }
 })();
