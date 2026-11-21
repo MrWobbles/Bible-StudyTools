@@ -309,6 +309,16 @@ Return as JSON array in this format:
     }
   }
 
+  if (typeof window !== 'undefined') {
+    window.checkOllamaAvailability = checkOllamaAvailability;
+    window.getInstalledModels = getInstalledModels;
+    window.generateCompletion = generateCompletion;
+    window.generateOutlineStructure = generateOutlineStructure;
+    window.enhanceOutline = enhanceOutline;
+    window.generateQuestions = generateQuestions;
+    window.LLM_CONFIG = LLM_CONFIG;
+  }
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       checkOllamaAvailability,
@@ -319,13 +329,5 @@ Return as JSON array in this format:
       generateQuestions,
       LLM_CONFIG
     };
-  } else {
-    window.checkOllamaAvailability = checkOllamaAvailability;
-    window.getInstalledModels = getInstalledModels;
-    window.generateCompletion = generateCompletion;
-    window.generateOutlineStructure = generateOutlineStructure;
-    window.enhanceOutline = enhanceOutline;
-    window.generateQuestions = generateQuestions;
-    window.LLM_CONFIG = LLM_CONFIG;
   }
 })();
