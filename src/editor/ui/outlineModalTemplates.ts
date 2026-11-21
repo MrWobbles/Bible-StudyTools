@@ -34,6 +34,7 @@ export function buildOutlineErrorHtml(errorMsg: string): string {
       </div>
     `;
   } else if (
+    errorMsg.includes('AI service') ||
     errorMsg.includes('Ollama') ||
     errorMsg.includes('Not Found') ||
     errorMsg.includes('404')
@@ -41,13 +42,10 @@ export function buildOutlineErrorHtml(errorMsg: string): string {
     suggestions = `
       <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 12px; border-radius: 6px; margin-top: 16px; text-align: left;">
         <strong><span class="material-symbols-outlined" style="font-size: 16px; vertical-align: text-bottom;">lightbulb</span> To use AI generation:</strong>
-        <ol style="margin: 8px 0 0 0; padding-left: 20px; font-size: 13px;">
-          <li>Download Ollama from <a href="https://ollama.ai" target="_blank" style="color: #0066cc;">ollama.ai</a></li>
-          <li>Install and start it (should auto-start)</li>
-          <li>Open PowerShell and run: <code style="background: #000; color: #0f0; padding: 2px 6px; border-radius: 3px;">ollama pull llama3.1</code></li>
-          <li>Wait for download to complete (~4.7GB)</li>
-          <li>Reload this page and try again</li>
-        </ol>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px; font-size: 13px;">
+          <li>Ensure <code>AI_API_KEY</code> (or <code>GEMINI_API_KEY</code>) is configured on the server, <strong>or</strong></li>
+          <li>Run local Ollama with a pulled model (e.g. <code>ollama pull llama3.1</code>).</li>
+        </ul>
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #ffc107;">
           <strong>Or use Standard generation:</strong><br>
           <span style="font-size: 13px;">Switch to "Standard" mode above - works instantly without AI (requires headings in your document)</span>

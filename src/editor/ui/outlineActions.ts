@@ -20,7 +20,7 @@ export async function enhanceCurrentOutline(): Promise<void> {
   try {
     const isAvailable = await checkOllamaAvailability();
     if (!isAvailable) {
-      alert('Ollama is not running. Please start Ollama to use AI enhancement.');
+      alert('AI service is not available. Configure AI_API_KEY on the server or start local Ollama.');
       return;
     }
 

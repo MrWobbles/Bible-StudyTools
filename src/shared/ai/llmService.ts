@@ -25,10 +25,37 @@
     return trimmed;
   }
 
+  let geminiAvailableCache: boolean | null = null;
+  let geminiModelCache: string | null = null;
+
+  async function checkGeminiAvailability(): Promise<boolean> {
+    if (geminiAvailableCache !== null) return geminiAvailableCache;
+    try {
+      const response = await fetch('/api/ai/status', {
+        method: 'GET',
+        signal: AbortSignal.timeout(4000)
+      });
+      if (!response.ok) {
+        geminiAvailableCache = false;
+        return false;
+      }
+      const data = (await response.json()) as { configured?: boolean; model?: string | null };
+      geminiAvailableCache = Boolean(data.configured);
+      geminiModelCache = typeof data.model === 'string' && data.model ? data.model : null;
+      return geminiAvailableCache;
+    } catch {
+      geminiAvailableCache = false;
+      return false;
+    }
+  }
+
   /**
-   * Check if Ollama is running and accessible.
+   * Check if server-side Gemini or local Ollama is running and accessible.
    */
   async function checkOllamaAvailability(): Promise<boolean> {
+    if (await checkGeminiAvailability()) {
+      return true;
+    }
     try {
       const response = await fetch(`${LLM_CONFIG.baseUrl}/api/tags`, {
         method: 'GET',
@@ -42,9 +69,12 @@
   }
 
   /**
-   * Get list of installed models from Ollama.
+   * Get list of available models from Gemini or local Ollama.
    */
   async function getInstalledModels(): Promise<unknown[]> {
+    if (await checkGeminiAvailability()) {
+      return [{ name: geminiModelCache || 'gemini-2.5-flash', size: 0 }];
+    }
     try {
       const response = await fetch(`${LLM_CONFIG.baseUrl}/api/tags`);
       if (!response.ok) return [];
@@ -58,7 +88,7 @@
   }
 
   /**
-   * Generate text completion using Ollama.
+   * Generate text completion using server-side Gemini (if configured) or local Ollama.
    */
   async function generateCompletion(prompt: string, options: LlmGenerateOptions = {}): Promise<string> {
     const {
@@ -67,6 +97,27 @@
       stream = false,
       system = null
     } = options;
+
+    if (await checkGeminiAvailability()) {
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          prompt,
+          system,
+          temperature
+        })
+      });
+      if (!response.ok) {
+        const errData = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errData.error || `Gemini request failed (${response.status})`);
+      }
+      const data = (await response.json()) as { response?: string };
+      return data.response || '';
+    }
 
     try {
       const controller = new AbortController();

@@ -17,7 +17,7 @@ export async function generateOutlineWithLLM(
 
   const isAvailable = await checkFn();
   if (!isAvailable) {
-    throw new Error('Ollama is not running. Please start Ollama and try again.');
+    throw new Error('AI service is not available. Configure AI_API_KEY on the server or start local Ollama.');
   }
 
   const content = editor.getHTML();
@@ -72,7 +72,7 @@ export async function enhanceOutlineWithLLM(
 
   const isAvailable = await checkFn();
   if (!isAvailable) {
-    throw new Error('Ollama is not running');
+    throw new Error('AI service is not available');
   }
 
   const content = editor.getText();

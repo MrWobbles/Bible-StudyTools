@@ -1,7 +1,7 @@
 import { closeModal, editorState, updateSaveStatus } from '../state';
 import { matchesClassId } from '../types';
 import type { VerseLookupResult } from '../types';
-import { fetchVerseText } from './verseApi';
+import { fetchVerseText, searchVersesByKeywords } from './verseApi';
 
 export { fetchVerseText };
 
@@ -163,22 +163,35 @@ export async function handleVerseLookupByThought(
   openModalFn('verse-lookup-thought-modal');
 
   let verses: VerseLookupResult[] = [];
+  const translationEl = document.getElementById('bible-translation-select');
+  const translation = translationEl instanceof HTMLSelectElement ? translationEl.value : 'nkjv';
+
   try {
-    const prompt = `Find 3-5 Bible verses that match or relate to the following thought or topic. For each, return the reference and the verse text.\n\nThought: "${thought}"\n\nFormat:\nReference: <book chapter:verse>\nText: <verse text>\n---`;
-    if (!window.generateCompletion) {
-      throw new Error('LLM completion service unavailable');
+    const canUseOllama =
+      typeof window.checkOllamaAvailability === 'function' &&
+      (await window.checkOllamaAvailability());
+    if (canUseOllama && window.generateCompletion) {
+      const prompt = `Find 3-5 Bible verses that match or relate to the following thought or topic. For each, return the reference and the verse text.\n\nThought: "${thought}"\n\nFormat:\nReference: <book chapter:verse>\nText: <verse text>\n---`;
+      const response = await window.generateCompletion(prompt, {
+        model: undefined,
+        temperature: 0.2,
+      });
+      verses = parseLLMVerseResults(response);
     }
-    const response = await window.generateCompletion(prompt, {
-      model: undefined,
-      temperature: 0.2,
-    });
-    verses = parseLLMVerseResults(response);
   } catch {
-    if (resultsEl) {
-      resultsEl.innerHTML = '<div style="color:red;">Error searching for verses.</div>';
+    // Fall back to API.Bible keyword search below
+  }
+
+  if (!verses.length) {
+    try {
+      verses = await searchVersesByKeywords(thought, translation);
+    } catch {
+      if (resultsEl) {
+        resultsEl.innerHTML = '<div style="color:red;">Error searching for verses.</div>';
+      }
+      if (loadingEl) loadingEl.style.display = 'none';
+      return;
     }
-    if (loadingEl) loadingEl.style.display = 'none';
-    return;
   }
   if (loadingEl) loadingEl.style.display = 'none';
   if (!verses.length) {

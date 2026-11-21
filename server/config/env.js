@@ -62,6 +62,8 @@ const SMTP_FROM = String(process.env.SMTP_FROM || SMTP_USER || `Bible Study Tool
 
 const API_BIBLE_KEY = String(process.env.API_BIBLE_KEY || '').trim();
 const API_BIBLE_BASE_URL = 'https://rest.api.bible/v1';
+const GEMINI_API_KEY = String(process.env.GEMINI_API_KEY || process.env.AI_API_KEY || '').trim();
+const GEMINI_MODEL = String(process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
 const UNSPLASH_ACCESS_KEY = String(process.env.UNSPLASH_ACCESS_KEY || '').trim();
 const UNSPLASH_CACHE_TTL_MS = 10 * 60 * 1000;
 const AUTH_COOKIE_NAME = 'bst_access_token';
@@ -147,6 +149,8 @@ module.exports = {
   SMTP_FROM,
   API_BIBLE_KEY,
   API_BIBLE_BASE_URL,
+  GEMINI_API_KEY,
+  GEMINI_MODEL,
   UNSPLASH_ACCESS_KEY,
   UNSPLASH_CACHE_TTL_MS,
   AUTH_COOKIE_NAME,

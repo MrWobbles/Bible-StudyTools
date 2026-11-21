@@ -266,3 +266,109 @@ export async function fetchVerseText(
 
   return null;
 }
+
+const STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'can', 'could',
+  'did', 'do', 'does', 'for', 'from', 'had', 'has', 'have', 'he', 'her', 'here', 'hers',
+  'him', 'his', 'how', 'i', 'if', 'in', 'into', 'is', 'it', 'its', 'may', 'me', 'might',
+  'more', 'most', 'must', 'my', 'no', 'nor', 'not', 'now', 'of', 'on', 'or', 'our', 'ours',
+  'out', 'own', 'shall', 'she', 'should', 'so', 'some', 'such', 'than', 'that', 'the',
+  'their', 'theirs', 'them', 'then', 'there', 'these', 'they', 'this', 'those', 'through',
+  'to', 'too', 'under', 'up', 'us', 'very', 'was', 'we', 'were', 'what', 'when', 'where',
+  'which', 'while', 'who', 'whom', 'why', 'will', 'with', 'would', 'you', 'your', 'yours',
+  'according',
+]);
+
+function extractSearchKeywords(thought: string): string[] {
+  const words = thought
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+  return Array.from(new Set(words));
+}
+
+export async function searchVersesByKeywords(
+  thought: string,
+  translation = 'nkjv',
+): Promise<Array<{ reference: string; text: string }>> {
+  const normTrans = String(translation || 'nkjv').toLowerCase();
+  const hardcoded: Record<string, string> = {
+    nkjv: '63097d2a0a2f7db3-01',
+    kjv: 'de4e12af7f28f599-01',
+    csb: 'a556c5305ee15c3f-01',
+  };
+  let bibleId: string | null = hardcoded[normTrans] || null;
+
+  if (!bibleId) {
+    try {
+      const mapRes = await fetch('/api/bible/bibles');
+      if (mapRes.ok) {
+        const mapData: unknown = await mapRes.json();
+        if (isRecord(mapData) && Array.isArray(mapData.data)) {
+          for (const b of mapData.data as ApiBibleItem[]) {
+            if (
+              (b.abbreviation && b.abbreviation.toLowerCase() === normTrans) ||
+              (b.abbreviationLocal && b.abbreviationLocal.toLowerCase() === normTrans) ||
+              (b.name && b.name.toLowerCase() === normTrans)
+            ) {
+              bibleId = b.id || null;
+              break;
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore and use fallback
+    }
+  }
+
+  if (!bibleId) {
+    bibleId = hardcoded.nkjv;
+  }
+
+  const keywords = extractSearchKeywords(thought);
+  const queries: string[] = [];
+  if (keywords.length > 0) {
+    queries.push(keywords.slice(0, 4).join(' '));
+    if (keywords.length > 2) {
+      const sorted = [...keywords].sort((a, b) => b.length - a.length);
+      queries.push(sorted.slice(0, 2).join(' '));
+    }
+    if (keywords.length > 1) {
+      const longest = [...keywords].sort((a, b) => b.length - a.length)[0];
+      queries.push(longest);
+    }
+  } else {
+    queries.push(thought.trim());
+  }
+
+  for (const q of queries) {
+    if (!q) continue;
+    try {
+      const url = `/api/bible/passages?bibleId=${encodeURIComponent(bibleId)}&reference=${encodeURIComponent(q)}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data: unknown = await res.json();
+      if (!isRecord(data) || !isRecord(data.data)) continue;
+
+      const versesRaw = data.data.verses;
+      if (Array.isArray(versesRaw) && versesRaw.length > 0) {
+        const results: Array<{ reference: string; text: string }> = [];
+        for (const item of versesRaw.slice(0, 5)) {
+          if (!isRecord(item)) continue;
+          const ref = typeof item.reference === 'string' ? item.reference.trim() : '';
+          const txt = typeof item.text === 'string' ? item.text.replace(/\s+/g, ' ').trim() : '';
+          if (ref && txt) {
+            results.push({ reference: ref, text: txt });
+          }
+        }
+        if (results.length > 0) return results;
+      }
+    } catch {
+      // try next narrower query
+    }
+  }
+
+  return [];
+}

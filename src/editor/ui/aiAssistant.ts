@@ -23,7 +23,7 @@ export async function openAIAssistant(): Promise<void> {
       statusDiv.style.color = '#856404';
       statusDiv.style.border = '1px solid #ffc107';
       statusDiv.innerHTML =
-        '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">warning</span> Ollama is not running. Please start Ollama to use AI features.';
+        '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">warning</span> AI is not configured. Set AI_API_KEY on the server or start local Ollama.';
     }
   } catch {
     statusDiv.style.display = 'block';
@@ -64,7 +64,7 @@ export async function askAIQuestion(): Promise<void> {
   try {
     const aiAvailable = await checkOllamaAvailability();
     if (!aiAvailable) {
-      throw new Error('AI service is not available. Please ensure Ollama is running.');
+      throw new Error('AI service is not available. Configure AI_API_KEY on the server or start local Ollama.');
     }
 
     const editorText = editor.getText();

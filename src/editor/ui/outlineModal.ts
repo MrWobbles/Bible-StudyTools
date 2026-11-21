@@ -33,7 +33,7 @@ export async function openOutlineModal(): Promise<void> {
         statusDiv.style.color = '#155724';
         statusDiv.style.border = '1px solid #c3e6cb';
         statusDiv.innerHTML =
-          '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">check_circle</span> Ollama is running and ready';
+          '<span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">check_circle</span> AI service is ready';
       }
 
       try {
@@ -46,9 +46,10 @@ export async function openOutlineModal(): Promise<void> {
           const select = document.getElementById('llm-model-select');
           if (select instanceof HTMLSelectElement) {
             select.innerHTML = models
-              .map(
-                (m) =>
-                  `<option value="${m.name}">${m.name} (${(m.size / 1e9).toFixed(1)}GB)</option>`,
+              .map((m) =>
+                m.size > 0
+                  ? `<option value="${m.name}">${m.name} (${(m.size / 1e9).toFixed(1)}GB)</option>`
+                  : `<option value="${m.name}">${m.name} (Gemini)</option>`,
               )
               .join('');
           }
